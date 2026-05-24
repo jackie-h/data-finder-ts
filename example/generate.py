@@ -2,22 +2,13 @@
 Generate TypeScript finders from the example mapping definitions.
 
 Usage:
-    python example/generate.py
-
-Expects the sibling data-finder project at ../data-finder relative to
-the data-finder-ts root.
+    uv run python example/generate.py
 """
 import os
 import sys
 
 _here = os.path.dirname(os.path.abspath(__file__))
 _root = os.path.dirname(_here)
-_data_finder = os.path.join(_root, '..', 'data-finder')
-
-for sub in ('datafinder/src', 'model/src', 'datafinder_generator/src'):
-    sys.path.insert(0, os.path.join(_data_finder, sub))
-
-sys.path.insert(0, os.path.join(_root, 'generator', 'src'))
 sys.path.insert(0, _here)
 
 from mappings import create_mappings_normalized

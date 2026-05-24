@@ -1,11 +1,15 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
+import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { registerDuckDb } from './duckdb-runner';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, '../example/data');
+const DATA_DIR = execSync(
+  'uv run python -c "import datafinder_examples, os; print(os.path.dirname(datafinder_examples.__file__))"',
+  { cwd: path.resolve(__dirname, '..') },
+).toString().trim();
 let conn: DuckDBConnection;
 let instance: DuckDBInstance;
 

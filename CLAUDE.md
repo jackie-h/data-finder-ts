@@ -2,25 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Sibling project
+## Python project
 
-This project mirrors `../data-finder` (Python). The Python models (`model/`, `datafinder/`, `model_markdown/`, `mapping_markdown/`) are the source of truth for concepts and behaviour. The TypeScript code here is a port; the Python generator here consumes those same Python model objects to emit TypeScript.
+The Python generator and its dependencies are managed by `uv` via `pyproject.toml` in the repo root. The `data-finder` package (published to PyPI) provides the model classes; `datafinder_examples` (included in 0.1.11+) provides the CSV fixtures and markdown mapping files used in tests and generation.
 
 ## Commands
 
 ```bash
+uv sync                                               # install Python deps (first time / after pulling)
+
 npm test                                              # run all tests
 npm run build                                         # tsc type-check
 npx vitest run tests/duckdb.test.ts                   # run a single test file
 
 # Regenerate TypeScript finders from programmatic mappings
-python3 example/generate.py
+npm run generate
 
 # Regenerate TypeScript finders from the finance markdown mapping
-python3 example/generate_from_markdown.py
+npm run generate:markdown
 ```
 
-Python dependencies for the generators (`jinja2`, `markdown-it-py`) must be installed system-wide (`pip3 install jinja2 markdown-it-py`). The generators import directly from `../data-finder`; no virtualenv is used.
+Both output directories are gitignored and must be regenerated before running tests on a fresh clone.
 
 ## Architecture
 
@@ -58,14 +60,14 @@ Key generator behaviours:
 | Script | Mapping source | Output |
 |---|---|---|
 | `example/generate.py` | `example/mappings.py` (Python objects) | `example/generated/` |
-| `example/generate_from_markdown.py` | `../data-finder/mapping_markdown/tests/finance_mapping.md` | `tests/generated_markdown/` |
+| `example/generate_from_markdown.py` | `datafinder_examples.finance_mapping.md` (PyPI) | `tests/generated_markdown/` |
 
 Both output directories are gitignored and must be regenerated before running tests on a fresh clone.
 
 ### Tests (`tests/`)
 
 - `duckdb-runner.ts` — `DuckDbRunner implements QueryRunner` using `@duckdb/node-api`; row retrieval via `result.getChunk(i).getRows()`.
-- `duckdb.test.ts` — tests against `example/generated/` finders; loads CSV fixtures from `example/data/`.
+- `duckdb.test.ts` — tests against `example/generated/` finders; CSV fixtures resolved at runtime from the installed `datafinder_examples` package via `uv run python`.
 - `duckdb-markdown.test.ts` — tests against `tests/generated_markdown/` finders; seeds data via `INSERT` statements (no CSVs needed).
 
 `tsconfig.json` includes `example/generated/**/*` but not `tests/generated_markdown/**/*` — however `tests/**/*` already covers that path.
