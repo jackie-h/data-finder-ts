@@ -1,0 +1,50 @@
+import type { Operation } from '@model/relational';
+import type { CountAllOperation, NoOperation } from '@model/relational';
+import type { Attribute } from '@datafinder/attribute';
+import type { FinderResult } from '@datafinder/runner';
+{% set attr_types = get_used_attr_types(rcm) %}
+{% if attr_types %}
+import type { {{attr_types | join(', ')}} } from '@datafinder/typed-attributes';
+{% endif %}
+{% for rpm in rcm.property_mappings %}
+{% if not is_primitive(rpm.property) and rpm.property.type.name != rcm.clazz.name %}
+import type { {{rpm.property.type.name}}RelatedFinderBase } from '{{class_module_map_base[rpm.property.type.name]}}Base';
+{% endif %}
+{% endfor %}
+{% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+import type { {{source_rcm.clazz.name}}RelatedFinderBase } from '{{class_module_map_base[source_rcm.clazz.name]}}Base';
+{% endfor %}
+
+
+export abstract class {{rcm.clazz.name}}RelatedFinderBase {
+{% for rpm in rcm.property_mappings %}
+{% if is_primitive(rpm.property) %}
+  abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
+{% elif rpm.property.type.name != rcm.clazz.name %}
+  abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinderBase;
+{% endif %}
+{% endfor %}
+{% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+  abstract {{reverse_name}}(): {{source_rcm.clazz.name}}RelatedFinderBase;
+{% endfor %}
+}
+
+export abstract class {{rcm.clazz.name}}FinderBase {
+{% for rpm in rcm.property_mappings %}
+{% if is_primitive(rpm.property) %}
+  abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
+{% elif rpm.property.type.name != rcm.clazz.name %}
+  abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinderBase;
+{% endif %}
+{% endfor %}
+{% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+  abstract {{reverse_name}}(): {{source_rcm.clazz.name}}RelatedFinderBase;
+{% endfor %}
+  abstract count(): CountAllOperation;
+  abstract findAll(
+    businessDate: Date | string | null,
+    processingValidAt: Date | string | null,
+    displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
+    filterOp?: Operation,
+  ): FinderResult;
+}

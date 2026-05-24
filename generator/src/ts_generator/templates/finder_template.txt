@@ -1,0 +1,219 @@
+import {
+  Column, Table, NoOperation, JoinOperation, JoinTreeNodeOperation, CountAllOperation,
+  Operation, RelationalOperationElement,
+} from '@model/relational';
+import {
+  ProcessingTemporalColumns, SingleBusinessDateColumn,
+  BusinessDateAndProcessingTemporalColumns, BiTemporalColumns, MilestonedTable,
+} from '@model/milestoning';
+import { convertInputsAndSelect, FinderResult } from '@datafinder/runner';
+import type { Attribute } from '@datafinder/attribute';
+{% set attr_types = get_used_attr_types(rcm) %}
+{% if attr_types %}
+import { {{attr_types | join(', ')}} } from '@datafinder/typed-attributes';
+{% endif %}
+import { {{rcm.clazz.name}}FinderBase, {{rcm.clazz.name}}RelatedFinderBase } from './{{rcm.clazz.name}}FinderBase';
+{% for rpm in rcm.property_mappings %}
+{% if not is_primitive(rpm.property) and rpm.property.type.name != rcm.clazz.name %}
+import { {{rpm.property.type.name}}RelatedFinder } from '{{class_module_map[rpm.property.type.name]}}';
+{% endif %}
+{% endfor %}
+{% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+import type { {{source_rcm.clazz.name}}RelatedFinder } from '{{class_module_map[source_rcm.clazz.name]}}';
+{% endfor %}
+{% if reverse_assocs %}
+import { registerRelatedFinderClass, getRelatedFinderClass } from '@datafinder/finder-registry';
+{% else %}
+import { registerRelatedFinderClass } from '@datafinder/finder-registry';
+{% endif %}
+
+
+export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFinderBase {
+
+{% if rcm.milestone_mapping %}
+{% if has_bitemporal(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new BiTemporalColumns(
+    new Column('{{rcm.milestone_mapping._date_from.target.name}}', '{{rcm.milestone_mapping._date_from.target.type}}'),
+    new Column('{{rcm.milestone_mapping._date_to.target.name}}', '{{rcm.milestone_mapping._date_to.target.type}}'),
+    new Column('{{rcm.milestone_mapping._in.target.name}}', '{{rcm.milestone_mapping._in.target.type}}'),
+    new Column('{{rcm.milestone_mapping._out.target.name}}', '{{rcm.milestone_mapping._out.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
+    '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_business_date_and_processing(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new BusinessDateAndProcessingTemporalColumns(
+    new Column('{{rcm.milestone_mapping._date.target.name}}', '{{rcm.milestone_mapping._date.target.type}}'),
+    new Column('{{rcm.milestone_mapping._in.target.name}}', '{{rcm.milestone_mapping._in.target.type}}'),
+    new Column('{{rcm.milestone_mapping._out.target.name}}', '{{rcm.milestone_mapping._out.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
+    '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_processing_temporal(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new ProcessingTemporalColumns(
+    new Column('{{rcm.milestone_mapping._in.target.name}}', '{{rcm.milestone_mapping._in.target.type}}'),
+    new Column('{{rcm.milestone_mapping._out.target.name}}', '{{rcm.milestone_mapping._out.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
+    '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_uni_business_temporal(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new SingleBusinessDateColumn(
+    new Column('{{rcm.milestone_mapping._date.target.name}}', '{{rcm.milestone_mapping._date.target.type}}'),
+  );
+{% endif %}
+  private static readonly _table = new MilestonedTable('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', [], {{rcm.clazz.name}}RelatedFinder._milestoningColumns);
+{% else %}
+  private static readonly _table = new Table('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', []);
+{% endif %}
+
+  private readonly _node: JoinTreeNodeOperation;
+{% for rpm in rcm.property_mappings %}
+{% if is_primitive(rpm.property) %}
+  private readonly _{{to_ts_name(rpm.property)}}: {{rpm.property.type.name}}Attribute;
+{% elif rpm.property.type.name != rcm.clazz.name %}
+  private readonly _{{to_ts_name(rpm.property)}}: {{rpm.property.type.name}}RelatedFinder;
+{% endif %}
+{% endfor %}
+{% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+  private _{{reverse_name}}?: {{source_rcm.clazz.name}}RelatedFinder;
+{% endfor %}
+
+  constructor(relationName: string, source: Column, target: Column, parentJoin?: JoinTreeNodeOperation) {
+    super();
+    const join = new JoinOperation(relationName, {{rcm.clazz.name}}RelatedFinder._table, source, target);
+    this._node = new JoinTreeNodeOperation(join, parentJoin);
+{% for rpm in rcm.property_mappings %}
+{% if is_primitive(rpm.property) %}
+    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(relationName + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node);
+{% endif %}
+{% endfor %}
+{% for rpm in rcm.property_mappings %}
+{% if not is_primitive(rpm.property) and rpm.property.type.name != rcm.clazz.name %}
+    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node);
+{% endif %}
+{% endfor %}
+  }
+
+{% for rpm in rcm.property_mappings %}
+{% if is_primitive(rpm.property) %}
+  {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute {
+    return this._{{to_ts_name(rpm.property)}};
+  }
+
+{% elif rpm.property.type.name != rcm.clazz.name %}
+  {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
+    return this._{{to_ts_name(rpm.property)}};
+  }
+
+{% endif %}
+{% endfor %}
+{% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+  {{reverse_name}}(): {{source_rcm.clazz.name}}RelatedFinder {
+    if (!this._{{reverse_name}}) {
+      const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, parentJoin?: JoinTreeNodeOperation) => {{source_rcm.clazz.name}}RelatedFinder;
+      if (!_Cls) throw new Error('{{source_rcm.clazz.name}}RelatedFinder not registered. Import {{source_rcm.clazz.name}}Finder before calling {{reverse_name}}().');
+      this._{{reverse_name}} = new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), this._node);
+    }
+    return this._{{reverse_name}}!;
+  }
+
+{% endfor %}
+}
+
+
+export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
+{% if rcm.clazz.tagged_values.get('doc') %}
+  // {{rcm.clazz.tagged_values['doc'].value}}
+{% endif %}
+
+{% if rcm.milestone_mapping %}
+{% if has_bitemporal(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new BiTemporalColumns(
+    new Column('{{rcm.milestone_mapping._date_from.target.name}}', '{{rcm.milestone_mapping._date_from.target.type}}'),
+    new Column('{{rcm.milestone_mapping._date_to.target.name}}', '{{rcm.milestone_mapping._date_to.target.type}}'),
+    new Column('{{rcm.milestone_mapping._in.target.name}}', '{{rcm.milestone_mapping._in.target.type}}'),
+    new Column('{{rcm.milestone_mapping._out.target.name}}', '{{rcm.milestone_mapping._out.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
+    '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_business_date_and_processing(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new BusinessDateAndProcessingTemporalColumns(
+    new Column('{{rcm.milestone_mapping._date.target.name}}', '{{rcm.milestone_mapping._date.target.type}}'),
+    new Column('{{rcm.milestone_mapping._in.target.name}}', '{{rcm.milestone_mapping._in.target.type}}'),
+    new Column('{{rcm.milestone_mapping._out.target.name}}', '{{rcm.milestone_mapping._out.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
+    '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_processing_temporal(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new ProcessingTemporalColumns(
+    new Column('{{rcm.milestone_mapping._in.target.name}}', '{{rcm.milestone_mapping._in.target.type}}'),
+    new Column('{{rcm.milestone_mapping._out.target.name}}', '{{rcm.milestone_mapping._out.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
+    '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_uni_business_temporal(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new SingleBusinessDateColumn(
+    new Column('{{rcm.milestone_mapping._date.target.name}}', '{{rcm.milestone_mapping._date.target.type}}'),
+  );
+{% endif %}
+  private static readonly _table = new MilestonedTable('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', [], {{rcm.clazz.name}}Finder._milestoningColumns);
+{% else %}
+  private static readonly _table = new Table('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', []);
+{% endif %}
+
+{% for rpm in rcm.property_mappings %}
+{% if is_primitive(rpm.property) %}
+  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute('{{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}');
+{% endif %}
+{% endfor %}
+{% for rpm in rcm.property_mappings %}
+{% if not is_primitive(rpm.property) %}
+  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'));
+{% endif %}
+{% endfor %}
+{% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+  private _{{reverse_name}}?: {{source_rcm.clazz.name}}RelatedFinder;
+{% endfor %}
+
+{% for rpm in rcm.property_mappings %}
+{% if is_primitive(rpm.property) %}
+  {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute {
+    return {{rcm.clazz.name}}Finder._{{to_ts_name(rpm.property)}};
+  }
+
+{% elif rpm.property.type.name != rcm.clazz.name %}
+  {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
+    return {{rcm.clazz.name}}Finder._{{to_ts_name(rpm.property)}};
+  }
+
+{% endif %}
+{% endfor %}
+{% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+  {{reverse_name}}(): {{source_rcm.clazz.name}}RelatedFinder {
+    if (!this._{{reverse_name}}) {
+      const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, parentJoin?: JoinTreeNodeOperation) => {{source_rcm.clazz.name}}RelatedFinder;
+      if (!_Cls) throw new Error('{{source_rcm.clazz.name}}RelatedFinder not registered. Import {{source_rcm.clazz.name}}Finder before calling {{reverse_name}}().');
+      this._{{reverse_name}} = new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'));
+    }
+    return this._{{reverse_name}}!;
+  }
+
+{% endfor %}
+  count(): CountAllOperation {
+    return new CountAllOperation('{{table_qualified_name(rcm.property_mappings[0].target.table)}}');
+  }
+
+  findAll(
+    businessDate: Date | string | null,
+    processingValidAt: Date | string | null,
+    displayColumns: (Attribute | RelationalOperationElement)[],
+    filterOp: Operation = new NoOperation(),
+  ): FinderResult {
+{% if rcm.milestone_mapping %}
+{% if has_processing_temporal(rcm.milestone_mapping) and not has_uni_business_temporal(rcm.milestone_mapping) and not has_business_date_and_processing(rcm.milestone_mapping) and not has_bitemporal(rcm.milestone_mapping) %}
+    return convertInputsAndSelect(null, processingValidAt, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+{% elif has_uni_business_temporal(rcm.milestone_mapping) and not has_business_date_and_processing(rcm.milestone_mapping) %}
+    return convertInputsAndSelect(businessDate, null, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+{% else %}
+    return convertInputsAndSelect(businessDate, processingValidAt, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+{% endif %}
+{% else %}
+    return convertInputsAndSelect(null, null, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+{% endif %}
+  }
+}
+
+registerRelatedFinderClass('{{rcm.clazz.name}}', {{rcm.clazz.name}}RelatedFinder);

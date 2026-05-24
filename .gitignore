@@ -1,0 +1,7 @@
+node_modules/
+
+# Generated TypeScript finders (rebuild with: python3 example/generate.py)
+example/generated/
+
+# Generated TypeScript finders from markdown (rebuild with: python3 example/generate_from_markdown.py)
+tests/generated_markdown/

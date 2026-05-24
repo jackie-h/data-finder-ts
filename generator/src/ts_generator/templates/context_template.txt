@@ -1,0 +1,24 @@
+{% for rcm in mapping.mappings %}
+import { {{rcm.clazz.name}}Finder } from '{{class_module_map[rcm.clazz.name]}}';
+import type { {{rcm.clazz.name}}FinderBase } from '{{class_module_map_base[rcm.clazz.name]}}Base';
+{% endfor %}
+
+
+export class {{context_class_name}} {
+{% for rcm in mapping.mappings %}
+  private readonly _{{to_camel_case(rcm.clazz.name)}}: {{rcm.clazz.name}}FinderBase;
+{% endfor %}
+
+  constructor() {
+{% for rcm in mapping.mappings %}
+    this._{{to_camel_case(rcm.clazz.name)}} = new {{rcm.clazz.name}}Finder();
+{% endfor %}
+  }
+
+{% for rcm in mapping.mappings %}
+  get {{to_camel_case(rcm.clazz.name)}}(): {{rcm.clazz.name}}FinderBase {
+    return this._{{to_camel_case(rcm.clazz.name)}};
+  }
+
+{% endfor %}
+}

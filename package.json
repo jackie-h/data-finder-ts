@@ -1,0 +1,22 @@
+{
+  "name": "data-finder-ts",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "generate": "python3 example/generate.py"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@duckdb/node-api": "^1.5.3-r.1",
+    "@types/node": "^20.19.41",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  },
+  "dependencies": {
+    "vite-tsconfig-paths": "^6.1.1"
+  }
+}
