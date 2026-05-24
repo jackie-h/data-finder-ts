@@ -10,12 +10,17 @@ import {
 
 export type Row = unknown[];
 
+/** Minimum interface satisfied by both Table (SQL) and GraphQLQuery (GraphQL). */
+export interface QueryTarget {
+  readonly name: string;
+}
+
 export interface QueryRunner {
   select(
     businessDate: Date | null,
     processingDatetime: Date | null,
     columns: (Attribute | RelationalOperationElement)[],
-    table: Table,
+    table: QueryTarget,
     op: RelationalOperationElement,
     orderBy?: SortOperation[],
     groupBy?: Attribute[],
@@ -41,7 +46,7 @@ export class FinderResult {
     private readonly _businessDate: Date | null,
     private readonly _processingDatetime: Date | null,
     private readonly _columns: (Attribute | RelationalOperationElement)[],
-    private readonly _table: Table,
+    private readonly _table: QueryTarget,
     private readonly _op: RelationalOperationElement,
   ) {}
 
@@ -65,7 +70,7 @@ export class FinderResult {
       this._businessDate,
       this._processingDatetime,
       this._columns,
-      this._table,
+      this._table as Table,
       this._op,
       this._orderBy,
       this._groupBy,
@@ -102,7 +107,7 @@ export function convertInputsAndSelect(
   businessDate: Date | string | null,
   processingDatetime: Date | string | null,
   columns: (Attribute | RelationalOperationElement)[],
-  table: Table,
+  table: QueryTarget,
   op: RelationalOperationElement = new NoOperation(),
 ): FinderResult {
   return new FinderResult(

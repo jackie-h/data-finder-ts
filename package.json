@@ -13,6 +13,7 @@
   "devDependencies": {
     "@duckdb/node-api": "^1.5.3-r.1",
     "@types/node": "^20.19.41",
+    "graphql": "^16.14.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
   },

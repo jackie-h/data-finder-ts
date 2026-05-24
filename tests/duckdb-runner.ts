@@ -1,5 +1,5 @@
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
-import { QueryRunner, registerRunner, clearRunner } from '../src/datafinder/runner';
+import { QueryRunner, QueryTarget, registerRunner, clearRunner } from '../src/datafinder/runner';
 import { toSql } from '../src/datafinder/sql-generator';
 import type { Attribute } from '../src/datafinder/attribute';
 import type { Table, SortOperation, RelationalOperationElement } from '../src/model/relational';
@@ -11,13 +11,13 @@ export class DuckDbRunner implements QueryRunner {
     businessDate: Date | null,
     processingDatetime: Date | null,
     columns: (Attribute | RelationalOperationElement)[],
-    table: Table,
+    table: QueryTarget,
     op: RelationalOperationElement,
     orderBy: SortOperation[] = [],
     groupBy: Attribute[] = [],
     limit?: number,
   ): Promise<unknown[][]> {
-    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table, op, orderBy, groupBy, limit);
+    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit);
     console.log('[SQL]', sql);
     const result = await this.conn.run(sql);
     const rows: unknown[][] = [];
