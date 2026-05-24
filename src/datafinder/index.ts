@@ -5,6 +5,7 @@ export { toSql, selectSqlToString } from './sql-generator';
 export {
   FinderResult,
   QueryRunner,
+  QueryTarget,
   Row,
   registerRunner,
   clearRunner,
