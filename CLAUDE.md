@@ -8,14 +8,10 @@ This project mirrors `../data-finder` (Python). The Python models (`model/`, `da
 
 ## Commands
 
-Node ≥ 20 is required. The system ships Node 16 — use the Homebrew install:
-
 ```bash
-PATH="/opt/homebrew/opt/node@25/bin:$PATH" npm test          # run all tests
-PATH="/opt/homebrew/opt/node@25/bin:$PATH" npm run build     # tsc type-check
-
-# Run a single test file
-PATH="/opt/homebrew/opt/node@25/bin:$PATH" npx vitest run tests/duckdb.test.ts
+npm test                                              # run all tests
+npm run build                                         # tsc type-check
+npx vitest run tests/duckdb.test.ts                   # run a single test file
 
 # Regenerate TypeScript finders from programmatic mappings
 python3 example/generate.py
