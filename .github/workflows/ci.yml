@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Generate TypeScript finders (programmatic)
+        run: npm run generate
+
+      - name: Generate TypeScript finders (markdown)
+        run: npm run generate:markdown
+
+      - name: Run tests
+        run: npm test

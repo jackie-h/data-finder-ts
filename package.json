@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "generate": "python3 example/generate.py"
+    "generate": "uv run python example/generate.py",
+    "generate:markdown": "uv run python example/generate_from_markdown.py"
   },
   "engines": {
     "node": ">=20.0.0"
