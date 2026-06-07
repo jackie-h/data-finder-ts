@@ -114,6 +114,8 @@ export abstract class BinaryOperation extends Operation {
 
 export class IsNullOperation extends UnaryOperation {}
 
+export class IsNotNullOperation extends UnaryOperation {}
+
 export class ComparisonOperation extends BinaryOperation {
   constructor(
     left: RelationalOperationElement,
@@ -130,12 +132,54 @@ export class LogicalOperation extends BinaryOperation {
   ) { super(left, right); }
 }
 
+export class WindowSpecification {
+  constructor(
+    readonly partitionBy: RelationalOperationElement[] = [],
+    readonly orderBy: SortOperation[] = [],
+  ) {}
+}
+
 export class AggregateOperation extends UnaryOperation {
   constructor(
     element: RelationalOperationElement,
     readonly operator: AggregateOperator,
     readonly displayName?: string,
+    readonly window?: WindowSpecification,
   ) { super(element); }
+
+  over(partitionBy?: RelationalOperationElement[], orderBy?: SortOperation[]): AggregateOperation {
+    return new AggregateOperation(this.element, this.operator, this.displayName,
+      new WindowSpecification(partitionBy ?? [], orderBy ?? []));
+  }
+}
+
+export enum WindowFunction {
+  ROW_NUMBER = 'ROW_NUMBER',
+  RANK = 'RANK',
+  DENSE_RANK = 'DENSE_RANK',
+  NTILE = 'NTILE',
+  LAG = 'LAG',
+  LEAD = 'LEAD',
+  FIRST_VALUE = 'FIRST_VALUE',
+  LAST_VALUE = 'LAST_VALUE',
+  CUME_DIST = 'CUME_DIST',
+  PERCENT_RANK = 'PERCENT_RANK',
+}
+
+export class WindowFunctionOperation extends UnaryOperation {
+  constructor(
+    element: RelationalOperationElement | null,
+    readonly func: WindowFunction,
+    readonly displayName?: string,
+    readonly secondArg?: number,
+    readonly extraArgs: (string | number)[] = [],
+    readonly window?: WindowSpecification,
+  ) { super(element as RelationalOperationElement); }
+
+  over(partitionBy?: RelationalOperationElement[], orderBy?: SortOperation[]): WindowFunctionOperation {
+    return new WindowFunctionOperation(this.element, this.func, this.displayName, this.secondArg,
+      [...this.extraArgs], new WindowSpecification(partitionBy ?? [], orderBy ?? []));
+  }
 }
 
 export class ScalarFunctionOperation extends UnaryOperation {

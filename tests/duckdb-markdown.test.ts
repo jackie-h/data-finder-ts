@@ -95,9 +95,9 @@ describe('InstrumentFinder (markdown-generated, processing temporal)', () => {
   it('exposes valid_from and valid_to milestoning attributes', async () => {
     const { InstrumentFinder } = await import('./generated_markdown/InstrumentFinder');
     const inf = new InstrumentFinder();
-    // Synthetic milestoning properties (not defined in model) use their mapping ID as method name
-    expect(inf.valid_from()).toBeTruthy();
-    expect(inf.valid_to()).toBeTruthy();
+    // Milestoning properties use camelCase of their display name
+    expect(inf.validFrom()).toBeTruthy();
+    expect(inf.validTo()).toBeTruthy();
   });
 });
 

@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "skipLibCheck": true,
+    "noEmit": true,
     "paths": {
       "@datafinder": ["./src/datafinder/index"],
       "@datafinder/*": ["./src/datafinder/*"],

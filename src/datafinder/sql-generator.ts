@@ -16,6 +16,7 @@ import {
   ComparisonOperation,
   ComparisonOperator,
   IsNullOperation,
+  IsNotNullOperation,
   AggregateOperation,
   AggregateOperator,
   ScalarFunctionOperation,
@@ -23,6 +24,9 @@ import {
   DateExtractOperation,
   DateArithmeticOperation,
   DateDiffOperation,
+  WindowFunction,
+  WindowFunctionOperation,
+  WindowSpecification,
   Column,
   ColumnWithJoin,
   Table,
@@ -41,6 +45,7 @@ import {
   SingleBusinessDateColumn,
 } from '../model/milestoning';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
+import { ExistsOperation, NotExistsOperation } from './finder';
 
 class Alias {
   constructor(readonly element: RelationalOperationElement, readonly name: string) {}
@@ -69,6 +74,7 @@ class SelectOperation {
     readonly orderBy: SortOperation[] = [],
     readonly groupBy: Attribute[] = [],
     readonly limit?: number,
+    readonly table?: Table,
   ) {}
 }
 
@@ -100,6 +106,19 @@ const COMPARISON_OPERATOR_STR: Record<ComparisonOperator, string> = {
 
 const AGGREGATE_SQL_NAMES: Partial<Record<AggregateOperator, string>> = {
   [AggregateOperator.AVERAGE]: 'AVG',
+};
+
+const WINDOW_SQL_NAMES: Record<WindowFunction, string> = {
+  [WindowFunction.ROW_NUMBER]: 'ROW_NUMBER',
+  [WindowFunction.RANK]: 'RANK',
+  [WindowFunction.DENSE_RANK]: 'DENSE_RANK',
+  [WindowFunction.NTILE]: 'NTILE',
+  [WindowFunction.LAG]: 'LAG',
+  [WindowFunction.LEAD]: 'LEAD',
+  [WindowFunction.FIRST_VALUE]: 'FIRST_VALUE',
+  [WindowFunction.LAST_VALUE]: 'LAST_VALUE',
+  [WindowFunction.CUME_DIST]: 'CUME_DIST',
+  [WindowFunction.PERCENT_RANK]: 'PERCENT_RANK',
 };
 
 const SCALAR_SQL_NAMES: Record<ScalarFunction, string> = {
@@ -135,13 +154,43 @@ function constantValueString(op: ConstantOperation): string {
   throw new Error('Unknown constant operation');
 }
 
+function windowSpecToString(window: WindowSpecification): string {
+  const parts: string[] = [];
+  if (window.partitionBy.length > 0) {
+    parts.push('PARTITION BY ' + window.partitionBy.map(p => sqlOperationToString(p)).join(', '));
+  }
+  if (window.orderBy.length > 0) {
+    parts.push('ORDER BY ' + window.orderBy.map(s =>
+      sqlOperationToString(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
+    ).join(', '));
+  }
+  return 'OVER (' + parts.join(' ') + ')';
+}
+
 function sqlOperationToString(operation: RelationalOperationElement): string {
   if (operation instanceof TableAliasColumn) {
     return operation.tableAlias.alias + '.' + operation.column.name;
   }
+  if (operation instanceof WindowFunctionOperation) {
+    const fn = WINDOW_SQL_NAMES[operation.func];
+    const parts: string[] = [];
+    if (operation.element !== null && operation.element !== undefined) {
+      parts.push(sqlOperationToString(operation.element));
+    }
+    if (operation.secondArg !== undefined) parts.push(String(operation.secondArg));
+    for (const arg of operation.extraArgs) {
+      parts.push(typeof arg === 'string' ? "'" + arg + "'" : String(arg));
+    }
+    const sql = fn + '(' + parts.join(', ') + ')';
+    return sql + (operation.window !== undefined ? ' ' + windowSpecToString(operation.window) : ' OVER ()');
+  }
   if (operation instanceof AggregateOperation) {
     const fn = AGGREGATE_SQL_NAMES[operation.operator] ?? operation.operator;
-    return fn + '(' + sqlOperationToString(operation.element) + ')';
+    let sql = fn + '(' + sqlOperationToString(operation.element) + ')';
+    if (operation.window !== undefined) {
+      sql += ' ' + windowSpecToString(operation.window);
+    }
+    return sql;
   }
   if (operation instanceof ScalarFunctionOperation) {
     const fn = SCALAR_SQL_NAMES[operation.func];
@@ -280,7 +329,7 @@ function buildQueryOperation(
     }
   }
 
-  return new SelectOperation(columns, filter, orderBy, groupBy, limit);
+  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table);
 }
 
 class SQLQueryGenerator {
@@ -294,10 +343,22 @@ class SQLQueryGenerator {
   private _tableAliasIncr = 0;
   private _tableAliasesByTable = new Map<unknown, TableAlias>();
   private _addedJoinIds = new Set<JoinTreeNodeOperation>();
+  private _rootTable?: Table;
 
   generate(select: SelectOperation): void {
+    this._rootTable = select.table;
+    if (this._rootTable !== undefined) {
+      this._from.add(this._tableAliasForTable(this._rootTable.qualifiedName, this._rootTable.qualifiedName));
+    }
     this.processSelect(select.display);
     this._where = this.buildFilter(select.filter);
+    const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
+    for (const expr of select.groupBy) {
+      this._collectRequiredJoins(expr, groupByJoins);
+    }
+    for (const node of groupByJoins.values()) {
+      this._addJoin(node);
+    }
     this._groupByParts = select.groupBy.map(a => this._attrToColString(a));
     this._orderByParts = select.orderBy.map(s =>
       this.buildFilter(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
@@ -311,51 +372,141 @@ class SQLQueryGenerator {
     return ta.alias + '.' + attr.column().name;
   }
 
-  private processSelect(cols: (Attribute | RelationalOperationElement)[]): void {
-    const requiredJoinIds = new Set<JoinTreeNodeOperation>();
-    const requiredJoins: JoinTreeNodeOperation[] = [];
+  private _collectRequiredJoins(op: RelationalOperationElement | null | undefined, out: Map<JoinTreeNodeOperation, JoinTreeNodeOperation>): void {
+    if (op === null || op === undefined) return;
+    if (op instanceof Attribute) {
+      const p = op.parent();
+      if (p !== undefined) out.set(p, p);
+    } else if (op instanceof ColumnWithJoin) {
+      if (op.parent !== undefined) out.set(op.parent, op.parent);
+    } else if (op instanceof AggregateOperation) {
+      this._collectRequiredJoins(op.element, out);
+      if (op.window) this._collectRequiredJoins(op.window as unknown as RelationalOperationElement, out);
+    } else if (op instanceof WindowFunctionOperation) {
+      if (op.element) this._collectRequiredJoins(op.element, out);
+      if (op.window) this._collectRequiredJoinsFromWindowSpec(op.window, out);
+    } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation ||
+               op instanceof DateArithmeticOperation || op instanceof DateDiffOperation) {
+      this._collectRequiredJoins((op as UnaryOperation).element, out);
+    } else if (op instanceof SortOperation) {
+      this._collectRequiredJoins(op.column, out);
+    } else if (op instanceof LogicalOperation || op instanceof ComparisonOperation) {
+      this._collectRequiredJoins((op as any).left, out);
+      this._collectRequiredJoins((op as any).right, out);
+    }
+  }
 
-    const require = (node: JoinTreeNodeOperation | undefined) => {
-      if (node !== undefined && !requiredJoinIds.has(node)) {
-        requiredJoinIds.add(node);
-        requiredJoins.push(node);
-      }
-    };
+  private _collectRequiredJoinsFromWindowSpec(window: WindowSpecification, out: Map<JoinTreeNodeOperation, JoinTreeNodeOperation>): void {
+    for (const p of window.partitionBy) {
+      this._collectRequiredJoins(p, out);
+    }
+    for (const s of window.orderBy) {
+      this._collectRequiredJoins(s.column, out);
+    }
+  }
+
+  private _rewriteWindowSpec(window: WindowSpecification): WindowSpecification {
+    const partitionBy = window.partitionBy.map(p => this._rewriteOperation(p));
+    const orderBy = window.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column) as ColumnWithJoin, s.direction));
+    return new WindowSpecification(partitionBy, orderBy);
+  }
+
+  private _rewriteOperation(op: RelationalOperationElement): RelationalOperationElement {
+    if (op instanceof Attribute) {
+      const ta = this._tableAliasForTable(op.owner(), op.parent() ?? op.owner());
+      return new TableAliasColumn(op.column(), ta);
+    }
+    if (op instanceof ColumnWithJoin) {
+      const ta = op.parent !== undefined
+        ? this._tableAliasForTable(op.column.owner!, op.parent)
+        : this._tableAliasForTable(op.column.owner!, op.column.owner!);
+      return new TableAliasColumn(op.column, ta);
+    }
+    if (op instanceof Column) {
+      const ta = this._tableAliasForTable(op.owner!, op.owner!);
+      return new TableAliasColumn(op, ta);
+    }
+    if (op instanceof AggregateOperation) {
+      return new AggregateOperation(
+        this._rewriteOperation(op.element), op.operator, op.displayName,
+        op.window ? this._rewriteWindowSpec(op.window) : undefined,
+      );
+    }
+    if (op instanceof WindowFunctionOperation) {
+      const el = op.element ? this._rewriteOperation(op.element) : null;
+      return new WindowFunctionOperation(el, op.func, op.displayName, op.secondArg, [...op.extraArgs],
+        op.window ? this._rewriteWindowSpec(op.window) : undefined);
+    }
+    if (op instanceof ScalarFunctionOperation) {
+      return new ScalarFunctionOperation(this._rewriteOperation(op.element), op.func, op.displayName, op.secondArg, op.extraArgs);
+    }
+    if (op instanceof DateExtractOperation) {
+      return new DateExtractOperation(this._rewriteOperation(op.element), op.part, op.displayName);
+    }
+    if (op instanceof DateArithmeticOperation) {
+      return new DateArithmeticOperation(this._rewriteOperation(op.element), op.n, op.unit, op.isAdd, op.displayName);
+    }
+    if (op instanceof DateDiffOperation) {
+      return new DateDiffOperation(this._rewriteOperation(op.element), (op as DateDiffOperation).other, (op as DateDiffOperation).unit, op.displayName);
+    }
+    return op;
+  }
+
+  private processSelect(cols: (Attribute | RelationalOperationElement)[]): void {
+    const requiredJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
+
+    for (const col of cols) {
+      this._collectRequiredJoins(col, requiredJoins);
+    }
+    for (const node of requiredJoins.values()) {
+      this._addJoin(node);
+    }
 
     for (const col of cols) {
       if (col instanceof Attribute) {
         const node = col.parent();
         let ta: TableAlias;
         if (node !== undefined) {
-          require(node);
           ta = this._tableAliasForTable(col.owner(), node);
         } else {
           ta = this._tableAliasForTable(col.owner(), col.owner());
           this._from.add(ta);
         }
         this._select.push(new Alias(new TableAliasColumn(col.column(), ta), col.displayName()));
+      } else if (col instanceof WindowFunctionOperation) {
+        const rewritten = this._rewriteOperation(col) as WindowFunctionOperation;
+        let alias: string;
+        if (col.displayName) {
+          alias = col.displayName;
+        } else if ([WindowFunction.ROW_NUMBER, WindowFunction.RANK, WindowFunction.DENSE_RANK].includes(col.func)) {
+          alias = col.func.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        } else if (col.element) {
+          alias = col.func + ' ' + findColumn(col).column.name;
+        } else {
+          alias = col.func;
+        }
+        this._select.push(new Alias(rewritten, alias));
       } else if (col instanceof AggregateOperation) {
         const colNested = findColumn(col);
         const node = colNested.parent;
         let ta: TableAlias;
         if (node !== undefined) {
-          require(node);
           ta = this._tableAliasForTable(colNested.column.owner!, node);
         } else {
           ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
           this._from.add(ta);
         }
         const alias = col.displayName ?? col.operator + ' ' + colNested.column.name;
-        this._select.push(new Alias(
-          new AggregateOperation(new TableAliasColumn(colNested.column, ta), col.operator),
-          alias,
-        ));
+        const rewrittenAgg = new AggregateOperation(
+          new TableAliasColumn(colNested.column, ta), col.operator, undefined,
+          col.window ? this._rewriteWindowSpec(col.window) : undefined,
+        );
+        this._select.push(new Alias(rewrittenAgg, alias));
       } else if (col instanceof ScalarFunctionOperation) {
         const colNested = findColumn(col);
         const node = colNested.parent;
         let ta: TableAlias;
         if (node !== undefined) {
-          require(node);
           ta = this._tableAliasForTable(colNested.column.owner!, node);
         } else {
           ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
@@ -371,7 +522,6 @@ class SQLQueryGenerator {
         const node = colNested.parent;
         let ta: TableAlias;
         if (node !== undefined) {
-          require(node);
           ta = this._tableAliasForTable(colNested.column.owner!, node);
         } else {
           ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
@@ -393,10 +543,6 @@ class SQLQueryGenerator {
         this._select.push(new Alias(col, 'Count'));
       }
     }
-
-    for (const node of requiredJoins) {
-      this._addJoin(node);
-    }
   }
 
   private _addJoin(node: JoinTreeNodeOperation): void {
@@ -416,6 +562,15 @@ class SQLQueryGenerator {
 
   buildFilter(op: RelationalOperationElement): string {
     if (op instanceof NoOperation) return '';
+    if (op instanceof ExistsOperation) {
+      const col = op.node.join.right;
+      return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NOT NULL';
+    }
+    if (op instanceof NotExistsOperation) {
+      const col = op.node.join.right;
+      return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NULL';
+    }
+    if (op instanceof IsNotNullOperation) return this.buildFilter(op.element) + ' IS NOT NULL';
     if (op instanceof IsNullOperation) return this.buildFilter(op.element) + ' IS NULL';
     if (op instanceof LogicalOperation) {
       let left = this.buildFilter(op.left);
