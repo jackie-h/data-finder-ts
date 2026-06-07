@@ -95,9 +95,9 @@ describe('InstrumentFinder (markdown-generated, processing temporal)', () => {
   it('exposes valid_from and valid_to milestoning attributes', async () => {
     const { InstrumentFinder } = await import('./generated_markdown/InstrumentFinder');
     const inf = new InstrumentFinder();
-    // Milestoning properties use camelCase of their display name
-    expect(inf.validFrom()).toBeTruthy();
-    expect(inf.validTo()).toBeTruthy();
+    // Milestoning properties use the mapping ID directly (snake_case from finance_mapping.md)
+    expect(inf.valid_from()).toBeTruthy();
+    expect(inf.valid_to()).toBeTruthy();
   });
 });
 
