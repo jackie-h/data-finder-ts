@@ -64,12 +64,16 @@ export enum SortDirection {
 export abstract class RelationalOperationElement {}
 
 export abstract class Operation extends RelationalOperationElement {
-  andOp(other: RelationalOperationElement): LogicalOperation {
+  andOp(other: RelationalOperationElement): Operation {
     return new LogicalOperation(this, LogicalOperator.AND, other);
   }
 }
 
-export class NoOperation extends RelationalOperationElement {}
+export class NoOperation extends Operation {
+  andOp(other: RelationalOperationElement): Operation {
+    return other as Operation;
+  }
+}
 
 export abstract class ConstantOperation extends RelationalOperationElement {}
 
