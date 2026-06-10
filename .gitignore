@@ -10,3 +10,6 @@ tests/generated_markdown/
 
 # Generated TypeScript finders for dual-association regression test
 tests/generated_dual_assoc/
+
+# Generated TypeScript finders for self-referencing association test
+tests/generated_self_ref/
