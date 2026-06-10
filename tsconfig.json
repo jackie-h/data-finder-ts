@@ -12,5 +12,5 @@
       "@model/*": ["./src/model/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*", "example/generated/**/*"]
+  "include": ["src/**/*", "tests/**/*", "example/generated/**/*", "tests/generated_dual_assoc/**/*"]
 }

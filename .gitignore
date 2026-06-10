@@ -7,3 +7,6 @@ example/generated/
 
 # Generated TypeScript finders from markdown (rebuild with: python3 example/generate_from_markdown.py)
 tests/generated_markdown/
+
+# Generated TypeScript finders for dual-association regression test
+tests/generated_dual_assoc/

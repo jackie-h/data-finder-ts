@@ -6,7 +6,8 @@
     "build": "tsc",
     "test": "vitest run",
     "generate": "uv run python example/generate.py",
-    "generate:markdown": "uv run python example/generate_from_markdown.py"
+    "generate:markdown": "uv run python example/generate_from_markdown.py",
+    "generate:dual-assoc": "uv run python example/generate_dual_assoc.py"
   },
   "engines": {
     "node": ">=20.0.0"

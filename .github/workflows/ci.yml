@@ -31,6 +31,9 @@ jobs:
       - name: Generate TypeScript finders (markdown)
         run: npm run generate:markdown
 
+      - name: Generate TypeScript finders (dual association)
+        run: npm run generate:dual-assoc
+
       - name: Type-check TypeScript
         run: npm run build
 
