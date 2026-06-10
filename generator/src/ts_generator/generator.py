@@ -101,7 +101,7 @@ def _build_association_lookup(mapping: Mapping) -> dict:
         if rcm.clazz.package:
             for child in rcm.clazz.package.children:
                 if isinstance(child, Association):
-                    result[(child.source, child.target, child.target_property)] = child
+                    result[(child.source, child.target, child.target_property.id)] = child
     return result
 
 
@@ -115,7 +115,7 @@ def _build_reverse_assoc_map(mapping: Mapping, assoc_lookup: dict) -> dict:
             assoc = assoc_lookup.get((rcm.clazz.name, target_cls.name, rpm.property.id))
             if assoc is None:
                 continue
-            reverse_name = assoc.source_property
+            reverse_name = assoc.source_property.id
             reverse_map.setdefault(target_cls.name, []).append((rcm, rpm, assoc, reverse_name))
     return reverse_map
 

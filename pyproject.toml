@@ -8,6 +8,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+data-finder = { path = "../data-finder", editable = true }
 
 [build-system]
 requires = ["hatchling"]

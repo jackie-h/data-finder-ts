@@ -12,23 +12,48 @@ resolution-markers = [
 
 [[package]]
 name = "data-finder"
-version = "0.1.11"
-source = { registry = "https://pypi.org/simple" }
+version = "0.1.13"
+source = { editable = "../data-finder" }
 dependencies = [
     { name = "jinja2" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "sqlglot" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/80/11e4c973e4175f881977f50862484b3f1fcd1c2db5faebee7bc68043d496/data_finder-0.1.11.tar.gz", hash = "sha256:c9d7892e0db8857f7907a4d88f31ccb98abc519cc79a8dfee3f08b1526bfbee3", size = 48241, upload-time = "2026-05-24T16:46:56.545Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/cd/4bbf4f886cc3df2d9786fba52d2eed7ea07f6e73f16b2266612c500095f6/data_finder-0.1.11-py3-none-any.whl", hash = "sha256:139e62a826c294001f54fd9569890108c88bf46fa889b9e57ba77354b242143b", size = 60115, upload-time = "2026-05-24T16:46:55.097Z" },
-]
 
 [package.optional-dependencies]
 markdown = [
     { name = "markdown-it-py" },
 ]
+
+[package.metadata]
+requires-dist = [
+    { name = "databricks-sql-connector", marker = "extra == 'databricks'", specifier = ">=3.0.0" },
+    { name = "databricks-sql-connector", marker = "extra == 'test'", specifier = ">=3.0.0" },
+    { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=1.0.0" },
+    { name = "duckdb", marker = "extra == 'test'", specifier = ">=1.0.0" },
+    { name = "ibis-framework", marker = "extra == 'ibis'", specifier = "~=12.0.0" },
+    { name = "ibis-framework", marker = "extra == 'test'", specifier = "~=12.0.0" },
+    { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "linkml-runtime", marker = "extra == 'linkml'", specifier = ">=1.9.5" },
+    { name = "linkml-runtime", marker = "extra == 'test'", specifier = ">=1.9.5" },
+    { name = "markdown-it-py", marker = "extra == 'markdown'", specifier = ">=4.0.0" },
+    { name = "markdown-it-py", marker = "extra == 'test'", specifier = ">=4.0.0" },
+    { name = "numpy", specifier = ">=2.0.0" },
+    { name = "pandas", specifier = ">=2.2.2" },
+    { name = "pyarrow", marker = "extra == 'ibis'", specifier = ">=24.0.0" },
+    { name = "pyarrow", marker = "extra == 'test'", specifier = ">=24.0.0" },
+    { name = "pyarrow-hotfix", marker = "extra == 'ibis'", specifier = ">=0.7" },
+    { name = "pyarrow-hotfix", marker = "extra == 'test'", specifier = ">=0.7" },
+    { name = "pyiceberg", marker = "extra == 'iceberg'", specifier = ">=0.11.0" },
+    { name = "pyiceberg", marker = "extra == 'test'", specifier = ">=0.11.0" },
+    { name = "pyright", marker = "extra == 'test'", specifier = ">=1.1.410" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=9.0.0" },
+    { name = "sqlalchemy", marker = "extra == 'iceberg-test'", specifier = ">=2.0.0" },
+    { name = "sqlalchemy", marker = "extra == 'test'", specifier = ">=2.0.0" },
+    { name = "sqlglot", specifier = ">=23.12.2" },
+]
+provides-extras = ["test", "ibis", "duckdb", "databricks", "linkml", "iceberg", "iceberg-test", "markdown"]
 
 [[package]]
 name = "jinja2"
@@ -315,7 +340,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "data-finder", extras = ["markdown"], specifier = ">=0.1.11" }]
+requires-dist = [{ name = "data-finder", extras = ["markdown"], editable = "../data-finder" }]
 
 [[package]]
 name = "tzdata"
