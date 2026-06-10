@@ -31,5 +31,8 @@ jobs:
       - name: Generate TypeScript finders (markdown)
         run: npm run generate:markdown
 
+      - name: Type-check TypeScript
+        run: npm run build
+
       - name: Run tests
         run: npm test
