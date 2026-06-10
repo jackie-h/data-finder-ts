@@ -64,8 +64,9 @@ export class StringAttribute extends Attribute {
     return new ScalarFunctionOperation(this.cwj(), ScalarFunction.REPLACE, 'Replace ' + this.displayName(), undefined, [fromStr, toStr]);
   }
   substring(start: number, length?: number): ScalarFunctionOperation {
-    const args: number[] = length !== undefined ? [length] : [];
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.SUBSTRING, 'Substring ' + this.displayName(), start, args);
+    // Python convention: 0-based start; SQL SUBSTRING is 1-based, so add 1
+    const args: (number)[] = length !== undefined ? [start + 1, length] : [start + 1];
+    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.SUBSTRING, 'Substring ' + this.displayName(), undefined, args);
   }
 
   eq(value: string): Operation {
