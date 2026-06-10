@@ -6,13 +6,19 @@ import type { FinderResult } from '@datafinder/runner';
 {% if attr_types %}
 import type { {{attr_types | join(', ')}} } from '@datafinder/typed-attributes';
 {% endif %}
+{% set ns = namespace(seen_base=[]) %}
 {% for rpm in rcm.property_mappings %}
-{% if not is_primitive(rpm.property) and rpm.property.type.name != rcm.clazz.name %}
+{% if not is_primitive(rpm.property) and rpm.property.type.name != rcm.clazz.name and rpm.property.type.name not in ns.seen_base %}
 import type { {{rpm.property.type.name}}RelatedFinderBase } from '{{class_module_map_base[rpm.property.type.name]}}Base';
+{% set ns.seen_base = ns.seen_base + [rpm.property.type.name] %}
 {% endif %}
 {% endfor %}
+{% set ns2 = namespace(seen_rev_base=[]) %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+{% if source_rcm.clazz.name not in ns2.seen_rev_base %}
 import type { {{source_rcm.clazz.name}}RelatedFinderBase } from '{{class_module_map_base[source_rcm.clazz.name]}}Base';
+{% set ns2.seen_rev_base = ns2.seen_rev_base + [source_rcm.clazz.name] %}
+{% endif %}
 {% endfor %}
 
 

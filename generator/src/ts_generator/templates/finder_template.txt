@@ -13,13 +13,19 @@ import type { Attribute } from '@datafinder/attribute';
 import { {{attr_types | join(', ')}} } from '@datafinder/typed-attributes';
 {% endif %}
 import { {{rcm.clazz.name}}FinderBase, {{rcm.clazz.name}}RelatedFinderBase } from './{{rcm.clazz.name}}FinderBase';
+{% set ns = namespace(seen=[]) %}
 {% for rpm in rcm.property_mappings %}
-{% if not is_primitive(rpm.property) and rpm.property.type.name != rcm.clazz.name %}
+{% if not is_primitive(rpm.property) and rpm.property.type.name != rcm.clazz.name and rpm.property.type.name not in ns.seen %}
 import { {{rpm.property.type.name}}RelatedFinder } from '{{class_module_map[rpm.property.type.name]}}';
+{% set ns.seen = ns.seen + [rpm.property.type.name] %}
 {% endif %}
 {% endfor %}
+{% set ns2 = namespace(seen_rev=[]) %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
+{% if source_rcm.clazz.name not in ns2.seen_rev %}
 import type { {{source_rcm.clazz.name}}RelatedFinder } from '{{class_module_map[source_rcm.clazz.name]}}';
+{% set ns2.seen_rev = ns2.seen_rev + [source_rcm.clazz.name] %}
+{% endif %}
 {% endfor %}
 {% if reverse_assocs %}
 import { registerRelatedFinderClass, getRelatedFinderClass } from '@datafinder/finder-registry';
