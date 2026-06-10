@@ -22,7 +22,7 @@ import { {{rpm.property.type.name}}RelatedFinder } from '{{class_module_map[rpm.
 {% endfor %}
 {% set ns2 = namespace(seen_rev=[]) %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
-{% if source_rcm.clazz.name not in ns2.seen_rev %}
+{% if source_rcm.clazz.name != rcm.clazz.name and source_rcm.clazz.name not in ns2.seen_rev %}
 import type { {{source_rcm.clazz.name}}RelatedFinder } from '{{class_module_map[source_rcm.clazz.name]}}';
 {% set ns2.seen_rev = ns2.seen_rev + [source_rcm.clazz.name] %}
 {% endif %}
@@ -74,6 +74,8 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   private readonly _{{to_ts_name(rpm.property)}}: {{rpm.property.type.name}}Attribute;
 {% elif rpm.property.type.name != rcm.clazz.name %}
   private readonly _{{to_ts_name(rpm.property)}}: {{rpm.property.type.name}}RelatedFinder;
+{% else %}
+  private _{{to_ts_name(rpm.property)}}?: {{rpm.property.type.name}}RelatedFinder;
 {% endif %}
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
@@ -105,6 +107,14 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% elif rpm.property.type.name != rcm.clazz.name %}
   {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
     return this._{{to_ts_name(rpm.property)}};
+  }
+
+{% else %}
+  {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
+    if (!this._{{to_ts_name(rpm.property)}}) {
+      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node);
+    }
+    return this._{{to_ts_name(rpm.property)}}!;
   }
 
 {% endif %}
@@ -166,8 +176,13 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% endif %}
 {% endfor %}
 {% for rpm in rcm.property_mappings %}
-{% if not is_primitive(rpm.property) %}
+{% if not is_primitive(rpm.property) and rpm.property.type.name != rcm.clazz.name %}
   private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'));
+{% endif %}
+{% endfor %}
+{% for rpm in rcm.property_mappings %}
+{% if not is_primitive(rpm.property) and rpm.property.type.name == rcm.clazz.name %}
+  private _{{to_ts_name(rpm.property)}}?: {{rpm.property.type.name}}RelatedFinder;
 {% endif %}
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
@@ -183,6 +198,14 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% elif rpm.property.type.name != rcm.clazz.name %}
   {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
     return {{rcm.clazz.name}}Finder._{{to_ts_name(rpm.property)}};
+  }
+
+{% else %}
+  {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
+    if (!this._{{to_ts_name(rpm.property)}}) {
+      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'));
+    }
+    return this._{{to_ts_name(rpm.property)}}!;
   }
 
 {% endif %}
