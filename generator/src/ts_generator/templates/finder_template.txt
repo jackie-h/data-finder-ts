@@ -33,7 +33,10 @@ import { registerRelatedFinderClass, getRelatedFinderClass } from '@datafinder/f
 import { registerRelatedFinderClass } from '@datafinder/finder-registry';
 {% endif %}
 
-
+{% set _class_doc = get_doc(rcm.clazz) %}
+{% if _class_doc %}
+/** {{_class_doc}} */
+{% endif %}
 export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFinderBase {
 
 {% if rcm.milestone_mapping %}
@@ -98,11 +101,13 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
+  {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute {
     return this._{{to_ts_name(rpm.property)}};
   }
 
 {% elif rpm.property.type.name != rcm.clazz.name %}
+  {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
     return this._{{to_ts_name(rpm.property)}};
   }
@@ -122,11 +127,11 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% endfor %}
 }
 
-
-export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
-{% if rcm.clazz.tagged_values.get('doc') %}
-  // {{rcm.clazz.tagged_values['doc'].value}}
+{% set _class_doc = get_doc(rcm.clazz) %}
+{% if _class_doc %}
+/** {{_class_doc}} */
 {% endif %}
+export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 
 {% if rcm.milestone_mapping %}
 {% if has_bitemporal(rcm.milestone_mapping) %}
@@ -176,11 +181,13 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
+  {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute {
     return {{rcm.clazz.name}}Finder._{{to_ts_name(rpm.property)}};
   }
 
 {% elif rpm.property.type.name != rcm.clazz.name %}
+  {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
     return {{rcm.clazz.name}}Finder._{{to_ts_name(rpm.property)}};
   }

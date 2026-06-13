@@ -21,12 +21,17 @@ import type { {{source_rcm.clazz.name}}RelatedFinderBase } from '{{class_module_
 {% endif %}
 {% endfor %}
 
-
+{% set _class_doc = get_doc(rcm.clazz) %}
+{% if _class_doc %}
+/** {{_class_doc}} */
+{% endif %}
 export abstract class {{rcm.clazz.name}}RelatedFinderBase {
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
+  {{prop_jsdoc(rpm.property)}}
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
 {% elif rpm.property.type.name != rcm.clazz.name %}
+  {{prop_jsdoc(rpm.property)}}
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinderBase;
 {% endif %}
 {% endfor %}
@@ -35,11 +40,16 @@ export abstract class {{rcm.clazz.name}}RelatedFinderBase {
 {% endfor %}
 }
 
+{% if _class_doc %}
+/** {{_class_doc}} */
+{% endif %}
 export abstract class {{rcm.clazz.name}}FinderBase {
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
+  {{prop_jsdoc(rpm.property)}}
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
 {% elif rpm.property.type.name != rcm.clazz.name %}
+  {{prop_jsdoc(rpm.property)}}
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinderBase;
 {% endif %}
 {% endfor %}
