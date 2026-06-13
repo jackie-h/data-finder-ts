@@ -12,7 +12,7 @@ resolution-markers = [
 
 [[package]]
 name = "data-finder"
-version = "0.1.11"
+version = "0.1.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2" },
@@ -20,9 +20,9 @@ dependencies = [
     { name = "pandas" },
     { name = "sqlglot" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/80/11e4c973e4175f881977f50862484b3f1fcd1c2db5faebee7bc68043d496/data_finder-0.1.11.tar.gz", hash = "sha256:c9d7892e0db8857f7907a4d88f31ccb98abc519cc79a8dfee3f08b1526bfbee3", size = 48241, upload-time = "2026-05-24T16:46:56.545Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/ef/9c3303a3ecdc84a55da81dad990234b3ad5aa686fb11c28fbe82ddc1ac8f/data_finder-0.1.13.tar.gz", hash = "sha256:55fc3e4312afa9c2b20b22599b7d72e09b7d3cefc223f66549ab32f7bbb7b58e", size = 55964, upload-time = "2026-06-07T21:24:51.231Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/cd/4bbf4f886cc3df2d9786fba52d2eed7ea07f6e73f16b2266612c500095f6/data_finder-0.1.11-py3-none-any.whl", hash = "sha256:139e62a826c294001f54fd9569890108c88bf46fa889b9e57ba77354b242143b", size = 60115, upload-time = "2026-05-24T16:46:55.097Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/fe/393ab8e0af9904d9c767ab79b8d68d29b8ee1c09f215411d826a02bf9c3b/data_finder-0.1.13-py3-none-any.whl", hash = "sha256:a2ebe5649146a21e5d2b90d51580000ad7f3bb2dc6d2a98fafec894e45259ca9", size = 68811, upload-time = "2026-06-07T21:24:50.003Z" },
 ]
 
 [package.optional-dependencies]
@@ -315,7 +315,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "data-finder", extras = ["markdown"], specifier = ">=0.1.11" }]
+requires-dist = [{ name = "data-finder", extras = ["markdown"], specifier = "==0.1.13" }]
 
 [[package]]
 name = "tzdata"

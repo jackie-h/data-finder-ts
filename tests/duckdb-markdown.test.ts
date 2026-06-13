@@ -92,12 +92,11 @@ describe('InstrumentFinder (markdown-generated, processing temporal)', () => {
     expect(rows[0][1]).toBeCloseTo(150.0, 1);
   });
 
-  it('exposes valid_from and valid_to milestoning attributes', async () => {
+  it('exposes validFrom and validTo milestoning attributes', async () => {
     const { InstrumentFinder } = await import('./generated_markdown/InstrumentFinder');
     const inf = new InstrumentFinder();
-    // Milestoning properties use the mapping ID directly (snake_case from finance_mapping.md)
-    expect(inf.valid_from()).toBeTruthy();
-    expect(inf.valid_to()).toBeTruthy();
+    expect(inf.validFrom()).toBeTruthy();
+    expect(inf.validTo()).toBeTruthy();
   });
 });
 
