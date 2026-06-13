@@ -3,7 +3,7 @@
  * methods not exercised in the other test files.
  *
  * Uses a self-contained in-memory DuckDB with extra rows for aggregate/sort tests.
- * Finders are imported from tests/generated_markdown (same schema).
+ * Finders are imported from tests/generated_examples/finance (same schema).
  */
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
@@ -55,42 +55,42 @@ afterAll(() => {
 // ---------------------------------------------------------------------------
 describe('StringAttribute scalar functions (SQL)', () => {
   it('upper() → UPPER(...)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().upper()]).toSql();
     expect(sql).toContain('UPPER(');
   });
 
   it('lower() → LOWER(...)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().lower()]).toSql();
     expect(sql).toContain('LOWER(');
   });
 
   it('strip() → TRIM(...)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().strip()]).toSql();
     expect(sql).toContain('TRIM(');
   });
 
   it('length() → LENGTH(...)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().length()]).toSql();
     expect(sql).toContain('LENGTH(');
   });
 
   it('reverse() → REVERSE(...)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().reverse()]).toSql();
     expect(sql).toContain('REVERSE(');
   });
 
   it('left(4) → LEFT(..., 4)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().left(4)]).toSql();
     expect(sql).toContain('LEFT(');
@@ -98,7 +98,7 @@ describe('StringAttribute scalar functions (SQL)', () => {
   });
 
   it('right(3) → RIGHT(..., 3)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().right(3)]).toSql();
     expect(sql).toContain('RIGHT(');
@@ -106,7 +106,7 @@ describe('StringAttribute scalar functions (SQL)', () => {
   });
 
   it('repeat(2) → REPEAT(..., 2)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().repeat(2)]).toSql();
     expect(sql).toContain('REPEAT(');
@@ -114,7 +114,7 @@ describe('StringAttribute scalar functions (SQL)', () => {
   });
 
   it('replace(a, b) → REPLACE(...)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().replace('Corp', 'LLC')]).toSql();
     expect(sql).toContain('REPLACE(');
@@ -123,7 +123,7 @@ describe('StringAttribute scalar functions (SQL)', () => {
   });
 
   it('substring(start, len) → SUBSTRING(..., start+1, len)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().substring(0, 4)]).toSql();
     expect(sql).toContain('SUBSTRING(');
@@ -132,7 +132,7 @@ describe('StringAttribute scalar functions (SQL)', () => {
   });
 
   it('substring(start) → SUBSTRING(..., start+1)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name().substring(5)]).toSql();
     expect(sql).toContain('SUBSTRING(');
@@ -145,42 +145,42 @@ describe('StringAttribute scalar functions (SQL)', () => {
 // ---------------------------------------------------------------------------
 describe('StringAttribute scalar functions (execution)', () => {
   it('upper() returns uppercase name', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name().upper()], af.id().eq(1)).toRows();
     expect(rows).toEqual([['ACME CORP']]);
   });
 
   it('lower() returns lowercase name', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name().lower()], af.id().eq(1)).toRows();
     expect(rows).toEqual([['acme corp']]);
   });
 
   it('length() returns character count', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name().length()], af.id().eq(1)).toRows();
     expect(Number(rows[0][0])).toBe(9); // 'Acme Corp' = 9 chars
   });
 
   it('left(4) returns first 4 chars', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name().left(4)], af.id().eq(1)).toRows();
     expect(rows).toEqual([['Acme']]);
   });
 
   it('right(4) returns last 4 chars', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name().right(4)], af.id().eq(1)).toRows();
     expect(rows).toEqual([['Corp']]);
   });
 
   it('substring(0, 4) returns first 4 chars (0-based)', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name().substring(0, 4)], af.id().eq(1)).toRows();
     expect(rows).toEqual([['Acme']]);
@@ -192,7 +192,7 @@ describe('StringAttribute scalar functions (execution)', () => {
 // ---------------------------------------------------------------------------
 describe('StringAttribute filter methods', () => {
   it('ne() filters out matching row', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name()], af.name().ne('Acme Corp')).toRows();
     const names = rows.map(r => r[0]);
@@ -201,21 +201,21 @@ describe('StringAttribute filter methods', () => {
   });
 
   it('contains() matches substring', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name()], af.name().contains('Corp')).toRows();
     expect(rows).toEqual([['Acme Corp']]);
   });
 
   it('startsWith() matches prefix', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name()], af.name().startsWith('Acme')).toRows();
     expect(rows).toEqual([['Acme Corp']]);
   });
 
   it('endsWith() matches suffix', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.name()], af.name().endsWith('LLC')).toRows();
     expect(rows).toEqual([['Beta LLC']]);
@@ -227,35 +227,35 @@ describe('StringAttribute filter methods', () => {
 // ---------------------------------------------------------------------------
 describe('NumericAttribute scalar functions (SQL)', () => {
   it('abs() → ABS(...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().abs()]).toSql();
     expect(sql).toContain('ABS(');
   });
 
   it('ceil() → CEILING(...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().ceil()]).toSql();
     expect(sql).toContain('CEILING(');
   });
 
   it('floor() → FLOOR(...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().floor()]).toSql();
     expect(sql).toContain('FLOOR(');
   });
 
   it('sqrt() → SQRT(...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().sqrt()]).toSql();
     expect(sql).toContain('SQRT(');
   });
 
   it('mod(n) → MOD(..., n)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().mod(10)]).toSql();
     expect(sql).toContain('MOD(');
@@ -263,7 +263,7 @@ describe('NumericAttribute scalar functions (SQL)', () => {
   });
 
   it('power(n) → POWER(..., n)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().power(2)]).toSql();
     expect(sql).toContain('POWER(');
@@ -271,7 +271,7 @@ describe('NumericAttribute scalar functions (SQL)', () => {
   });
 
   it('round(d) → ROUND(..., d)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().round(2)]).toSql();
     expect(sql).toContain('ROUND(');
@@ -279,7 +279,7 @@ describe('NumericAttribute scalar functions (SQL)', () => {
   });
 
   it('round() → ROUND(...) no second arg', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().round()]).toSql();
     expect(sql).toMatch(/ROUND\(\s*t\d+\.price\s*\)/);
@@ -291,21 +291,21 @@ describe('NumericAttribute scalar functions (SQL)', () => {
 // ---------------------------------------------------------------------------
 describe('NumericAttribute scalar functions (execution)', () => {
   it('round() rounds AAPL price to integer', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.price().round()], tf.symbol().eq('AAPL')).toRows();
     expect(rows).toEqual([[84]]); // round(84.11) = 84
   });
 
   it('ceil() rounds AAPL price up', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.price().ceil()], tf.symbol().eq('AAPL')).toRows();
     expect(rows).toEqual([[85]]); // ceil(84.11) = 85
   });
 
   it('floor() rounds AAPL price down', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.price().floor()], tf.symbol().eq('AAPL')).toRows();
     expect(rows).toEqual([[84]]); // floor(84.11) = 84
@@ -317,28 +317,28 @@ describe('NumericAttribute scalar functions (execution)', () => {
 // ---------------------------------------------------------------------------
 describe('NumericAttribute aggregate functions (SQL)', () => {
   it('sum() → SUM(...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().sum()]).toSql();
     expect(sql).toContain('SUM(');
   });
 
   it('min() → MIN(...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().min()]).toSql();
     expect(sql).toContain('MIN(');
   });
 
   it('max() → MAX(...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().max()]).toSql();
     expect(sql).toContain('MAX(');
   });
 
   it('average() → AVG(...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.price().average()]).toSql();
     expect(sql).toContain('AVG(');
@@ -350,7 +350,7 @@ describe('NumericAttribute aggregate functions (SQL)', () => {
 // ---------------------------------------------------------------------------
 describe('NumericAttribute aggregate functions (execution)', () => {
   it('sum() returns total price of all trades', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.price().sum()]).toRows();
     // AAPL 84.11 + GOOG 200.0 + IBM 3000.5 = 3284.61
@@ -359,28 +359,28 @@ describe('NumericAttribute aggregate functions (execution)', () => {
   });
 
   it('min() returns lowest price', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.price().min()]).toRows();
     expect(rows[0][0] as number).toBeCloseTo(84.11, 2);
   });
 
   it('max() returns highest price', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.price().max()]).toRows();
     expect(rows[0][0] as number).toBeCloseTo(3000.5, 1);
   });
 
   it('count() returns total row count', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.count()]).toRows();
     expect(Number(rows[0][0])).toBe(3);
   });
 
   it('groupByOp + sum() returns per-symbol totals', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.symbol(), tf.price().sum()])
       .groupByOp(tf.symbol())
@@ -397,7 +397,7 @@ describe('NumericAttribute aggregate functions (execution)', () => {
 // ---------------------------------------------------------------------------
 describe('DateAttribute extract operations (SQL)', () => {
   it('year() → EXTRACT(YEAR FROM ...)', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().year()]).toSql();
     expect(sql).toContain('EXTRACT(');
@@ -405,7 +405,7 @@ describe('DateAttribute extract operations (SQL)', () => {
   });
 
   it('month() → EXTRACT(MONTH FROM ...)', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().month()]).toSql();
     expect(sql).toContain('EXTRACT(');
@@ -413,7 +413,7 @@ describe('DateAttribute extract operations (SQL)', () => {
   });
 
   it('day() → EXTRACT(DAY FROM ...)', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().day()]).toSql();
     expect(sql).toContain('EXTRACT(');
@@ -421,14 +421,14 @@ describe('DateAttribute extract operations (SQL)', () => {
   });
 
   it('quarter() → EXTRACT(QUARTER FROM ...)', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().quarter()]).toSql();
     expect(sql).toContain('QUARTER');
   });
 
   it('dayOfWeek() → EXTRACT(DOW FROM ...)', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().dayOfWeek()]).toSql();
     expect(sql).toContain('DOW');
@@ -440,7 +440,7 @@ describe('DateAttribute extract operations (SQL)', () => {
 // ---------------------------------------------------------------------------
 describe('DateAttribute extract operations (execution)', () => {
   it('year() extracts 2023 from 2023-06-15', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const rows = await cpf.findAll('2023-06-15', null, [cpf.businessDate().year()]).toRows();
     expect(rows.length).toBe(1);
@@ -448,14 +448,14 @@ describe('DateAttribute extract operations (execution)', () => {
   });
 
   it('month() extracts 6 from 2023-06-15', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const rows = await cpf.findAll('2023-06-15', null, [cpf.businessDate().month()]).toRows();
     expect(Number(rows[0][0])).toBe(6);
   });
 
   it('day() extracts 15 from 2023-06-15', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const rows = await cpf.findAll('2023-06-15', null, [cpf.businessDate().day()]).toRows();
     expect(Number(rows[0][0])).toBe(15);
@@ -467,7 +467,7 @@ describe('DateAttribute extract operations (execution)', () => {
 // ---------------------------------------------------------------------------
 describe('DateAttribute arithmetic operations (SQL)', () => {
   it('addDays(n) → ... + INTERVAL n DAY', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().addDays(7)]).toSql();
     expect(sql).toContain('INTERVAL');
@@ -477,7 +477,7 @@ describe('DateAttribute arithmetic operations (SQL)', () => {
   });
 
   it('subtractDays(n) → ... - INTERVAL n DAY', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().subtractDays(3)]).toSql();
     expect(sql).toContain('INTERVAL');
@@ -485,7 +485,7 @@ describe('DateAttribute arithmetic operations (SQL)', () => {
   });
 
   it('addMonths(n) → ... + INTERVAL n MONTH', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().addMonths(3)]).toSql();
     expect(sql).toContain('MONTH');
@@ -497,7 +497,7 @@ describe('DateAttribute arithmetic operations (SQL)', () => {
 // ---------------------------------------------------------------------------
 describe('DateAttribute diff operations (SQL)', () => {
   it('diffDays() → DATE_DIFF(day, ...)', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().diffDays(new Date('2024-01-01'))]).toSql();
     expect(sql).toContain('DATE_DIFF(');
@@ -505,7 +505,7 @@ describe('DateAttribute diff operations (SQL)', () => {
   });
 
   it('diffMonths() → DATE_DIFF(month, ...)', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().diffMonths(new Date('2024-01-01'))]).toSql();
     expect(sql).toContain("'month'");
@@ -517,7 +517,7 @@ describe('DateAttribute diff operations (SQL)', () => {
 // ---------------------------------------------------------------------------
 describe('DateTimeAttribute extract and arithmetic (SQL)', () => {
   it('hour() → EXTRACT(HOUR FROM ...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.validFrom().hour()]).toSql();
     expect(sql).toContain('EXTRACT(');
@@ -525,21 +525,21 @@ describe('DateTimeAttribute extract and arithmetic (SQL)', () => {
   });
 
   it('minute() → EXTRACT(MINUTE FROM ...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.validFrom().minute()]).toSql();
     expect(sql).toContain('MINUTE');
   });
 
   it('second() → EXTRACT(SECOND FROM ...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.validFrom().second()]).toSql();
     expect(sql).toContain('SECOND');
   });
 
   it('addHours(n) → ... + INTERVAL n HOUR', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.validFrom().addHours(2)]).toSql();
     expect(sql).toContain('HOUR');
@@ -548,7 +548,7 @@ describe('DateTimeAttribute extract and arithmetic (SQL)', () => {
   });
 
   it('diffHours() → DATE_DIFF(hour, ...)', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.validFrom().diffHours(new Date('2024-01-01'))]).toSql();
     expect(sql).toContain("'hour'");
@@ -560,7 +560,7 @@ describe('DateTimeAttribute extract and arithmetic (SQL)', () => {
 // ---------------------------------------------------------------------------
 describe('ORDER BY', () => {
   it('orderByOp(asc) produces ORDER BY ... ASC in SQL', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.symbol(), tf.price()])
       .orderByOp(tf.price().ascending())
@@ -570,7 +570,7 @@ describe('ORDER BY', () => {
   });
 
   it('orderByOp(desc) produces ORDER BY ... DESC in SQL', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.symbol(), tf.price()])
       .orderByOp(tf.price().descending())
@@ -579,7 +579,7 @@ describe('ORDER BY', () => {
   });
 
   it('ascending() returns rows sorted lowest price first', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.symbol(), tf.price()])
       .orderByOp(tf.price().ascending())
@@ -592,7 +592,7 @@ describe('ORDER BY', () => {
   });
 
   it('descending() returns rows sorted highest price first', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.symbol(), tf.price()])
       .orderByOp(tf.price().descending())
@@ -607,21 +607,21 @@ describe('ORDER BY', () => {
 // ---------------------------------------------------------------------------
 describe('LIMIT', () => {
   it('limit() produces LIMIT in SQL', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.symbol()]).limit(1).toSql();
     expect(sql).toContain('LIMIT 1');
   });
 
   it('limit(1) returns exactly one row', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.symbol()]).limit(1).toRows();
     expect(rows.length).toBe(1);
   });
 
   it('limit(2) combined with order returns top-2 by price', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.symbol(), tf.price()])
       .orderByOp(tf.price().descending())
@@ -638,14 +638,14 @@ describe('LIMIT', () => {
 // ---------------------------------------------------------------------------
 describe('IsNotNull filter', () => {
   it('isNotNull() produces IS NOT NULL in SQL', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.name()], af.name().isNotNull()).toSql();
     expect(sql).toContain('IS NOT NULL');
   });
 
   it('isNotNull() returns all rows when none are null', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.id()], af.name().isNotNull()).toRows();
     expect(rows.length).toBe(3);
@@ -657,7 +657,7 @@ describe('IsNotNull filter', () => {
 // ---------------------------------------------------------------------------
 describe('IntegerAttribute ne() filter', () => {
   it('ne() SQL contains <>', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const sql = af.findAll(null, null, [af.id()], af.id().ne(1)).toSql();
     expect(sql).toContain('<>');
@@ -665,7 +665,7 @@ describe('IntegerAttribute ne() filter', () => {
   });
 
   it('ne() execution excludes the filtered id', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
     const rows = await af.findAll(null, null, [af.id()], af.id().ne(1)).toRows();
     const ids = rows.map(r => r[0]);

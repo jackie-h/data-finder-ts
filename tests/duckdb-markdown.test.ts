@@ -53,7 +53,7 @@ afterAll(() => {
 
 describe('AccountFinder (markdown-generated)', () => {
   it('finds account by id', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
 
     const rows = await af.findAll(null, null, [af.id(), af.name()], af.id().eq(1)).toRows();
@@ -61,7 +61,7 @@ describe('AccountFinder (markdown-generated)', () => {
   });
 
   it('returns all accounts without filter', async () => {
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
 
     const rows = await af.findAll(null, null, [af.id(), af.name()]).toRows();
@@ -72,7 +72,7 @@ describe('AccountFinder (markdown-generated)', () => {
 
 describe('InstrumentFinder (markdown-generated, processing temporal)', () => {
   it('returns both instruments active in 2021', async () => {
-    const { InstrumentFinder } = await import('./generated_markdown/InstrumentFinder');
+    const { InstrumentFinder } = await import('./generated_examples/finance/InstrumentFinder');
     const inf = new InstrumentFinder();
 
     const rows = await inf.findAll(null, '2021-06-01 12:00:00', [inf.symbol(), inf.price()]).toRows();
@@ -83,7 +83,7 @@ describe('InstrumentFinder (markdown-generated, processing temporal)', () => {
   });
 
   it('filters expired GOOG record after 2022', async () => {
-    const { InstrumentFinder } = await import('./generated_markdown/InstrumentFinder');
+    const { InstrumentFinder } = await import('./generated_examples/finance/InstrumentFinder');
     const inf = new InstrumentFinder();
 
     const rows = await inf.findAll(null, '2023-01-01 12:00:00', [inf.symbol(), inf.price()]).toRows();
@@ -93,7 +93,7 @@ describe('InstrumentFinder (markdown-generated, processing temporal)', () => {
   });
 
   it('exposes validFrom and validTo milestoning attributes', async () => {
-    const { InstrumentFinder } = await import('./generated_markdown/InstrumentFinder');
+    const { InstrumentFinder } = await import('./generated_examples/finance/InstrumentFinder');
     const inf = new InstrumentFinder();
     expect(inf.validFrom()).toBeTruthy();
     expect(inf.validTo()).toBeTruthy();
@@ -102,7 +102,7 @@ describe('InstrumentFinder (markdown-generated, processing temporal)', () => {
 
 describe('TradeFinder (markdown-generated, processing temporal)', () => {
   it('returns both trades active in 2021', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
 
     const rows = await tf.findAll(null, '2021-06-01 12:00:00', [tf.symbol(), tf.price()]).toRows();
@@ -113,7 +113,7 @@ describe('TradeFinder (markdown-generated, processing temporal)', () => {
   });
 
   it('filters expired GOOG after 2022', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
 
     const rows = await tf.findAll(null, '2023-01-01 12:00:00', [tf.symbol(), tf.price()]).toRows();
@@ -123,7 +123,7 @@ describe('TradeFinder (markdown-generated, processing temporal)', () => {
   });
 
   it('filters by symbol', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
 
     const rows = await tf.findAll(
@@ -137,7 +137,7 @@ describe('TradeFinder (markdown-generated, processing temporal)', () => {
   });
 
   it('filters by boolean isSettled', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
 
     const rows = await tf.findAll(
@@ -151,7 +151,7 @@ describe('TradeFinder (markdown-generated, processing temporal)', () => {
   });
 
   it('forward join: trade symbol and account name', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
 
     const rows = await tf.findAll(
@@ -166,7 +166,7 @@ describe('TradeFinder (markdown-generated, processing temporal)', () => {
   });
 
   it('forward join: milestoning filters expired records, leaving only AAPL', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
 
     const rows = await tf.findAll(
@@ -180,7 +180,7 @@ describe('TradeFinder (markdown-generated, processing temporal)', () => {
   });
 
   it('forward join: both trades visible before GOOG expiry', async () => {
-    const { TradeFinder } = await import('./generated_markdown/TradeFinder');
+    const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
 
     const rows = await tf.findAll(
@@ -200,8 +200,8 @@ describe('TradeFinder (markdown-generated, processing temporal)', () => {
 describe('AccountFinder reverse association (markdown-generated)', () => {
   it('traverses Account → trades (no milestoning filter, both trades returned)', async () => {
     // Import TradeFinder first so it registers TradeRelatedFinder in the finder registry
-    await import('./generated_markdown/TradeFinder');
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    await import('./generated_examples/finance/TradeFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
 
     const rows = await af.findAll(
@@ -219,8 +219,8 @@ describe('AccountFinder reverse association (markdown-generated)', () => {
   });
 
   it('traverses Account → trades with filter on trade symbol', async () => {
-    await import('./generated_markdown/TradeFinder');
-    const { AccountFinder } = await import('./generated_markdown/AccountFinder');
+    await import('./generated_examples/finance/TradeFinder');
+    const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
 
     const rows = await af.findAll(
@@ -237,7 +237,7 @@ describe('AccountFinder reverse association (markdown-generated)', () => {
 
 describe('ContractualPositionFinder (markdown-generated, business_date + processing)', () => {
   it('returns active row for business_date=2023-01-15 at current processing time', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
 
     const rows = await cpf.findAll(
@@ -250,7 +250,7 @@ describe('ContractualPositionFinder (markdown-generated, business_date + process
   });
 
   it('excludes row for a different business_date', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
 
     const rows = await cpf.findAll(
@@ -263,7 +263,7 @@ describe('ContractualPositionFinder (markdown-generated, business_date + process
   });
 
   it('excludes processing-expired row (quantity=90 superseded at 2023-01-15)', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
 
     const rows = await cpf.findAll(
@@ -276,7 +276,7 @@ describe('ContractualPositionFinder (markdown-generated, business_date + process
   });
 
   it('processing time travel: expired row (quantity=90) visible before supersession', async () => {
-    const { ContractualPositionFinder } = await import('./generated_markdown/ContractualPositionFinder');
+    const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
 
     const rows = await cpf.findAll(

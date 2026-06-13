@@ -15,7 +15,7 @@ import type { {{rpm.property.type.name}}RelatedFinderBase } from '{{class_module
 {% endfor %}
 {% set ns2 = namespace(seen_rev_base=[]) %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
-{% if source_rcm.clazz.name not in ns2.seen_rev_base %}
+{% if source_rcm.clazz.name not in ns2.seen_rev_base and source_rcm.clazz.name != rcm.clazz.name %}
 import type { {{source_rcm.clazz.name}}RelatedFinderBase } from '{{class_module_map_base[source_rcm.clazz.name]}}Base';
 {% set ns2.seen_rev_base = ns2.seen_rev_base + [source_rcm.clazz.name] %}
 {% endif %}
@@ -30,7 +30,7 @@ export abstract class {{rcm.clazz.name}}RelatedFinderBase {
 {% if is_primitive(rpm.property) %}
   {{prop_jsdoc(rpm.property)}}
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
-{% elif rpm.property.type.name != rcm.clazz.name %}
+{% else %}
   {{prop_jsdoc(rpm.property)}}
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinderBase;
 {% endif %}
@@ -48,7 +48,7 @@ export abstract class {{rcm.clazz.name}}FinderBase {
 {% if is_primitive(rpm.property) %}
   {{prop_jsdoc(rpm.property)}}
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
-{% elif rpm.property.type.name != rcm.clazz.name %}
+{% else %}
   {{prop_jsdoc(rpm.property)}}
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinderBase;
 {% endif %}
