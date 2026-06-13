@@ -1,59 +1,42 @@
 # data-finder-ts
 
-TypeScript port of [data-finder](https://github.com/jackie-h/data-finder), a model-driven SQL query builder with temporal (milestoned) data support. A Python generator reads the same mapping definitions used by the Python project and emits strongly-typed TypeScript finder classes.
+TypeScript port of [data-finder](https://github.com/jackie-h/data-finder), a model-driven SQL query builder with temporal (milestoned) data support. A Python generator reads mapping definitions and emits strongly-typed TypeScript finder classes.
 
-## What it does
+For runtime usage and query API see **[FINDERS.md](FINDERS.md)**.
 
-You define a mapping between your domain model and relational tables (in Python or Markdown). The generator produces a typed `*Finder` class per entity. You use those classes to build and run SQL queries without writing SQL directly:
+## Requirements
 
-```typescript
-const tf = new TradeFinder();
+- Node ≥ 24
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
 
-// Filter, join, milestoning applied automatically
-const rows = await tf.findAll(
-  null,                        // business date (null = not applicable)
-  new Date(),                  // processing valid-at (temporal snapshot)
-  [tf.symbol(), tf.price(), tf.account().name()],
-  tf.symbol().eq('AAPL'),
-).toRows();
-```
-
-Temporal filtering (`in_z <= ? AND out_z > ?`) is injected automatically based on the milestoning type declared in the mapping.
-
-## Setup
+## Install
 
 ```bash
 npm install
-
-# Install Python generator dependencies (system-wide, no virtualenv)
-pip3 install jinja2 markdown-it-py
+uv sync       # install Python generator dependencies
 ```
-
-Node ≥ 20 required.
 
 ## Generating finders
 
-Generated files are gitignored — regenerate them before running tests on a fresh clone.
+Generated files are gitignored — regenerate before running tests on a fresh clone.
 
 ```bash
-# From programmatic mapping definitions (example/mappings.py)
-python3 example/generate.py               # → example/generated/
-
-# From a markdown mapping file (finance_mapping.md in sibling data-finder repo)
-python3 example/generate_from_markdown.py # → tests/generated_markdown/
+npm run generate           # from programmatic mappings (example/mappings.py) → example/generated/
+npm run generate:examples  # from all datafinder_examples mappings → tests/generated_examples/
 ```
 
-The generators import directly from the sibling `../data-finder` Python project, which must be present.
+The generator uses the [`data-finder`](https://pypi.org/project/data-finder/) PyPI package (installed via `uv sync`).
 
 ## Running tests
 
 ```bash
-npm test                                        # all tests
-npx vitest run tests/duckdb.test.ts             # single file
-npm run build                                   # type-check only
+npm test                                  # all tests
+npx vitest run tests/duckdb.test.ts       # single file
+npm run build                             # type-check only
+npm run build:lib                         # build distributable (tsup)
 ```
 
-Tests use an in-memory DuckDB instance via `@duckdb/node-api`. `tests/duckdb.test.ts` loads CSV fixtures from `example/data/`; `tests/duckdb-markdown.test.ts` seeds data with INSERT statements.
+Tests use an in-memory DuckDB instance via `@duckdb/node-api`.
 
 ## Milestoning types
 
@@ -64,6 +47,8 @@ Tests use an in-memory DuckDB instance via `@duckdb/node-api`. `tests/duckdb.tes
 | Single business date | `SingleBusinessDateMilestonePropertyMapping` | `businessDate` |
 | Business date + processing | `BusinessDateAndProcessingMilestonePropertyMapping` | both |
 | Bi-temporal | `BiTemporalMilestonePropertyMapping` | both |
+
+Temporal filtering (`in_z <= ? AND out_z > ?`) is injected automatically based on the milestoning type declared in the mapping.
 
 ## Defining a mapping (Markdown)
 
@@ -98,20 +83,9 @@ Tests use an in-memory DuckDB instance via `@duckdb/node-api`. `tests/duckdb.tes
 Load and generate:
 
 ```python
-from mapping_markdown.markdown_mapping import load
+from datafinder_examples.finance_mapping import load
 from ts_generator.generator import generate
 
 mapping = load('my_mapping.md')
 generate(mapping, 'output/')
-```
-
-## Reverse associations
-
-When a model association is declared (e.g. `Trade → Account`), the generator adds a `trades()` method on `AccountFinder` pointing back to `TradeRelatedFinder`. Because ESM circular imports can't be resolved with static `import`, finders self-register at module load via `registerRelatedFinderClass`. When using a reverse association in tests, import the source finder's module first:
-
-```typescript
-await import('./generated/TradeFinder'); // ensures TradeRelatedFinder is registered
-const { AccountFinder } = await import('./generated/AccountFinder');
-const af = new AccountFinder();
-const rows = await af.findAll(null, null, [af.name(), af.trades().symbol()]).toRows();
 ```
