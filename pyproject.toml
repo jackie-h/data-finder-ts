@@ -1,11 +1,27 @@
 [project]
-name = "ts-generator"
+name = "data-finder-ts-generator"
 version = "0.1.0"
-description = "TypeScript finder generator for data-finder-ts"
+description = "TypeScript finder generator for the data-finder-ts runtime library"
+readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+keywords = ["data-finder", "typescript", "code-generation", "sql"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+]
 dependencies = [
     "data-finder[markdown]>=0.1.14",
 ]
+
+[project.urls]
+Repository = "https://github.com/jackie-h/data-finder-ts"
 
 [tool.uv]
 environments = ["sys_platform == 'darwin'", "sys_platform == 'linux'"]

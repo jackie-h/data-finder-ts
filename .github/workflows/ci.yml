@@ -37,5 +37,8 @@ jobs:
       - name: Type-check TypeScript
         run: npm run build
 
+      - name: Build library (tsup)
+        run: npm run build:lib
+
       - name: Run tests
         run: npm test

@@ -1,21 +1,77 @@
 {
   "name": "data-finder-ts",
   "version": "0.1.0",
+  "description": "TypeScript runtime library for data-finder generated finders",
   "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./model/relational": {
+      "types": "./dist/model/relational.d.ts",
+      "import": "./dist/model/relational.js",
+      "require": "./dist/model/relational.cjs"
+    },
+    "./model/milestoning": {
+      "types": "./dist/model/milestoning.d.ts",
+      "import": "./dist/model/milestoning.js",
+      "require": "./dist/model/milestoning.cjs"
+    },
+    "./datafinder/attribute": {
+      "types": "./dist/datafinder/attribute.d.ts",
+      "import": "./dist/datafinder/attribute.js",
+      "require": "./dist/datafinder/attribute.cjs"
+    },
+    "./datafinder/typed-attributes": {
+      "types": "./dist/datafinder/typed-attributes.d.ts",
+      "import": "./dist/datafinder/typed-attributes.js",
+      "require": "./dist/datafinder/typed-attributes.cjs"
+    },
+    "./datafinder/runner": {
+      "types": "./dist/datafinder/runner.d.ts",
+      "import": "./dist/datafinder/runner.js",
+      "require": "./dist/datafinder/runner.cjs"
+    },
+    "./datafinder/finder-registry": {
+      "types": "./dist/datafinder/finder-registry.d.ts",
+      "import": "./dist/datafinder/finder-registry.js",
+      "require": "./dist/datafinder/finder-registry.cjs"
+    },
+    "./datafinder/sql-generator": {
+      "types": "./dist/datafinder/sql-generator.d.ts",
+      "import": "./dist/datafinder/sql-generator.js",
+      "require": "./dist/datafinder/sql-generator.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jackie-h/data-finder-ts.git"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "tsc",
+    "build:lib": "tsup",
     "test": "vitest run",
     "generate": "uv run python example/generate.py",
     "generate:dual-assoc": "uv run python example/generate_dual_assoc.py",
     "generate:examples": "uv run python example/generate_examples.py"
   },
-  "engines": {
-    "node": ">=20.0.0"
-  },
   "devDependencies": {
     "@duckdb/node-api": "^1.5.3-r.1",
     "@types/node": "^20.19.41",
     "graphql": "^16.14.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
   },

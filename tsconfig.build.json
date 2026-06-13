@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "paths": {
+      "@datafinder": ["./src/datafinder/index"],
+      "@datafinder/*": ["./src/datafinder/*"],
+      "@model/*": ["./src/model/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}
