@@ -4,8 +4,11 @@ version = "0.1.0"
 description = "TypeScript finder generator for data-finder-ts"
 requires-python = ">=3.11"
 dependencies = [
-    "data-finder[markdown]>=0.1.13",
+    "data-finder[markdown]>=0.1.14",
 ]
+
+[tool.uv]
+environments = ["sys_platform == 'darwin'", "sys_platform == 'linux'"]
 
 [tool.uv.sources]
 
