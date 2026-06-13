@@ -29,6 +29,18 @@ const rows: unknown[][]  = await result.toRows();
 // rows[i] aligns to displayColumns order
 ```
 
+## Milestoning (temporal filtering)
+
+Pass dates to `findAll` to snapshot data at a point in time. Temporal WHERE clauses are injected automatically.
+
+| Type | `businessDate` | `processingDate` |
+|---|---|---|
+| None | `null` | `null` |
+| Processing temporal | `null` | required |
+| Single business date | required | `null` |
+| Business date + processing | required | required |
+| Bi-temporal | required | required |
+
 ## Filter operators
 
 | Type | Methods |

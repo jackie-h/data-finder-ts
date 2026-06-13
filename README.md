@@ -38,18 +38,6 @@ npm run build:lib                         # build distributable (tsup)
 
 Tests use an in-memory DuckDB instance via `@duckdb/node-api`.
 
-## Milestoning types
-
-| Type | Mapping class | `findAll` args used |
-|---|---|---|
-| None | — | neither |
-| Processing temporal | `ProcessingDateMilestonesPropertyMapping` | `processingValidAt` |
-| Single business date | `SingleBusinessDateMilestonePropertyMapping` | `businessDate` |
-| Business date + processing | `BusinessDateAndProcessingMilestonePropertyMapping` | both |
-| Bi-temporal | `BiTemporalMilestonePropertyMapping` | both |
-
-Temporal filtering (`in_z <= ? AND out_z > ?`) is injected automatically based on the milestoning type declared in the mapping.
-
 ## Defining a mapping (Markdown)
 
 ```markdown
