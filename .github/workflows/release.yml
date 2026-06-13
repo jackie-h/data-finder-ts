@@ -27,7 +27,7 @@ jobs:
         run: npm run build:lib
 
       - name: Publish
-        run: npm publish --access public --provenance
+        run: npm publish
 
   publish-pypi:
     name: Publish to PyPI
