@@ -50,6 +50,20 @@ def display_name(prop: Property) -> str:
     return prop.name
 
 
+def get_doc(obj) -> str:
+    """Return the doc tagged value text, or empty string if absent."""
+    tv = getattr(obj, 'tagged_values', {}).get('doc')
+    return tv.value if tv else ''
+
+
+def prop_jsdoc(prop: Property) -> str:
+    """Return a JSDoc line for a property method: friendly name + optional description."""
+    doc = get_doc(prop)
+    if doc:
+        return f'/** {prop.name} — {doc} */'
+    return f'/** {prop.name} */'
+
+
 def to_ts_name(prop: Property) -> str:
     """Convert a Property display name to a TypeScript camelCase method name."""
     words = prop.name.lower().split()
@@ -157,6 +171,8 @@ def generate(mapping: Mapping, output_directory: str):
         to_camel_case=to_camel_case,
         table_qualified_name=table_qualified_name,
         get_used_attr_types=get_used_attr_types,
+        get_doc=get_doc,
+        prop_jsdoc=prop_jsdoc,
     )
 
     for rcm in mapping.mappings:
