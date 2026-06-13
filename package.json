@@ -82,14 +82,14 @@
   },
   "devDependencies": {
     "@duckdb/node-api": "^1.5.3-r.1",
-    "@types/node": "^20.19.41",
+    "@types/node": "^24.13.2",
     "graphql": "^16.14.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "module": "./dist/index.js"
 }
