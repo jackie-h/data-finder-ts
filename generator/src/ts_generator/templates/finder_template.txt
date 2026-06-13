@@ -75,6 +75,8 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
   private readonly _{{to_ts_name(rpm.property)}}: {{rpm.property.type.name}}Attribute;
+{% elif rpm.property.type.name == rcm.clazz.name %}
+  private _{{to_ts_name(rpm.property)}}?: {{rpm.property.type.name}}RelatedFinder;
 {% else %}
   private readonly _{{to_ts_name(rpm.property)}}: {{rpm.property.type.name}}RelatedFinder;
 {% endif %}
@@ -90,7 +92,7 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
     this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(relationName + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node);
-{% else %}
+{% elif rpm.property.type.name != rcm.clazz.name %}
     this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node);
 {% endif %}
 {% endfor %}
@@ -101,6 +103,15 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute {
     return this._{{to_ts_name(rpm.property)}};
+  }
+
+{% elif rpm.property.type.name == rcm.clazz.name %}
+  {{prop_jsdoc(rpm.property)}}
+  {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
+    if (!this._{{to_ts_name(rpm.property)}}) {
+      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node);
+    }
+    return this._{{to_ts_name(rpm.property)}}!;
   }
 
 {% else %}
@@ -165,8 +176,13 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
   private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute('{{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}');
-{% else %}
+{% elif rpm.property.type.name != rcm.clazz.name %}
   private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'));
+{% endif %}
+{% endfor %}
+{% for rpm in rcm.property_mappings %}
+{% if not is_primitive(rpm.property) and rpm.property.type.name == rcm.clazz.name %}
+  private _{{to_ts_name(rpm.property)}}?: {{rpm.property.type.name}}RelatedFinder;
 {% endif %}
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
@@ -178,6 +194,15 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute {
     return {{rcm.clazz.name}}Finder._{{to_ts_name(rpm.property)}};
+  }
+
+{% elif rpm.property.type.name == rcm.clazz.name %}
+  {{prop_jsdoc(rpm.property)}}
+  {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}RelatedFinder {
+    if (!this._{{to_ts_name(rpm.property)}}) {
+      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'));
+    }
+    return this._{{to_ts_name(rpm.property)}}!;
   }
 
 {% else %}
