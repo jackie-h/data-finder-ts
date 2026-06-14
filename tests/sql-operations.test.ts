@@ -54,24 +54,24 @@ afterAll(() => {
 // String scalar functions — SQL shape
 // ---------------------------------------------------------------------------
 describe('StringAttribute scalar functions (SQL)', () => {
-  it('upper() → UPPER(...)', async () => {
+  it('toUpperCase() → UPPER(...)', async () => {
     const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
-    const sql = af.findAll(null, null, [af.name().upper()]).toSql();
+    const sql = af.findAll(null, null, [af.name().toUpperCase()]).toSql();
     expect(sql).toContain('UPPER(');
   });
 
-  it('lower() → LOWER(...)', async () => {
+  it('toLowerCase() → LOWER(...)', async () => {
     const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
-    const sql = af.findAll(null, null, [af.name().lower()]).toSql();
+    const sql = af.findAll(null, null, [af.name().toLowerCase()]).toSql();
     expect(sql).toContain('LOWER(');
   });
 
-  it('strip() → TRIM(...)', async () => {
+  it('trim() → TRIM(...)', async () => {
     const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
-    const sql = af.findAll(null, null, [af.name().strip()]).toSql();
+    const sql = af.findAll(null, null, [af.name().trim()]).toSql();
     expect(sql).toContain('TRIM(');
   });
 
@@ -144,17 +144,17 @@ describe('StringAttribute scalar functions (SQL)', () => {
 // String scalar functions — DuckDB execution
 // ---------------------------------------------------------------------------
 describe('StringAttribute scalar functions (execution)', () => {
-  it('upper() returns uppercase name', async () => {
+  it('toUpperCase() returns uppercase name', async () => {
     const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
-    const rows = await af.findAll(null, null, [af.name().upper()], af.id().eq(1)).toRows();
+    const rows = await af.findAll(null, null, [af.name().toUpperCase()], af.id().eq(1)).toRows();
     expect(rows).toEqual([['ACME CORP']]);
   });
 
-  it('lower() returns lowercase name', async () => {
+  it('toLowerCase() returns lowercase name', async () => {
     const { AccountFinder } = await import('./generated_examples/finance/AccountFinder');
     const af = new AccountFinder();
-    const rows = await af.findAll(null, null, [af.name().lower()], af.id().eq(1)).toRows();
+    const rows = await af.findAll(null, null, [af.name().toLowerCase()], af.id().eq(1)).toRows();
     expect(rows).toEqual([['acme corp']]);
   });
 

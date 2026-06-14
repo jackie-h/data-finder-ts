@@ -3,7 +3,7 @@ import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb } from './duckdb-runner';
 import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
 
-// Padded/cased names to exercise strip and case functions
+// Padded/cased names to exercise trim and case functions
 const COMPANIES = [
   [1, '  Acme Corp  ', 'Technology'],
   [2, 'beta corp',     'Manufacturing'],
@@ -32,13 +32,13 @@ afterAll(() => {
 });
 
 describe('CompanyFinder — string scalar functions', () => {
-  it('lstrip removes leading whitespace', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().lstrip()], cf.id().eq(1)).toRows();
+  it('trimStart removes leading whitespace', async () => {
+    const rows = await cf.findAll(null, null, [cf.name().trimStart()], cf.id().eq(1)).toRows();
     expect(rows[0][0]).toBe('Acme Corp  ');
   });
 
-  it('rstrip removes trailing whitespace', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().rstrip()], cf.id().eq(1)).toRows();
+  it('trimEnd removes trailing whitespace', async () => {
+    const rows = await cf.findAll(null, null, [cf.name().trimEnd()], cf.id().eq(1)).toRows();
     expect(rows[0][0]).toBe('  Acme Corp');
   });
 
@@ -47,18 +47,18 @@ describe('CompanyFinder — string scalar functions', () => {
     expect(rows[0][0]).toBe('beta corp'.split('').reverse().join(''));
   });
 
-  it('upper uppercases the string', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().upper()], cf.id().eq(2)).toRows();
+  it('toUpperCase uppercases the string', async () => {
+    const rows = await cf.findAll(null, null, [cf.name().toUpperCase()], cf.id().eq(2)).toRows();
     expect(rows[0][0]).toBe('BETA CORP');
   });
 
-  it('lower lowercases the string', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().lower()], cf.id().eq(3)).toRows();
+  it('toLowerCase lowercases the string', async () => {
+    const rows = await cf.findAll(null, null, [cf.name().toLowerCase()], cf.id().eq(3)).toRows();
     expect(rows[0][0]).toBe('hello world');
   });
 
-  it('strip removes both leading and trailing whitespace', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().strip()], cf.id().eq(1)).toRows();
+  it('trim removes both leading and trailing whitespace', async () => {
+    const rows = await cf.findAll(null, null, [cf.name().trim()], cf.id().eq(1)).toRows();
     expect(rows[0][0]).toBe('Acme Corp');
   });
 
