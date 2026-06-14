@@ -31,24 +31,24 @@ export class StringAttribute extends Attribute {
   ) { super(displayName, columnName, columnDbType, owner, parent); }
 
   /** Convert every character to uppercase. */
-  upper(): ScalarFunctionOperation {
+  toUpperCase(): ScalarFunctionOperation {
     return new ScalarFunctionOperation(this.cwj(), ScalarFunction.UPPER, 'Upper ' + this.displayName());
   }
   /** Convert every character to lowercase. */
-  lower(): ScalarFunctionOperation {
+  toLowerCase(): ScalarFunctionOperation {
     return new ScalarFunctionOperation(this.cwj(), ScalarFunction.LOWER, 'Lower ' + this.displayName());
   }
   /** Remove leading and trailing whitespace. */
-  strip(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.TRIM, 'Strip ' + this.displayName());
+  trim(): ScalarFunctionOperation {
+    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.TRIM, 'Trim ' + this.displayName());
   }
   /** Remove leading whitespace. */
-  lstrip(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.LTRIM, 'LStrip ' + this.displayName());
+  trimStart(): ScalarFunctionOperation {
+    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.LTRIM, 'Trim Start ' + this.displayName());
   }
   /** Remove trailing whitespace. */
-  rstrip(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.RTRIM, 'RStrip ' + this.displayName());
+  trimEnd(): ScalarFunctionOperation {
+    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.RTRIM, 'Trim End ' + this.displayName());
   }
   /** Return the number of characters in the string. */
   length(): ScalarFunctionOperation {
