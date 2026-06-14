@@ -66,10 +66,11 @@ export abstract class Attribute {
   }
 
   private _windowSpec(
-    partitionBy?: ColumnWithJoin | ColumnWithJoin[],
+    partitionBy?: Attribute | ColumnWithJoin | (Attribute | ColumnWithJoin)[],
     orderBy?: SortOperation | SortOperation[],
   ): WindowSpecification {
-    const pb = partitionBy === undefined ? [] : Array.isArray(partitionBy) ? partitionBy : [partitionBy];
+    const pbArr = partitionBy === undefined ? [] : Array.isArray(partitionBy) ? partitionBy : [partitionBy];
+    const pb = pbArr.map(x => x instanceof Attribute ? x.cwj() : x);
     const ob = orderBy === undefined ? [] : Array.isArray(orderBy) ? orderBy : [orderBy];
     return new WindowSpecification(pb, ob);
   }
@@ -77,7 +78,7 @@ export abstract class Attribute {
   rank(opts: {
     method?: 'min' | 'dense' | 'first';
     pct?: boolean;
-    partitionBy?: ColumnWithJoin | ColumnWithJoin[];
+    partitionBy?: Attribute | ColumnWithJoin | (Attribute | ColumnWithJoin)[];
     orderBy?: SortOperation | SortOperation[];
   } = {}): WindowFunctionOperation {
     const { method = 'min', pct = false, partitionBy, orderBy } = opts;
@@ -93,7 +94,7 @@ export abstract class Attribute {
   }
 
   qcut(buckets: number, opts: {
-    partitionBy?: ColumnWithJoin | ColumnWithJoin[];
+    partitionBy?: Attribute | ColumnWithJoin | (Attribute | ColumnWithJoin)[];
     orderBy?: SortOperation | SortOperation[];
   } = {}): WindowFunctionOperation {
     return new WindowFunctionOperation(null, WindowFunction.NTILE, 'Quantile', buckets, [],
@@ -102,7 +103,7 @@ export abstract class Attribute {
 
   shift(periods = 1, opts: {
     fillValue?: string | number;
-    partitionBy?: ColumnWithJoin | ColumnWithJoin[];
+    partitionBy?: Attribute | ColumnWithJoin | (Attribute | ColumnWithJoin)[];
     orderBy?: SortOperation | SortOperation[];
   } = {}): WindowFunctionOperation {
     const extraArgs: (string | number)[] = opts.fillValue !== undefined ? [opts.fillValue] : [];
@@ -119,7 +120,7 @@ export abstract class Attribute {
   }
 
   first(opts: {
-    partitionBy?: ColumnWithJoin | ColumnWithJoin[];
+    partitionBy?: Attribute | ColumnWithJoin | (Attribute | ColumnWithJoin)[];
     orderBy?: SortOperation | SortOperation[];
   } = {}): WindowFunctionOperation {
     return new WindowFunctionOperation(
@@ -132,7 +133,7 @@ export abstract class Attribute {
   }
 
   last(opts: {
-    partitionBy?: ColumnWithJoin | ColumnWithJoin[];
+    partitionBy?: Attribute | ColumnWithJoin | (Attribute | ColumnWithJoin)[];
     orderBy?: SortOperation | SortOperation[];
   } = {}): WindowFunctionOperation {
     return new WindowFunctionOperation(

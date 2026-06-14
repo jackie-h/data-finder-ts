@@ -308,6 +308,7 @@ function buildQueryOperation(
 
   for (const col of columns) {
     if (col instanceof CountAllOperation) continue;
+    if (col instanceof WindowFunctionOperation && col.element === null) continue;
     let node: JoinTreeNodeOperation | undefined;
     if (col instanceof Attribute) {
       node = col.parent();
