@@ -83,4 +83,27 @@ describe('EmployeeFinder (orgchart, self-referential)', () => {
     expect(reports).toContain('Bob');
     expect(reports).toContain('Carol');
   });
+
+  it('manager name for Dave is Bob', async () => {
+    const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
+    const ef = new EmployeeFinder();
+    const rows = await ef.findAll(null, null, [ef.name(), ef.manager().name()], ef.name().eq('Dave')).toRows();
+    expect(rows[0][0]).toBe('Dave');
+    expect(rows[0][1]).toBe('Bob');
+  });
+
+  it('filters by manager name to find all direct reports', async () => {
+    const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
+    const ef = new EmployeeFinder();
+    const rows = await ef.findAll(null, null, [ef.name()], ef.manager().name().eq('Bob')).toRows();
+    expect(rows.map(r => r[0])).toEqual(['Dave']);
+  });
+
+  it('filters by manager Alice returns Bob and Carol ordered', async () => {
+    const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
+    const ef = new EmployeeFinder();
+    const rows = await ef.findAll(null, null, [ef.name()], ef.manager().name().eq('Alice'))
+      .orderByOp(ef.name().ascending()).toRows();
+    expect(rows.map(r => r[0])).toEqual(['Bob', 'Carol']);
+  });
 });
