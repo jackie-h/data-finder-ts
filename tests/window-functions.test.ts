@@ -67,7 +67,7 @@ describe('CompanyFinder — window functions: rank', () => {
     const rows = await cf.findAll(null, null, [cf.id(), cf.id().rank({ pct: true, method: 'max' as 'min', orderBy: [cf.id().ascending()] })])
       .orderByOp(cf.id().ascending()).toRows();
     const dists = rows.map(r => Number(r[1]));
-    expect(dists).toBeCloseTo ? dists.forEach((d, i) => expect(d).toBeCloseTo([0.2, 0.4, 0.6, 0.8, 1.0][i], 5)) : expect(dists).toEqual([0.2, 0.4, 0.6, 0.8, 1.0]);
+    [0.2, 0.4, 0.6, 0.8, 1.0].forEach((expected, i) => expect(dists[i]).toBeCloseTo(expected, 5));
   });
 });
 
