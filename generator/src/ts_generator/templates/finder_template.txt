@@ -8,6 +8,7 @@ import {
 } from '@model/milestoning';
 import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
 import type { Attribute } from '@datafinder/attribute';
+import { EmbeddedAttributes, embeddedUnder } from '@datafinder/embedded';
 {% set attr_types = get_used_attr_types(rcm) %}
 {% if attr_types %}
 import { {{attr_types | join(', ')}} } from '@datafinder/typed-attributes';
@@ -33,6 +34,22 @@ import { registerRelatedFinderClass, getRelatedFinderClass } from '@datafinder/f
 import { registerRelatedFinderClass } from '@datafinder/finder-registry';
 {% endif %}
 
+{% for rpm in rcm.property_mappings %}
+{% if not is_primitive(rpm.property) and rpm.property.type.name != rcm.clazz.name and flatten_embedded(rpm.target) %}
+/** Join-less alternates for '{{rpm.property.id}}.*' properties satisfied by flat columns on this table,
+ * merged with any deeper embedding forwarded by the caller. */
+function embeddedFor_{{to_ts_name(rpm.property)}}(incoming: EmbeddedAttributes | undefined, parent: JoinTreeNodeOperation | undefined, relationName: string): EmbeddedAttributes {
+  const result: EmbeddedAttributes = {};
+{% for dotted, leaf_prop, col in flatten_embedded(rpm.target) %}
+  result['{{dotted}}'] = new {{leaf_prop.type.name}}Attribute(relationName + ' {{display_name(leaf_prop)}}', '{{col.name}}', '{{col.type}}', '{{table_qualified_name(col.table)}}', parent);
+{% endfor %}
+  const forwarded = embeddedUnder(incoming, '{{rpm.property.id}}.');
+  if (forwarded) Object.assign(result, forwarded);
+  return result;
+}
+
+{% endif %}
+{% endfor %}
 {% set _class_doc = get_doc(rcm.clazz) %}
 {% if _class_doc %}
 /** {{_class_doc}} */
@@ -85,15 +102,15 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   private _{{reverse_name}}?: {{source_rcm.clazz.name}}RelatedFinder;
 {% endfor %}
 
-  constructor(relationName: string, source: Column, target: Column, parentJoin?: JoinTreeNodeOperation) {
+  constructor(relationName: string, source: Column, target: Column, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes) {
     super();
     const join = new JoinOperation(relationName, {{rcm.clazz.name}}RelatedFinder._table, source, target);
     this._node = new JoinTreeNodeOperation(join, parentJoin);
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
-    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(relationName + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node);
+    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(relationName + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node, embedded?.['{{rpm.property.id}}']);
 {% elif rpm.property.type.name != rcm.clazz.name %}
-    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node);
+    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node, {% if flatten_embedded(rpm.target) %}embeddedFor_{{to_ts_name(rpm.property)}}(embedded, this._node, '{{rpm.property.name}}'){% else %}embeddedUnder(embedded, '{{rpm.property.id}}.'){% endif %});
 {% endif %}
 {% endfor %}
   }
@@ -177,7 +194,7 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% if is_primitive(rpm.property) %}
   private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute('{{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}');
 {% elif rpm.property.type.name != rcm.clazz.name %}
-  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'));
+  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'){% if flatten_embedded(rpm.target) %}, undefined, embeddedFor_{{to_ts_name(rpm.property)}}(undefined, undefined, '{{rpm.property.name}}'){% endif %});
 {% endif %}
 {% endfor %}
 {% for rpm in rcm.property_mappings %}

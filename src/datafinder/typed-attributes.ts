@@ -28,7 +28,8 @@ export class StringAttribute extends Attribute {
     columnDbType: string,
     owner: string,
     parent?: JoinTreeNodeOperation,
-  ) { super(displayName, columnName, columnDbType, owner, parent); }
+    embedded?: Attribute,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
   /** Convert every character to uppercase. */
   toUpperCase(): ScalarFunctionOperation {
@@ -117,7 +118,8 @@ export abstract class NumericAttribute extends Attribute {
     columnDbType: string,
     owner: string,
     parent?: JoinTreeNodeOperation,
-  ) { super(displayName, columnName, columnDbType, owner, parent); }
+    embedded?: Attribute,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
   /** Sum of all values in the group. */
   sum(): AggregateOperation {
@@ -172,7 +174,8 @@ export class DoubleAttribute extends NumericAttribute {
     columnDbType: string,
     owner: string,
     parent?: JoinTreeNodeOperation,
-  ) { super(displayName, columnName, columnDbType, owner, parent); }
+    embedded?: Attribute,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number): Operation {
@@ -210,7 +213,8 @@ export class DecimalAttribute extends NumericAttribute {
     columnDbType: string,
     owner: string,
     parent?: JoinTreeNodeOperation,
-  ) { super(displayName, columnName, columnDbType, owner, parent); }
+    embedded?: Attribute,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number): Operation {
@@ -245,7 +249,8 @@ export class IntegerAttribute extends NumericAttribute {
     columnDbType: string,
     owner: string,
     parent?: JoinTreeNodeOperation,
-  ) { super(displayName, columnName, columnDbType, owner, parent); }
+    embedded?: Attribute,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number): Operation {
@@ -280,7 +285,8 @@ export class BooleanAttribute extends Attribute {
     columnDbType: string,
     owner: string,
     parent?: JoinTreeNodeOperation,
-  ) { super(displayName, columnName, columnDbType, owner, parent); }
+    embedded?: Attribute,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
   /** Filter to rows where this attribute equals `value`. */
   eq(value: boolean): Operation {
@@ -310,7 +316,8 @@ export class DateAttribute extends Attribute {
     columnDbType: string,
     owner: string,
     parent?: JoinTreeNodeOperation,
-  ) { super(displayName, columnName, columnDbType, owner, parent); }
+    embedded?: Attribute,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
   /** Filter to rows where this date equals `value`. */
   eq(value: Date | string): Operation {
@@ -378,7 +385,8 @@ export class DateTimeAttribute extends Attribute {
     columnDbType: string,
     owner: string,
     parent?: JoinTreeNodeOperation,
-  ) { super(displayName, columnName, columnDbType, owner, parent); }
+    embedded?: Attribute,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
   /** Filter to rows where this timestamp equals `value`. */
   eq(value: Date | string): Operation {
