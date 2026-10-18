@@ -49,6 +49,16 @@ Finders for tables with a business date (single business date, business date + p
 cpf.findForDateRange('2023-01-15', '2023-01-16', new Date(), [cpf.quantity()])
 ```
 
+## Query timeout
+
+Queries time out after 60 seconds by default. Override per query with `.timeout(ms)`; a runner that exceeds it rejects with `QueryTimeoutError`.
+
+```ts
+await af.findAll(null, null, [af.name()]).timeout(5_000).toRows();
+```
+
+Custom `QueryRunner`s receive the timeout as the last argument to `select`.
+
 ## Filter operators
 
 | Type | Methods |

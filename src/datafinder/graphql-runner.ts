@@ -1,5 +1,5 @@
 import { Attribute } from './attribute';
-import { QueryRunner, QueryTarget, Row } from './runner';
+import { DEFAULT_TIMEOUT_MS, QueryRunner, QueryTarget, QueryTimeoutError, Row } from './runner';
 import {
   RelationalOperationElement,
   SortOperation,
@@ -44,6 +44,7 @@ export class GraphQLConnect implements QueryRunner {
     _orderBy?: SortOperation[],
     _groupBy?: Attribute[],
     _limit?: number,
+    timeoutMs: number = DEFAULT_TIMEOUT_MS,
   ): Promise<Row[]> {
     const gqlQuery = table as GraphQLQuery;
     const fieldNames = (columns as Attribute[]).map(col => col.column().name);
@@ -53,11 +54,18 @@ export class GraphQLConnect implements QueryRunner {
     const args = argParts.length > 0 ? `(${argParts.join(', ')})` : '';
     const queryStr = `{ ${gqlQuery.name}${args} { ${fieldsStr} } }`;
 
-    const response = await fetch(gqlQuery.endpoint.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: queryStr }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(gqlQuery.endpoint.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: queryStr }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      if (e instanceof Error && e.name === 'TimeoutError') throw new QueryTimeoutError(timeoutMs);
+      throw e;
+    }
 
     if (!response.ok) {
       throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);

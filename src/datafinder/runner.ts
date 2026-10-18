@@ -10,6 +10,16 @@ import {
 
 export type Row = unknown[];
 
+export const DEFAULT_TIMEOUT_MS = 60_000;
+
+/** Thrown by a QueryRunner when a query runs longer than the timeout set on its FinderResult. */
+export class QueryTimeoutError extends Error {
+  constructor(readonly timeoutMs: number) {
+    super(`Query exceeded ${timeoutMs}ms timeout`);
+    this.name = 'QueryTimeoutError';
+  }
+}
+
 /** Minimum interface satisfied by both Table (SQL) and GraphQLQuery (GraphQL). */
 export interface QueryTarget {
   readonly name: string;
@@ -25,6 +35,7 @@ export interface QueryRunner {
     orderBy?: SortOperation[],
     groupBy?: Attribute[],
     limit?: number,
+    timeoutMs?: number,
     businessDateTo?: Date | null,
   ): Promise<Row[]>;
 }
@@ -42,6 +53,7 @@ export class FinderResult {
   private _orderBy: SortOperation[] = [];
   private _groupBy: Attribute[] = [];
   private _limit?: number;
+  private _timeoutMs: number = DEFAULT_TIMEOUT_MS;
 
   constructor(
     private readonly _businessDate: Date | null,
@@ -64,6 +76,12 @@ export class FinderResult {
 
   limit(n: number): this {
     this._limit = n;
+    return this;
+  }
+
+  /** Abort the query and throw QueryTimeoutError if it runs longer than `milliseconds` (default 60000). */
+  timeout(milliseconds: number): this {
+    this._timeoutMs = milliseconds;
     return this;
   }
 
@@ -91,6 +109,7 @@ export class FinderResult {
       this._orderBy,
       this._groupBy,
       this._limit,
+      this._timeoutMs,
       this._businessDateTo,
     );
   }
