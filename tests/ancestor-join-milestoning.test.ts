@@ -9,40 +9,9 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb } from './duckdb-runner';
-import { StringAttribute } from '../src/datafinder/typed-attributes';
-import { convertInputsAndSelect } from '../src/datafinder/runner';
 import {
-  Column, JoinOperation, JoinTreeNodeOperation, NoOperation, Table,
-} from '../src/model/relational';
-import { MilestonedTable, ProcessingTemporalColumns } from '../src/model/milestoning';
-
-const AT = '2023-12-01 12:00:00';
-const BOTH_AT = '2021-06-01 12:00:00';
-
-const processing = () => new ProcessingTemporalColumns(new Column('in_z', 'TIMESTAMP'), new Column('out_z', 'TIMESTAMP'));
-const tradeTable = new MilestonedTable('trading.trades', [], processing());
-const accountTable = new MilestonedTable('ref_data.account_master', [], processing());
-const branchTable = new Table('ref_data.branch', []);
-
-const accountJoin = new JoinOperation(
-  'Account', accountTable,
-  new Column('account_id', 'INT', 'trading.trades'), new Column('ID', 'INT', 'ref_data.account_master'),
-);
-const accountNode = new JoinTreeNodeOperation(accountJoin);
-const branchNode = new JoinTreeNodeOperation(
-  new JoinOperation(
-    'Branch', branchTable,
-    new Column('BRANCH_ID', 'INT', 'ref_data.account_master'), new Column('ID', 'INT', 'ref_data.branch'),
-  ),
-  accountNode,
-);
-
-const symbol = new StringAttribute('Symbol', 'sym', 'VARCHAR', 'trading.trades');
-const accountName = new StringAttribute('Account Name', 'ACCT_NAME', 'VARCHAR', 'ref_data.account_master', accountNode);
-const branchCity = new StringAttribute('Branch City', 'CITY', 'VARCHAR', 'ref_data.branch', branchNode);
-
-const find = (processingAt: string, columns: StringAttribute[], filter = new NoOperation()) =>
-  convertInputsAndSelect(null, processingAt, columns, tradeTable, filter);
+  AT, BOTH_AT, accountJoin, accountName, branchCity, find, seedTradeAccountBranch, symbol,
+} from './trade-account-branch';
 
 let conn: DuckDBConnection;
 let instance: DuckDBInstance;
@@ -51,18 +20,7 @@ beforeAll(async () => {
   instance = await DuckDBInstance.create(':memory:');
   conn = await instance.connect();
   registerDuckDb(conn);
-  await conn.run('CREATE SCHEMA trading');
-  await conn.run('CREATE SCHEMA ref_data');
-  await conn.run('CREATE TABLE trading.trades (sym VARCHAR, price DOUBLE, is_settled BOOLEAN, account_id INT, in_z TIMESTAMP, out_z TIMESTAMP)');
-  await conn.run(`INSERT INTO trading.trades VALUES
-    ('AAPL', 84.11, true, 1, '2020-01-01', '9999-12-31 23:59:59'),
-    ('GOOG', 200.0, false, 1, '2020-01-01', '2022-01-01')`);
-  await conn.run('CREATE TABLE ref_data.account_master (ID INT, ACCT_NAME VARCHAR, BRANCH_ID INT, in_z TIMESTAMP, out_z TIMESTAMP)');
-  await conn.run(`INSERT INTO ref_data.account_master VALUES
-    (1, 'Acme Ltd', 10, '2020-01-01', '2022-01-01'),
-    (1, 'Acme Corp', 11, '2022-01-01', '9999-12-31 23:59:59')`);
-  await conn.run('CREATE TABLE ref_data.branch (ID INT, CITY VARCHAR)');
-  await conn.run("INSERT INTO ref_data.branch VALUES (10, 'London'), (11, 'New York')");
+  await seedTradeAccountBranch(conn);
 });
 
 afterAll(() => {

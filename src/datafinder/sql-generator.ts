@@ -327,31 +327,44 @@ function buildMilestoningFilterOperationForDateRange(
 
 type RefVisitor = (ref: Attribute | ColumnWithJoin) => void;
 
-/** Call `visit` for every Attribute/ColumnWithJoin referenced anywhere in `op`. */
-function walkRefs(op: RelationalOperationElement | null | undefined, visit: RefVisitor): void {
+type NodeVisitor = (node: JoinTreeNodeOperation) => void;
+
+/**
+ * Call `visit` for every Attribute/ColumnWithJoin referenced anywhere in `op`, and `visitExists` for the
+ * join node of every exists()/notExists(). The latter are not attribute references, so they don't count
+ * against whether other references to the same node can be satisfied by an embedded alternate.
+ */
+function walkRefs(
+  op: RelationalOperationElement | null | undefined,
+  visit: RefVisitor,
+  visitExists?: NodeVisitor,
+): void {
   if (op === null || op === undefined) return;
   if (op instanceof Attribute || op instanceof ColumnWithJoin) {
     visit(op);
+  } else if (op instanceof ExistsOperation || op instanceof NotExistsOperation) {
+    visitExists?.(op.node);
   } else if (op instanceof AggregateOperation) {
-    walkRefs(op.element, visit);
-    if (op.window) walkWindowSpec(op.window, visit);
+    walkRefs(op.element, visit, visitExists);
+    if (op.window) walkWindowSpec(op.window, visit, visitExists);
   } else if (op instanceof WindowFunctionOperation) {
-    if (op.element) walkRefs(op.element, visit);
-    if (op.window) walkWindowSpec(op.window, visit);
+    if (op.element) walkRefs(op.element, visit, visitExists);
+    if (op.window) walkWindowSpec(op.window, visit, visitExists);
   } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation ||
-             op instanceof DateArithmeticOperation || op instanceof DateDiffOperation) {
-    walkRefs((op as UnaryOperation).element, visit);
+             op instanceof DateArithmeticOperation || op instanceof DateDiffOperation ||
+             op instanceof IsNullOperation || op instanceof IsNotNullOperation) {
+    walkRefs((op as UnaryOperation).element, visit, visitExists);
   } else if (op instanceof SortOperation) {
-    walkRefs(op.column, visit);
+    walkRefs(op.column, visit, visitExists);
   } else if (op instanceof LogicalOperation || op instanceof ComparisonOperation) {
-    walkRefs((op as any).left, visit);
-    walkRefs((op as any).right, visit);
+    walkRefs((op as any).left, visit, visitExists);
+    walkRefs((op as any).right, visit, visitExists);
   }
 }
 
-function walkWindowSpec(window: WindowSpecification, visit: RefVisitor): void {
-  for (const p of window.partitionBy) walkRefs(p, visit);
-  for (const s of window.orderBy) walkRefs(s.column, visit);
+function walkWindowSpec(window: WindowSpecification, visit: RefVisitor, visitExists?: NodeVisitor): void {
+  for (const p of window.partitionBy) walkRefs(p, visit, visitExists);
+  for (const s of window.orderBy) walkRefs(s.column, visit, visitExists);
 }
 
 /**
@@ -428,10 +441,11 @@ function buildQueryOperation(
     const parent = ref instanceof Attribute ? ref.parent() : ref.parent;
     if (parent !== undefined) requiredJoins.add(parent);
   };
-  for (const col of columns) walkRefs(col, collect);
-  for (const expr of groupBy) walkRefs(expr, collect);
-  for (const sort of orderBy) walkRefs(sort, collect);
-  walkRefs(op, collect);
+  const collectNode: NodeVisitor = node => requiredJoins.add(node);
+  for (const col of columns) walkRefs(col, collect, collectNode);
+  for (const expr of groupBy) walkRefs(expr, collect, collectNode);
+  for (const sort of orderBy) walkRefs(sort, collect, collectNode);
+  walkRefs(op, collect, collectNode);
 
   for (const node of withAncestors(requiredJoins)) {
     let combined: Operation | undefined;
