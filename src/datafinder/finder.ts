@@ -1,20 +1,7 @@
-import { RelationalOperationElement, LogicalOperation, LogicalOperator, JoinTreeNodeOperation } from '../model/relational';
+import { ExistsOperation, NotExistsOperation, JoinTreeNodeOperation } from '../model/relational';
 
-export class ExistsOperation extends RelationalOperationElement {
-  constructor(readonly node: JoinTreeNodeOperation) { super(); }
-
-  andOp(other: RelationalOperationElement): LogicalOperation {
-    return new LogicalOperation(this, LogicalOperator.AND, other);
-  }
-}
-
-export class NotExistsOperation extends RelationalOperationElement {
-  constructor(readonly node: JoinTreeNodeOperation) { super(); }
-
-  andOp(other: RelationalOperationElement): LogicalOperation {
-    return new LogicalOperation(this, LogicalOperator.AND, other);
-  }
-}
+// Defined in the relational model; re-exported so existing imports keep working.
+export { ExistsOperation, NotExistsOperation };
 
 export class RelatedFinder {
   constructor(private readonly _node: JoinTreeNodeOperation) {}

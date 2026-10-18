@@ -339,3 +339,36 @@ export class SortOperation {
 export class CountAllOperation extends RelationalOperationElement {
   constructor(readonly table: string) { super(); }
 }
+
+export class Alias extends RelationalOperationElement {
+  constructor(readonly element: RelationalOperationElement, readonly name: string) { super(); }
+}
+
+/** Returned by `RelatedFinder.exists()`. A backend translates it to a join-presence check. */
+export class ExistsOperation extends RelationalOperationElement {
+  constructor(readonly node: JoinTreeNodeOperation) { super(); }
+
+  andOp(other: RelationalOperationElement): LogicalOperation {
+    return new LogicalOperation(this, LogicalOperator.AND, other);
+  }
+}
+
+/** Returned by `RelatedFinder.notExists()`. A backend translates it to a join-absence check. */
+export class NotExistsOperation extends RelationalOperationElement {
+  constructor(readonly node: JoinTreeNodeOperation) { super(); }
+
+  andOp(other: RelationalOperationElement): LogicalOperation {
+    return new LogicalOperation(this, LogicalOperator.AND, other);
+  }
+}
+
+export class SelectOperation {
+  constructor(
+    readonly display: RelationalOperationElement[],
+    readonly filter: RelationalOperationElement,
+    readonly orderBy: SortOperation[] = [],
+    readonly groupBy: RelationalOperationElement[] = [],
+    readonly limit?: number,
+    readonly table?: Table,
+  ) {}
+}
