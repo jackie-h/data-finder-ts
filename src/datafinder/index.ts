@@ -4,7 +4,7 @@ export * from './typed-attributes';
 export { toSql, selectSqlToString } from './sql-generator';
 export { titleCase } from './naming';
 export { EmbeddedAttributes, embeddedUnder } from './embedded';
-export { ExistsOperation, NotExistsOperation, RelatedFinder } from './finder';
+export { RelatedFinder } from './finder';
 export {
   FinderResult,
   QueryRunner,

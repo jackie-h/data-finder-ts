@@ -1,8 +1,5 @@
 import { ExistsOperation, NotExistsOperation, JoinTreeNodeOperation } from '../model/relational';
 
-// Defined in the relational model; re-exported so existing imports keep working.
-export { ExistsOperation, NotExistsOperation };
-
 export class RelatedFinder {
   constructor(private readonly _node: JoinTreeNodeOperation) {}
 

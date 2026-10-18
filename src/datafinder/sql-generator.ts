@@ -770,4 +770,4 @@ export function toSql(
   return selectSqlToString(selectOp);
 }
 
-export { buildQueryOperation, SelectOperation };
+export { buildQueryOperation };
