@@ -14,7 +14,7 @@ beforeAll(async () => {
   conn = await instance.connect();
   registerDuckDb(conn);
   await conn.run('CREATE TABLE companies (id INT, name VARCHAR, category VARCHAR)');
-  await conn.run("INSERT INTO companies SELECT range, 'Company ' || range, 'Cat' || (range % 7) FROM range(5000000)");
+  await conn.run("INSERT INTO companies VALUES (7, 'Company 7', 'Tech'), (42, 'Company 42', 'Finance')");
   cf = new CompanyFinder();
 });
 
@@ -24,14 +24,33 @@ afterAll(() => {
 });
 
 describe('FinderResult.timeout', () => {
-  it('aborts a slow query with QueryTimeoutError', async () => {
-    const slow = cf.findAll(null, null, [cf.id(), cf.name().length(), cf.id().rank({ orderBy: [cf.name().ascending()] })]);
-    await expect(slow.timeout(1).toRows()).rejects.toThrow(QueryTimeoutError);
-  });
+  describe('against a query that takes far longer than the timeout', () => {
+    // `companies` becomes a view over ten billion generated rows, so summing the ids runs for
+    // far longer than the test's own 5s limit however fast the machine is. The query returns one row, so nothing large is ever read.
+    const SHORT_TIMEOUT_MS = 50;
+    const slow = () => cf.findAll(null, null, [cf.id().sum()]);
 
-  it('reports the configured timeout in the error', async () => {
-    const slow = cf.findAll(null, null, [cf.id(), cf.id().rank({ orderBy: [cf.name().ascending()] })]);
-    await expect(slow.timeout(1).toRows()).rejects.toMatchObject({ timeoutMs: 1, message: 'Query exceeded 1ms timeout' });
+    beforeAll(async () => {
+      await conn.run('ALTER TABLE companies RENAME TO companies_small');
+      await conn.run(`CREATE VIEW companies AS
+        SELECT ((range * 7919) % 1000003)::INT AS id, 'Company' AS name, 'Cat' AS category FROM range(10000000000)`);
+    });
+
+    afterAll(async () => {
+      await conn.run('DROP VIEW companies');
+      await conn.run('ALTER TABLE companies_small RENAME TO companies');
+    });
+
+    it('aborts with QueryTimeoutError', async () => {
+      await expect(slow().timeout(SHORT_TIMEOUT_MS).toRows()).rejects.toThrow(QueryTimeoutError);
+    });
+
+    it('reports the configured timeout in the error', async () => {
+      await expect(slow().timeout(SHORT_TIMEOUT_MS).toRows()).rejects.toMatchObject({
+        timeoutMs: SHORT_TIMEOUT_MS,
+        message: `Query exceeded ${SHORT_TIMEOUT_MS}ms timeout`,
+      });
+    });
   });
 
   it('lets queries finishing inside the timeout complete', async () => {
