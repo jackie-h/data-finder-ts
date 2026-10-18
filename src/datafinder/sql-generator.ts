@@ -381,6 +381,22 @@ function buildJoinFilterFromProperties(
   return ops.reduce((acc, op) => new LogicalOperation(acc, LogicalOperator.AND, op));
 }
 
+/**
+ * The nodes plus every ancestor, each once, ancestors first. The SQL generator joins a node's
+ * ancestors whenever it joins the node, so each of them needs its join filter set too, not only the
+ * nodes an expression refers to directly.
+ */
+function withAncestors(nodes: Iterable<JoinTreeNodeOperation>): JoinTreeNodeOperation[] {
+  const ordered = new Set<JoinTreeNodeOperation>();
+  const add = (node: JoinTreeNodeOperation): void => {
+    if (ordered.has(node)) return;
+    if (node.parent !== undefined) add(node.parent);
+    ordered.add(node);
+  };
+  for (const node of nodes) add(node);
+  return [...ordered];
+}
+
 function buildQueryOperation(
   businessDate: Date | null,
   processingDatetime: Date | null,
@@ -417,7 +433,7 @@ function buildQueryOperation(
   for (const sort of orderBy) walkRefs(sort, collect);
   walkRefs(op, collect);
 
-  for (const node of requiredJoins) {
+  for (const node of withAncestors(requiredJoins)) {
     let combined: Operation | undefined;
     if (Object.keys(node.join.filterKwargs).length > 0) {
       combined = buildJoinFilterFromProperties(node, node.join.filterKwargs, node.join.filterColumnMap);
