@@ -63,4 +63,13 @@ export abstract class {{rcm.clazz.name}}FinderBase {
     displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
     filterOp?: Operation,
   ): FinderResult;
+{% if rcm.milestone_mapping and (has_bitemporal(rcm.milestone_mapping) or has_business_date_and_processing(rcm.milestone_mapping) or has_uni_business_temporal(rcm.milestone_mapping)) %}
+  abstract findForDateRange(
+    businessDateFrom: Date | string,
+    businessDateTo: Date | string,
+    processingValidAt: Date | string,
+    displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
+    filterOp?: Operation,
+  ): FinderResult;
+{% endif %}
 }
