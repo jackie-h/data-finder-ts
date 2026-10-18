@@ -13,4 +13,6 @@ export {
   getRunner,
   convertInputsAndSelect,
   convertInputsAndSelectForDateRange,
+  DEFAULT_TIMEOUT_MS,
+  QueryTimeoutError,
 } from './runner';

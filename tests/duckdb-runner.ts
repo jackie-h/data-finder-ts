@@ -1,5 +1,5 @@
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
-import { QueryRunner, QueryTarget, registerRunner, clearRunner } from '../src/datafinder/runner';
+import { DEFAULT_TIMEOUT_MS, QueryRunner, QueryTarget, QueryTimeoutError, registerRunner, clearRunner } from '../src/datafinder/runner';
 import { toSql } from '../src/datafinder/sql-generator';
 import type { Attribute } from '../src/datafinder/attribute';
 import type { Table, SortOperation, RelationalOperationElement } from '../src/model/relational';
@@ -16,11 +16,21 @@ export class DuckDbRunner implements QueryRunner {
     orderBy: SortOperation[] = [],
     groupBy: Attribute[] = [],
     limit?: number,
+    timeoutMs: number = DEFAULT_TIMEOUT_MS,
     businessDateTo: Date | null = null,
   ): Promise<unknown[][]> {
     const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit, businessDateTo);
     console.log('[SQL]', sql);
-    const result = await this.conn.run(sql);
+    const timer = setTimeout(() => this.conn.interrupt(), timeoutMs);
+    let result;
+    try {
+      result = await this.conn.run(sql);
+    } catch (e) {
+      if (e instanceof Error && /INTERRUPT/i.test(e.message)) throw new QueryTimeoutError(timeoutMs);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
     const rows: unknown[][] = [];
     for (let i = 0; i < result.chunkCount; i++) {
       const chunk = result.getChunk(i);
