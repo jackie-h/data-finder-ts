@@ -89,6 +89,10 @@ tf.findAll(null, new Date(),
 
 Chains are arbitrarily deep: `tf.account().address().city().eq('London')`.
 
+### Embedded (denormalized) columns
+
+If the mapping declares flat columns on the table that duplicate a related property (e.g. `acct_name` for `account.name`, see `finance_mapping_embedded.md`), the generated finders carry them as join-less alternates. When every property taken from a related table has one, whether projected, filtered, grouped, ordered or partitioned on, the JOIN is left out of the SQL. If any property from that table lacks one (e.g. `account().id()`), the real join is used for all of them.
+
 ## Count
 
 ```ts

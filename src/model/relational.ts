@@ -314,9 +314,14 @@ export class JoinTreeNodeOperation {
 }
 
 export class ColumnWithJoin extends RelationalOperationElement {
+  /**
+   * `embedded` is an alternate reference to a flat (denormalized) column on the owning table that
+   * holds the same value without the join; the SQL generator uses it when the join can be elided.
+   */
   constructor(
     readonly column: Column,
     readonly parent?: JoinTreeNodeOperation,
+    readonly embedded?: ColumnWithJoin,
   ) { super(); }
 }
 

@@ -18,6 +18,7 @@ export abstract class Attribute {
   private readonly _column: Column;
   private readonly _owner: string;
   private readonly _parent?: JoinTreeNodeOperation;
+  private readonly _embedded?: Attribute;
 
   constructor(
     displayName: string,
@@ -25,11 +26,13 @@ export abstract class Attribute {
     columnDbType: string,
     owner: string,
     parent?: JoinTreeNodeOperation,
+    embedded?: Attribute,
   ) {
     this._displayName = displayName;
     this._column = new Column(columnName, columnDbType, owner);
     this._owner = owner;
     this._parent = parent;
+    this._embedded = embedded;
   }
 
   column(): Column { return this._column; }
@@ -37,14 +40,17 @@ export abstract class Attribute {
   parent(): JoinTreeNodeOperation | undefined { return this._parent; }
   displayName(): string { return this._displayName; }
 
+  /** Alternate attribute on a flat column of the owning table, used in place of this one when its join is elided. */
+  embedded(): Attribute | undefined { return this._embedded; }
+
   cwj(): ColumnWithJoin {
-    return new ColumnWithJoin(this._column, this._parent);
+    return new ColumnWithJoin(this._column, this._parent, this._embedded?.cwj());
   }
 
   /** Count the number of non-null values. Use in a projection with `groupByOp` to aggregate per group. */
   count(): AggregateOperation {
     return new AggregateOperation(
-      new ColumnWithJoin(this._column, this._parent),
+      this.cwj(),
       AggregateOperator.COUNT,
       this._displayName + ' Count',
     );
@@ -52,22 +58,22 @@ export abstract class Attribute {
 
   /** Sort this attribute in ascending order. Pass to `orderByOp` or a window function's `orderBy`. */
   ascending(): SortOperation {
-    return new SortOperation(new ColumnWithJoin(this._column, this._parent), SortDirection.ASC);
+    return new SortOperation(this.cwj(), SortDirection.ASC);
   }
 
   /** Sort this attribute in descending order. Pass to `orderByOp` or a window function's `orderBy`. */
   descending(): SortOperation {
-    return new SortOperation(new ColumnWithJoin(this._column, this._parent), SortDirection.DESC);
+    return new SortOperation(this.cwj(), SortDirection.DESC);
   }
 
   /** Filter to rows where this attribute has no value. */
   isNull(): IsNullOperation {
-    return new IsNullOperation(new ColumnWithJoin(this._column, this._parent));
+    return new IsNullOperation(this.cwj());
   }
 
   /** Filter to rows where this attribute has a value. */
   isNotNull(): IsNotNullOperation {
-    return new IsNotNullOperation(new ColumnWithJoin(this._column, this._parent));
+    return new IsNotNullOperation(this.cwj());
   }
 
   private _windowSpec(
@@ -139,7 +145,7 @@ export abstract class Attribute {
     const func = periods >= 0 ? WindowFunction.LAG : WindowFunction.LEAD;
     const label = periods >= 0 ? 'Lag' : 'Lead';
     return new WindowFunctionOperation(
-      new ColumnWithJoin(this._column, this._parent),
+      this.cwj(),
       func,
       label + ' ' + this._displayName,
       Math.abs(periods),
@@ -157,7 +163,7 @@ export abstract class Attribute {
     orderBy?: SortOperation | SortOperation[];
   } = {}): WindowFunctionOperation {
     return new WindowFunctionOperation(
-      new ColumnWithJoin(this._column, this._parent),
+      this.cwj(),
       WindowFunction.FIRST_VALUE,
       'First ' + this._displayName,
       undefined, [],
@@ -174,7 +180,7 @@ export abstract class Attribute {
     orderBy?: SortOperation | SortOperation[];
   } = {}): WindowFunctionOperation {
     return new WindowFunctionOperation(
-      new ColumnWithJoin(this._column, this._parent),
+      this.cwj(),
       WindowFunction.LAST_VALUE,
       'Last ' + this._displayName,
       undefined, [],

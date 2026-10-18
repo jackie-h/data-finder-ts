@@ -219,6 +219,10 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
   throw new TypeError('Unknown operation in sqlOperationToString: ' + operation.constructor.name);
 }
 
+function embeddedOf(ref: Attribute | ColumnWithJoin): Attribute | ColumnWithJoin | undefined {
+  return ref instanceof Attribute ? ref.embedded() : ref.embedded;
+}
+
 function findColumn(operation: RelationalOperationElement): ColumnWithJoin {
   if (operation instanceof UnaryOperation) return findColumn(operation.element);
   if (operation instanceof ColumnWithJoin) return operation;
@@ -401,9 +405,11 @@ class SQLQueryGenerator {
   private _tableAliasesByTable = new Map<unknown, TableAlias>();
   private _addedJoinIds = new Set<JoinTreeNodeOperation>();
   private _rootTable?: Table;
+  private _elidableNodes = new Set<JoinTreeNodeOperation>();
 
   generate(select: SelectOperation): void {
     this._rootTable = select.table;
+    this._elidableNodes = this._computeElidableNodes(select);
     if (this._rootTable !== undefined) {
       this._from.add(this._tableAliasForTable(this._rootTable.qualifiedName, this._rootTable.qualifiedName));
     }
@@ -424,42 +430,79 @@ class SQLQueryGenerator {
   }
 
   private _attrToColString(attr: Attribute): string {
-    const node = attr.parent();
-    const ta = this._tableAliasForTable(attr.owner(), node ?? attr.owner());
-    return ta.alias + '.' + attr.column().name;
+    const { column, parent } = this._resolve(attr);
+    const ta = this._tableAliasForTable(column.owner!, parent ?? column.owner!);
+    return ta.alias + '.' + column.name;
+  }
+
+  /** Call `visit` for every Attribute/ColumnWithJoin referenced anywhere in `op`. */
+  private _walkRefs(op: RelationalOperationElement | null | undefined, visit: (ref: Attribute | ColumnWithJoin) => void): void {
+    if (op === null || op === undefined) return;
+    if (op instanceof Attribute || op instanceof ColumnWithJoin) {
+      visit(op);
+    } else if (op instanceof AggregateOperation) {
+      this._walkRefs(op.element, visit);
+      if (op.window) this._walkWindowSpec(op.window, visit);
+    } else if (op instanceof WindowFunctionOperation) {
+      if (op.element) this._walkRefs(op.element, visit);
+      if (op.window) this._walkWindowSpec(op.window, visit);
+    } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation ||
+               op instanceof DateArithmeticOperation || op instanceof DateDiffOperation) {
+      this._walkRefs((op as UnaryOperation).element, visit);
+    } else if (op instanceof SortOperation) {
+      this._walkRefs(op.column, visit);
+    } else if (op instanceof LogicalOperation || op instanceof ComparisonOperation) {
+      this._walkRefs((op as any).left, visit);
+      this._walkRefs((op as any).right, visit);
+    }
+  }
+
+  private _walkWindowSpec(window: WindowSpecification, visit: (ref: Attribute | ColumnWithJoin) => void): void {
+    for (const p of window.partitionBy) this._walkRefs(p, visit);
+    for (const s of window.orderBy) this._walkRefs(s.column, visit);
   }
 
   private _collectRequiredJoins(op: RelationalOperationElement | null | undefined, out: Map<JoinTreeNodeOperation, JoinTreeNodeOperation>): void {
-    if (op === null || op === undefined) return;
-    if (op instanceof Attribute) {
-      const p = op.parent();
-      if (p !== undefined) out.set(p, p);
-    } else if (op instanceof ColumnWithJoin) {
-      if (op.parent !== undefined) out.set(op.parent, op.parent);
-    } else if (op instanceof AggregateOperation) {
-      this._collectRequiredJoins(op.element, out);
-      if (op.window) this._collectRequiredJoins(op.window as unknown as RelationalOperationElement, out);
-    } else if (op instanceof WindowFunctionOperation) {
-      if (op.element) this._collectRequiredJoins(op.element, out);
-      if (op.window) this._collectRequiredJoinsFromWindowSpec(op.window, out);
-    } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation ||
-               op instanceof DateArithmeticOperation || op instanceof DateDiffOperation) {
-      this._collectRequiredJoins((op as UnaryOperation).element, out);
-    } else if (op instanceof SortOperation) {
-      this._collectRequiredJoins(op.column, out);
-    } else if (op instanceof LogicalOperation || op instanceof ComparisonOperation) {
-      this._collectRequiredJoins((op as any).left, out);
-      this._collectRequiredJoins((op as any).right, out);
-    }
+    this._walkRefs(op, ref => {
+      const { parent } = this._resolve(ref);
+      if (parent !== undefined) out.set(parent, parent);
+    });
   }
 
-  private _collectRequiredJoinsFromWindowSpec(window: WindowSpecification, out: Map<JoinTreeNodeOperation, JoinTreeNodeOperation>): void {
-    for (const p of window.partitionBy) {
-      this._collectRequiredJoins(p, out);
+  /**
+   * Determine upfront which join nodes can be satisfied entirely by embedded (join-less) alternates:
+   * a node is elidable when every reference to it has an embedded alternate. A reference without one
+   * (e.g. a milestoning column) keeps the join for every reference to that node.
+   */
+  private _computeElidableNodes(select: SelectOperation): Set<JoinTreeNodeOperation> {
+    const refsByNode = new Map<JoinTreeNodeOperation, (Attribute | ColumnWithJoin)[]>();
+    const record = (ref: Attribute | ColumnWithJoin) => {
+      const parent = ref instanceof Attribute ? ref.parent() : ref.parent;
+      if (parent === undefined) return;
+      const refs = refsByNode.get(parent);
+      if (refs) refs.push(ref); else refsByNode.set(parent, [ref]);
+    };
+    for (const col of select.display) this._walkRefs(col, record);
+    for (const expr of select.groupBy) this._walkRefs(expr, record);
+    for (const sort of select.orderBy) this._walkRefs(sort, record);
+    this._walkRefs(select.filter, record);
+
+    const elidable = new Set<JoinTreeNodeOperation>();
+    for (const [node, refs] of refsByNode) {
+      if (refs.every(ref => embeddedOf(ref) !== undefined)) elidable.add(node);
     }
-    for (const s of window.orderBy) {
-      this._collectRequiredJoins(s.column, out);
+    return elidable;
+  }
+
+  /** The (column, parent) a reference should resolve to, substituting its embedded alternate when its join is elided. */
+  private _resolve(ref: Attribute | ColumnWithJoin): { column: Column; parent?: JoinTreeNodeOperation } {
+    const column = ref instanceof Attribute ? ref.column() : ref.column;
+    const parent = ref instanceof Attribute ? ref.parent() : ref.parent;
+    if (parent !== undefined && this._elidableNodes.has(parent)) {
+      const embedded = embeddedOf(ref);
+      if (embedded !== undefined) return this._resolve(embedded);
     }
+    return { column, parent };
   }
 
   private _rewriteWindowSpec(window: WindowSpecification): WindowSpecification {
@@ -469,15 +512,9 @@ class SQLQueryGenerator {
   }
 
   private _rewriteOperation(op: RelationalOperationElement): RelationalOperationElement {
-    if (op instanceof Attribute) {
-      const ta = this._tableAliasForTable(op.owner(), op.parent() ?? op.owner());
-      return new TableAliasColumn(op.column(), ta);
-    }
-    if (op instanceof ColumnWithJoin) {
-      const ta = op.parent !== undefined
-        ? this._tableAliasForTable(op.column.owner!, op.parent)
-        : this._tableAliasForTable(op.column.owner!, op.column.owner!);
-      return new TableAliasColumn(op.column, ta);
+    if (op instanceof Attribute || op instanceof ColumnWithJoin) {
+      const { column, parent } = this._resolve(op);
+      return new TableAliasColumn(column, this._tableAliasForTable(column.owner!, parent ?? column.owner!));
     }
     if (op instanceof Column) {
       const ta = this._tableAliasForTable(op.owner!, op.owner!);
@@ -521,15 +558,15 @@ class SQLQueryGenerator {
 
     for (const col of cols) {
       if (col instanceof Attribute) {
-        const node = col.parent();
+        const { column, parent: node } = this._resolve(col);
         let ta: TableAlias;
         if (node !== undefined) {
-          ta = this._tableAliasForTable(col.owner(), node);
+          ta = this._tableAliasForTable(column.owner!, node);
         } else {
-          ta = this._tableAliasForTable(col.owner(), col.owner());
+          ta = this._tableAliasForTable(column.owner!, column.owner!);
           this._from.add(ta);
         }
-        this._select.push(new Alias(new TableAliasColumn(col.column(), ta), col.displayName()));
+        this._select.push(new Alias(new TableAliasColumn(column, ta), col.displayName()));
       } else if (col instanceof WindowFunctionOperation) {
         const rewritten = this._rewriteOperation(col) as WindowFunctionOperation;
         let alias: string;
@@ -544,7 +581,7 @@ class SQLQueryGenerator {
         }
         this._select.push(new Alias(rewritten, alias));
       } else if (col instanceof AggregateOperation) {
-        const colNested = findColumn(col);
+        const colNested = this._resolve(findColumn(col));
         const node = colNested.parent;
         let ta: TableAlias;
         if (node !== undefined) {
@@ -553,14 +590,14 @@ class SQLQueryGenerator {
           ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
           this._from.add(ta);
         }
-        const alias = col.displayName ?? col.operator + ' ' + colNested.column.name;
+        const alias = col.displayName ?? col.operator + ' ' + findColumn(col).column.name;
         const rewrittenAgg = new AggregateOperation(
           new TableAliasColumn(colNested.column, ta), col.operator, undefined,
           col.window ? this._rewriteWindowSpec(col.window) : undefined,
         );
         this._select.push(new Alias(rewrittenAgg, alias));
       } else if (col instanceof ScalarFunctionOperation) {
-        const colNested = findColumn(col);
+        const colNested = this._resolve(findColumn(col));
         const node = colNested.parent;
         let ta: TableAlias;
         if (node !== undefined) {
@@ -569,13 +606,13 @@ class SQLQueryGenerator {
           ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
           this._from.add(ta);
         }
-        const alias = col.displayName ?? col.func + ' ' + colNested.column.name;
+        const alias = col.displayName ?? col.func + ' ' + findColumn(col).column.name;
         this._select.push(new Alias(
           new ScalarFunctionOperation(new TableAliasColumn(colNested.column, ta), col.func, undefined, col.secondArg, col.extraArgs),
           alias,
         ));
       } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation || col instanceof DateDiffOperation) {
-        const colNested = findColumn(col as RelationalOperationElement);
+        const colNested = this._resolve(findColumn(col as RelationalOperationElement));
         const node = colNested.parent;
         let ta: TableAlias;
         if (node !== undefined) {
@@ -584,7 +621,7 @@ class SQLQueryGenerator {
           ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
           this._from.add(ta);
         }
-        const alias = (col as DateExtractOperation).displayName ?? colNested.column.name;
+        const alias = (col as DateExtractOperation).displayName ?? findColumn(col as RelationalOperationElement).column.name;
         let aliasedOp: RelationalOperationElement;
         if (col instanceof DateExtractOperation) {
           aliasedOp = new DateExtractOperation(new TableAliasColumn(colNested.column, ta), col.part);
@@ -641,15 +678,15 @@ class SQLQueryGenerator {
     }
     if (op instanceof ConstantOperation) return constantValueString(op);
     if (op instanceof ColumnWithJoin) {
-      const node = op.parent;
+      const { column, parent: node } = this._resolve(op);
       let ta: TableAlias;
       if (node !== undefined) {
-        ta = this._tableAliasForTable(op.column.owner!, node);
+        ta = this._tableAliasForTable(column.owner!, node);
         this._addJoin(node);
       } else {
-        ta = this._tableAliasForTable(op.column.owner!, op.column.owner!);
+        ta = this._tableAliasForTable(column.owner!, column.owner!);
       }
-      return ta.alias + '.' + op.column.name;
+      return ta.alias + '.' + column.name;
     }
     if (op instanceof Column) {
       const ta = this._tableAliasForTable(op.owner!, op.owner!);

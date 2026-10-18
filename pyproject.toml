@@ -17,7 +17,7 @@ classifiers = [
     "Topic :: Software Development :: Code Generators",
 ]
 dependencies = [
-    "data-finder[markdown]>=0.1.14",
+    "data-finder[markdown]>=0.1.15",
 ]
 
 [project.urls]

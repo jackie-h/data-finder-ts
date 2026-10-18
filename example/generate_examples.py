@@ -16,6 +16,7 @@ _EXAMPLES_DIR = os.path.dirname(datafinder_examples.__file__)
 
 _MAPPINGS = [
     'finance_mapping.md',
+    'finance_mapping_embedded.md',
     'orgchart_mapping.md',
     'orgchart_inheritance_mapping.md',
     'companies_mapping.md',
@@ -29,7 +30,7 @@ if __name__ == '__main__':
     for mapping_file in _MAPPINGS:
         mapping_path = os.path.join(_EXAMPLES_DIR, mapping_file)
         mapping = load(mapping_path)
-        name = mapping_file.replace('_mapping.md', '').replace('.md', '')
+        name = mapping_file.replace('.md', '').replace('_mapping', '')
         out_dir = os.path.join(_root, 'tests', 'generated_examples', name)
         os.makedirs(out_dir, exist_ok=True)
         print(f'\n--- {mapping_file} → tests/generated_examples/{name}/')
