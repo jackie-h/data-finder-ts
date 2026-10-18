@@ -5,6 +5,9 @@ import type { Attribute } from '../src/datafinder/attribute';
 import type { Table, SortOperation, RelationalOperationElement } from '../src/model/relational';
 
 export class DuckDbRunner implements QueryRunner {
+  /** Column names of the most recent result, in the order they were selected. */
+  lastColumns: string[] = [];
+
   constructor(private conn: DuckDBConnection) {}
 
   async select(
@@ -31,6 +34,7 @@ export class DuckDbRunner implements QueryRunner {
     } finally {
       clearTimeout(timer);
     }
+    this.lastColumns = result.columnNames();
     const rows: unknown[][] = [];
     for (let i = 0; i < result.chunkCount; i++) {
       const chunk = result.getChunk(i);

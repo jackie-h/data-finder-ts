@@ -109,6 +109,17 @@ def flatten_embedded(join: Join) -> list:
     return result
 
 
+_FILTER_TS_TYPES = {
+    'String': 'string', 'Integer': 'number', 'Float': 'number', 'Double': 'number', 'Decimal': 'number',
+    'Boolean': 'boolean', 'Date': 'Date', 'DateTime': 'Date',
+}
+
+
+def filter_ts_type(prop: Property) -> str:
+    """TypeScript type of the value a related-finder filter accepts for a primitive property."""
+    return _FILTER_TS_TYPES.get(prop.type.name, 'string')
+
+
 def get_used_attr_types(rcm) -> list:
     """Return ordered list of TypeScript attribute type names used in this mapping."""
     seen = set()
@@ -204,6 +215,7 @@ def generate(mapping: Mapping, output_directory: str):
         get_doc=get_doc,
         prop_jsdoc=prop_jsdoc,
         flatten_embedded=flatten_embedded,
+        filter_ts_type=filter_ts_type,
     )
 
     for rcm in mapping.mappings:

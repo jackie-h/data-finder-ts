@@ -294,6 +294,10 @@ export class Table {
 
 export class JoinOperation {
   filter?: RelationalOperationElement;
+  /** Property-equality filters on the join target (property id -> value), set by a related finder given a filter. */
+  filterKwargs: Record<string, unknown> = {};
+  /** Maps property ids to [column, type, table] for `filterKwargs`. */
+  filterColumnMap: Record<string, [string, string, string]> = {};
 
   constructor(
     readonly name: string,
