@@ -7,6 +7,7 @@ import {
   BusinessDateAndProcessingTemporalColumns, BiTemporalColumns, MilestonedTable,
 } from '@model/milestoning';
 import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
+import { ExistsOperation, NotExistsOperation } from '@datafinder/finder';
 import type { Attribute } from '@datafinder/attribute';
 import { EmbeddedAttributes, embeddedUnder } from '@datafinder/embedded';
 {% set attr_types = get_used_attr_types(rcm) %}
@@ -150,6 +151,15 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   }
 
 {% endfor %}
+  /** Filter to rows that have a matching {{rcm.clazz.name}} through this join. */
+  exists(): ExistsOperation {
+    return new ExistsOperation(this._node);
+  }
+
+  /** Filter to rows that have no matching {{rcm.clazz.name}} through this join. */
+  notExists(): NotExistsOperation {
+    return new NotExistsOperation(this._node);
+  }
 }
 
 {% set _class_doc = get_doc(rcm.clazz) %}

@@ -2,6 +2,7 @@ import type { Operation } from '@model/relational';
 import type { CountAllOperation, NoOperation } from '@model/relational';
 import type { Attribute } from '@datafinder/attribute';
 import type { FinderResult } from '@datafinder/runner';
+import type { ExistsOperation, NotExistsOperation } from '@datafinder/finder';
 {% set attr_types = get_used_attr_types(rcm) %}
 {% if attr_types %}
 import type { {{attr_types | join(', ')}} } from '@datafinder/typed-attributes';
@@ -38,6 +39,10 @@ export abstract class {{rcm.clazz.name}}RelatedFinderBase {
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
   abstract {{reverse_name}}(): {{source_rcm.clazz.name}}RelatedFinderBase;
 {% endfor %}
+  /** Filter to rows that have a matching {{rcm.clazz.name}} through this join. */
+  abstract exists(): ExistsOperation;
+  /** Filter to rows that have no matching {{rcm.clazz.name}} through this join. */
+  abstract notExists(): NotExistsOperation;
 }
 
 {% if _class_doc %}
