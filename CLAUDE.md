@@ -68,6 +68,7 @@ Both output directories are gitignored and must be regenerated before running te
 
 - `duckdb-runner.ts` — `DuckDbRunner implements QueryRunner` using `@duckdb/node-api`; row retrieval via `result.getChunk(i).getRows()`.
 - `duckdb.test.ts` — tests against `example/generated/` finders; CSV fixtures resolved at runtime from the installed `datafinder_examples` package via `uv run python`.
+- `specs/*.test.ts` — **generated** by `scripts/generate_spec_tests.py` (`npm run generate:specs`) from the Python `datafinder_examples_tests` specs, one file per spec module, so every Python `TestExpectation` has a TypeScript equivalent (queries translated, expected columns/values/SQL fragments copied). Don't edit by hand; CI regenerates and fails on drift. Fixtures are in `spec-seeds.ts`, the runner in `spec-harness.ts`. Only deviation: `strip`/`lstrip`/`rstrip` result labels follow the TS names (`Trim Name`, …).
 - `duckdb-markdown.test.ts` — tests against `tests/generated_markdown/` finders; seeds data via `INSERT` statements (no CSVs needed).
 
 `tsconfig.json` includes `example/generated/**/*` but not `tests/generated_markdown/**/*` — however `tests/**/*` already covers that path.

@@ -34,6 +34,11 @@ jobs:
       - name: Generate TypeScript finders (all examples)
         run: npm run generate:examples
 
+      - name: Check spec tests are up to date with the Python specs
+        run: |
+          npm run generate:specs
+          git diff --exit-code tests/specs
+
       - name: Type-check TypeScript
         run: npm run build
 

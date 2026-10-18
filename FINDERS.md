@@ -92,6 +92,14 @@ Chains are arbitrarily deep: `tf.account().address().city().eq('London')`.
 ### Embedded (denormalized) columns
 
 If the mapping declares flat columns on the table that duplicate a related property (e.g. `acct_name` for `account.name`, see `finance_mapping_embedded.md`), the generated finders carry them as join-less alternates. When every property taken from a related table has one, whether projected, filtered, grouped, ordered or partitioned on, the JOIN is left out of the SQL. If any property from that table lacks one (e.g. `account().id()`), the real join is used for all of them.
+### Filtering a join by property
+
+A related-finder accessor accepts property values to restrict the joined rows (an equality filter on the join, so unmatched rows stay as NULLs rather than being dropped):
+
+```ts
+ef.findAll(null, null, [ef.firstName(), ef.projects({ code: 'ALPHA' }).name()])
+```
+
 ### Existence filters
 
 `exists()` and `notExists()` on a related finder keep only rows that do (or don't) have a match through that join:
