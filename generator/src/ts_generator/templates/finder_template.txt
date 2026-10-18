@@ -6,7 +6,7 @@ import {
   ProcessingTemporalColumns, SingleBusinessDateColumn,
   BusinessDateAndProcessingTemporalColumns, BiTemporalColumns, MilestonedTable,
 } from '@model/milestoning';
-import { convertInputsAndSelect, FinderResult } from '@datafinder/runner';
+import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
 import type { Attribute } from '@datafinder/attribute';
 {% set attr_types = get_used_attr_types(rcm) %}
 {% if attr_types %}
@@ -246,6 +246,27 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
     return convertInputsAndSelect(null, null, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
 {% endif %}
   }
+{% if rcm.milestone_mapping and (has_bitemporal(rcm.milestone_mapping) or has_business_date_and_processing(rcm.milestone_mapping) or has_uni_business_temporal(rcm.milestone_mapping)) %}
+
+  /**
+   * Returns data for all records whose business date overlaps the given range.
+   *
+   * For bitemporal tables the range uses interval overlap:
+   *   business_date_from_col <= businessDateTo AND business_date_to_col > businessDateFrom
+   * For single-date tables:
+   *   business_date >= businessDateFrom AND business_date <= businessDateTo
+   * Processing-time filtering is point-in-time at processingValidAt.
+   */
+  findForDateRange(
+    businessDateFrom: Date | string,
+    businessDateTo: Date | string,
+    processingValidAt: Date | string,
+    displayColumns: (Attribute | RelationalOperationElement)[],
+    filterOp: Operation = new NoOperation(),
+  ): FinderResult {
+    return convertInputsAndSelectForDateRange(businessDateFrom, businessDateTo, processingValidAt, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+  }
+{% endif %}
 }
 
 registerRelatedFinderClass('{{rcm.clazz.name}}', {{rcm.clazz.name}}RelatedFinder);

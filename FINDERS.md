@@ -41,6 +41,14 @@ Pass dates to `findAll` to snapshot data at a point in time. Temporal WHERE clau
 | Business date + processing | required | required |
 | Bi-temporal | required | required |
 
+### Date ranges
+
+Finders for tables with a business date (single business date, business date + processing, bi-temporal) also have `findForDateRange(from, to, processingValidAt, columns, filter?)`. It returns every record whose business date falls in the inclusive range; for bi-temporal tables, records whose business-date interval overlaps it. The processing time is still a point-in-time filter.
+
+```ts
+cpf.findForDateRange('2023-01-15', '2023-01-16', new Date(), [cpf.quantity()])
+```
+
 ## Filter operators
 
 | Type | Methods |

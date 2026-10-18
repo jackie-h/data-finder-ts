@@ -282,6 +282,57 @@ function buildMilestoningFilterOperation(
   return new LogicalOperation(ops[0], LogicalOperator.AND, ops[1]);
 }
 
+/**
+ * Like buildMilestoningFilterOperation but applies a business-date range filter.
+ *
+ * Bitemporal tables use interval overlap:
+ *   business_date_from_col <= businessDateTo AND business_date_to_col > businessDateFrom
+ * Single-date tables:
+ *   business_date >= businessDateFrom AND business_date <= businessDateTo
+ * Processing-date filtering is point-in-time, as in the normal path.
+ */
+function buildMilestoningFilterOperationForDateRange(
+  businessDateFrom: Date | null,
+  businessDateTo: Date | null,
+  processingDatetime: Date | null,
+  table: MilestonedTable,
+  joinNode?: JoinTreeNodeOperation,
+): Operation | null {
+  const mc = table.milestoningColumns;
+  const ops: Operation[] = [];
+  const hasRange = businessDateFrom !== null && businessDateTo !== null;
+
+  const processingOp = (m: BiTemporalColumns | BusinessDateAndProcessingTemporalColumns | ProcessingTemporalColumns): Operation => {
+    const startAt = new DateTimeAttribute('start_at', m.startAtColumn.name, m.startAtColumn.type, m.startAtColumn.table!.qualifiedName, joinNode);
+    const endAt = new DateTimeAttribute('end_at', m.endAtColumn.name, m.endAtColumn.type, m.endAtColumn.table!.qualifiedName, joinNode);
+    return new LogicalOperation(startAt.lte(processingDatetime!), LogicalOperator.AND, openEndClause(endAt, processingDatetime!, m.infiniteDatetime));
+  };
+
+  if (mc instanceof BiTemporalColumns) {
+    if (hasRange) {
+      const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
+      const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
+      ops.push(new LogicalOperation(dateFrom.lte(businessDateTo!), LogicalOperator.AND, openEndClause(dateTo, businessDateFrom!, mc.infiniteDatetime)));
+    }
+    if (processingDatetime !== null) ops.push(processingOp(mc));
+  } else if (mc instanceof BusinessDateAndProcessingTemporalColumns) {
+    if (hasRange) {
+      const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
+      ops.push(new LogicalOperation(businessAtt.gte(businessDateFrom!), LogicalOperator.AND, businessAtt.lte(businessDateTo!)));
+    }
+    if (processingDatetime !== null) ops.push(processingOp(mc));
+  } else if (mc instanceof ProcessingTemporalColumns) {
+    if (processingDatetime !== null) ops.push(processingOp(mc));
+  } else if (mc instanceof SingleBusinessDateColumn && hasRange) {
+    const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
+    ops.push(new LogicalOperation(businessAtt.gte(businessDateFrom!), LogicalOperator.AND, businessAtt.lte(businessDateTo!)));
+  }
+
+  if (ops.length === 0) return null;
+  if (ops.length === 1) return ops[0];
+  return new LogicalOperation(ops[0], LogicalOperator.AND, ops[1]);
+}
+
 function buildQueryOperation(
   businessDate: Date | null,
   processingDatetime: Date | null,
@@ -291,11 +342,16 @@ function buildQueryOperation(
   orderBy: SortOperation[] = [],
   groupBy: Attribute[] = [],
   limit?: number,
+  businessDateTo: Date | null = null,
 ): SelectOperation {
   let filter = op;
+  const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) =>
+    businessDateTo !== null
+      ? buildMilestoningFilterOperationForDateRange(businessDate, businessDateTo, processingDatetime, t, node)
+      : buildMilestoningFilterOperation(businessDate, processingDatetime, t, node);
 
   if (table instanceof MilestonedTable) {
-    const milestonedOp = buildMilestoningFilterOperation(businessDate, processingDatetime, table);
+    const milestonedOp = milestoningFor(table);
     if (milestonedOp !== null) {
       filter = filter instanceof NoOperation
         ? milestonedOp
@@ -323,7 +379,7 @@ function buildQueryOperation(
 
   for (const node of requiredJoins) {
     if (node.join.target instanceof MilestonedTable) {
-      const milestonedOp = buildMilestoningFilterOperation(businessDate, processingDatetime, node.join.target, node);
+      const milestonedOp = milestoningFor(node.join.target, node);
       if (milestonedOp !== null) {
         node.join.filter = milestonedOp;
       }
@@ -657,8 +713,9 @@ export function toSql(
   orderBy: SortOperation[] = [],
   groupBy: Attribute[] = [],
   limit?: number,
+  businessDateTo: Date | null = null,
 ): string {
-  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit);
+  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo);
   return selectSqlToString(selectOp);
 }
 

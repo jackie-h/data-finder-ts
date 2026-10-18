@@ -16,8 +16,9 @@ export class DuckDbRunner implements QueryRunner {
     orderBy: SortOperation[] = [],
     groupBy: Attribute[] = [],
     limit?: number,
+    businessDateTo: Date | null = null,
   ): Promise<unknown[][]> {
-    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit);
+    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit, businessDateTo);
     console.log('[SQL]', sql);
     const result = await this.conn.run(sql);
     const rows: unknown[][] = [];

@@ -25,6 +25,7 @@ export interface QueryRunner {
     orderBy?: SortOperation[],
     groupBy?: Attribute[],
     limit?: number,
+    businessDateTo?: Date | null,
   ): Promise<Row[]>;
 }
 
@@ -48,6 +49,7 @@ export class FinderResult {
     private readonly _columns: (Attribute | RelationalOperationElement)[],
     private readonly _table: QueryTarget,
     private readonly _op: RelationalOperationElement,
+    private readonly _businessDateTo: Date | null = null,
   ) {}
 
   orderByOp(...sorts: SortOperation[]): this {
@@ -75,6 +77,7 @@ export class FinderResult {
       this._orderBy,
       this._groupBy,
       this._limit,
+      this._businessDateTo,
     );
   }
 
@@ -88,6 +91,7 @@ export class FinderResult {
       this._orderBy,
       this._groupBy,
       this._limit,
+      this._businessDateTo,
     );
   }
 }
@@ -116,5 +120,26 @@ export function convertInputsAndSelect(
     columns,
     table,
     op,
+  );
+}
+
+export function convertInputsAndSelectForDateRange(
+  businessDateFrom: Date | string,
+  businessDateTo: Date | string,
+  processingDatetime: Date | string,
+  columns: (Attribute | RelationalOperationElement)[],
+  table: QueryTarget,
+  op: RelationalOperationElement = new NoOperation(),
+): FinderResult {
+  if (businessDateFrom == null) throw new Error('businessDateFrom is required for findForDateRange');
+  if (businessDateTo == null) throw new Error('businessDateTo is required for findForDateRange');
+  if (processingDatetime == null) throw new Error('processingValidAt is required for findForDateRange');
+  return new FinderResult(
+    convertDate(businessDateFrom),
+    convertDate(processingDatetime),
+    columns,
+    table,
+    op,
+    convertDate(businessDateTo),
   );
 }
