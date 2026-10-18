@@ -36,6 +36,10 @@ import {
   SortDirection,
   CountAllOperation,
   UnaryOperation,
+  Alias,
+  ExistsOperation,
+  NotExistsOperation,
+  SelectOperation,
 } from '../model/relational';
 import {
   MilestonedTable,
@@ -45,11 +49,6 @@ import {
   SingleBusinessDateColumn,
 } from '../model/milestoning';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
-import { ExistsOperation, NotExistsOperation } from './finder';
-
-class Alias {
-  constructor(readonly element: RelationalOperationElement, readonly name: string) {}
-}
 
 class TableAlias {
   constructor(readonly table: string, readonly alias: string) {}
@@ -64,17 +63,6 @@ class Join {
     readonly source: TableAliasColumn,
     readonly target: TableAliasColumn,
     readonly filterOp?: RelationalOperationElement,
-  ) {}
-}
-
-class SelectOperation {
-  constructor(
-    readonly display: (Attribute | RelationalOperationElement)[],
-    readonly filter: RelationalOperationElement,
-    readonly orderBy: SortOperation[] = [],
-    readonly groupBy: Attribute[] = [],
-    readonly limit?: number,
-    readonly table?: Table,
   ) {}
 }
 
@@ -475,7 +463,7 @@ class SQLQueryGenerator {
     for (const node of groupByJoins.values()) {
       this._addJoin(node);
     }
-    this._groupByParts = select.groupBy.map(a => this._attrToColString(a));
+    this._groupByParts = select.groupBy.map(a => this._attrToColString(a as Attribute));
     this._orderByParts = select.orderBy.map(s =>
       this.buildFilter(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
     );
@@ -782,4 +770,4 @@ export function toSql(
   return selectSqlToString(selectOp);
 }
 
-export { buildQueryOperation, SelectOperation };
+export { buildQueryOperation };

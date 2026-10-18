@@ -7,7 +7,7 @@ import {
   BusinessDateAndProcessingTemporalColumns, BiTemporalColumns, MilestonedTable,
 } from '@model/milestoning';
 import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
-import { ExistsOperation, NotExistsOperation } from '@datafinder/finder';
+import { ExistsOperation, NotExistsOperation } from '@model/relational';
 import type { Attribute } from '@datafinder/attribute';
 import { EmbeddedAttributes, embeddedUnder } from '@datafinder/embedded';
 import { titleCase } from '@datafinder/naming';
