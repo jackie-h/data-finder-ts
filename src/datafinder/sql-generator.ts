@@ -337,6 +337,62 @@ function buildMilestoningFilterOperationForDateRange(
   return new LogicalOperation(ops[0], LogicalOperator.AND, ops[1]);
 }
 
+type RefVisitor = (ref: Attribute | ColumnWithJoin) => void;
+
+/** Call `visit` for every Attribute/ColumnWithJoin referenced anywhere in `op`. */
+function walkRefs(op: RelationalOperationElement | null | undefined, visit: RefVisitor): void {
+  if (op === null || op === undefined) return;
+  if (op instanceof Attribute || op instanceof ColumnWithJoin) {
+    visit(op);
+  } else if (op instanceof AggregateOperation) {
+    walkRefs(op.element, visit);
+    if (op.window) walkWindowSpec(op.window, visit);
+  } else if (op instanceof WindowFunctionOperation) {
+    if (op.element) walkRefs(op.element, visit);
+    if (op.window) walkWindowSpec(op.window, visit);
+  } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation ||
+             op instanceof DateArithmeticOperation || op instanceof DateDiffOperation) {
+    walkRefs((op as UnaryOperation).element, visit);
+  } else if (op instanceof SortOperation) {
+    walkRefs(op.column, visit);
+  } else if (op instanceof LogicalOperation || op instanceof ComparisonOperation) {
+    walkRefs((op as any).left, visit);
+    walkRefs((op as any).right, visit);
+  }
+}
+
+function walkWindowSpec(window: WindowSpecification, visit: RefVisitor): void {
+  for (const p of window.partitionBy) walkRefs(p, visit);
+  for (const s of window.orderBy) walkRefs(s.column, visit);
+}
+
+/**
+ * Translate property-equality filters given to a related finder (e.g. `ef.projects({ code: 'ALPHA' })`)
+ * into a relational filter on the join node. `columnMap` maps property ids to [column, type, table].
+ */
+function buildJoinFilterFromProperties(
+  node: JoinTreeNodeOperation,
+  filter: Record<string, unknown>,
+  columnMap: Record<string, [string, string, string]>,
+): Operation {
+  const ops: Operation[] = [];
+  for (const [key, value] of Object.entries(filter)) {
+    const entry = columnMap[key];
+    if (entry === undefined) {
+      throw new Error(`Unknown property '${key}' — valid properties are: ${Object.keys(columnMap).sort().join(', ')}`);
+    }
+    const [name, type, table] = entry;
+    const col = new ColumnWithJoin(new Column(name, type, table), node);
+    let constant: ConstantOperation;
+    if (typeof value === 'boolean') constant = new BooleanConstantOperation(value);
+    else if (typeof value === 'number') constant = Number.isInteger(value) ? new IntegerConstantOperation(value) : new FloatConstantOperation(value);
+    else if (value instanceof Date) constant = type.toUpperCase() === 'DATE' ? new DateConstantOperation(value) : new DateTimeConstantOperation(value);
+    else constant = new StringConstantOperation(String(value));
+    ops.push(new ComparisonOperation(col, ComparisonOperator.EQUAL, constant));
+  }
+  return ops.reduce((acc, op) => new LogicalOperation(acc, LogicalOperator.AND, op));
+}
+
 function buildQueryOperation(
   businessDate: Date | null,
   processingDatetime: Date | null,
@@ -363,31 +419,28 @@ function buildQueryOperation(
     }
   }
 
-  const requiredJoins: JoinTreeNodeOperation[] = [];
-  const requiredJoinIds = new Set<JoinTreeNodeOperation>();
-
-  for (const col of columns) {
-    if (col instanceof CountAllOperation) continue;
-    if (col instanceof WindowFunctionOperation && col.element === null) continue;
-    let node: JoinTreeNodeOperation | undefined;
-    if (col instanceof Attribute) {
-      node = col.parent();
-    } else {
-      node = findColumn(col as RelationalOperationElement).parent;
-    }
-    if (node !== undefined && !requiredJoinIds.has(node)) {
-      requiredJoinIds.add(node);
-      requiredJoins.push(node);
-    }
-  }
+  const requiredJoins = new Set<JoinTreeNodeOperation>();
+  const collect: RefVisitor = ref => {
+    const parent = ref instanceof Attribute ? ref.parent() : ref.parent;
+    if (parent !== undefined) requiredJoins.add(parent);
+  };
+  for (const col of columns) walkRefs(col, collect);
+  for (const expr of groupBy) walkRefs(expr, collect);
+  for (const sort of orderBy) walkRefs(sort, collect);
+  walkRefs(op, collect);
 
   for (const node of requiredJoins) {
+    let combined: Operation | undefined;
+    if (Object.keys(node.join.filterKwargs).length > 0) {
+      combined = buildJoinFilterFromProperties(node, node.join.filterKwargs, node.join.filterColumnMap);
+    }
     if (node.join.target instanceof MilestonedTable) {
       const milestonedOp = milestoningFor(node.join.target, node);
       if (milestonedOp !== null) {
-        node.join.filter = milestonedOp;
+        combined = combined === undefined ? milestonedOp : new LogicalOperation(combined, LogicalOperator.AND, milestonedOp);
       }
     }
+    node.join.filter = combined;
   }
 
   return new SelectOperation(columns, filter, orderBy, groupBy, limit, table);
@@ -435,35 +488,8 @@ class SQLQueryGenerator {
     return ta.alias + '.' + column.name;
   }
 
-  /** Call `visit` for every Attribute/ColumnWithJoin referenced anywhere in `op`. */
-  private _walkRefs(op: RelationalOperationElement | null | undefined, visit: (ref: Attribute | ColumnWithJoin) => void): void {
-    if (op === null || op === undefined) return;
-    if (op instanceof Attribute || op instanceof ColumnWithJoin) {
-      visit(op);
-    } else if (op instanceof AggregateOperation) {
-      this._walkRefs(op.element, visit);
-      if (op.window) this._walkWindowSpec(op.window, visit);
-    } else if (op instanceof WindowFunctionOperation) {
-      if (op.element) this._walkRefs(op.element, visit);
-      if (op.window) this._walkWindowSpec(op.window, visit);
-    } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation ||
-               op instanceof DateArithmeticOperation || op instanceof DateDiffOperation) {
-      this._walkRefs((op as UnaryOperation).element, visit);
-    } else if (op instanceof SortOperation) {
-      this._walkRefs(op.column, visit);
-    } else if (op instanceof LogicalOperation || op instanceof ComparisonOperation) {
-      this._walkRefs((op as any).left, visit);
-      this._walkRefs((op as any).right, visit);
-    }
-  }
-
-  private _walkWindowSpec(window: WindowSpecification, visit: (ref: Attribute | ColumnWithJoin) => void): void {
-    for (const p of window.partitionBy) this._walkRefs(p, visit);
-    for (const s of window.orderBy) this._walkRefs(s.column, visit);
-  }
-
   private _collectRequiredJoins(op: RelationalOperationElement | null | undefined, out: Map<JoinTreeNodeOperation, JoinTreeNodeOperation>): void {
-    this._walkRefs(op, ref => {
+    walkRefs(op, ref => {
       const { parent } = this._resolve(ref);
       if (parent !== undefined) out.set(parent, parent);
     });
@@ -482,10 +508,10 @@ class SQLQueryGenerator {
       const refs = refsByNode.get(parent);
       if (refs) refs.push(ref); else refsByNode.set(parent, [ref]);
     };
-    for (const col of select.display) this._walkRefs(col, record);
-    for (const expr of select.groupBy) this._walkRefs(expr, record);
-    for (const sort of select.orderBy) this._walkRefs(sort, record);
-    this._walkRefs(select.filter, record);
+    for (const col of select.display) walkRefs(col, record);
+    for (const expr of select.groupBy) walkRefs(expr, record);
+    for (const sort of select.orderBy) walkRefs(sort, record);
+    walkRefs(select.filter, record);
 
     const elidable = new Set<JoinTreeNodeOperation>();
     for (const [node, refs] of refsByNode) {

@@ -75,7 +75,8 @@
     "test": "vitest run",
     "generate": "uv run python example/generate.py",
     "generate:dual-assoc": "uv run python example/generate_dual_assoc.py",
-    "generate:examples": "uv run python example/generate_examples.py"
+    "generate:examples": "uv run python example/generate_examples.py",
+    "generate:specs": "uv run python scripts/generate_spec_tests.py"
   },
   "dependencies": {
     "vite-tsconfig-paths": "^6.1.1"

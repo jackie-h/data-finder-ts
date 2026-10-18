@@ -93,6 +93,7 @@ export abstract class Attribute {
    * - `'min'`   — tied rows share the lowest rank; the next rank skips.
    * - `'dense'` — like `'min'` but ranks are contiguous (no gaps).
    * - `'first'` — each row gets a unique sequential integer (no ties).
+   * - `'max'`   — only meaningful with `pct: true` (see below).
    *
    * When `pct: true` the result is a relative rank between 0 and 1:
    * - `method: 'min'` (default) → fraction of values strictly below this row (PERCENT_RANK).
@@ -101,7 +102,7 @@ export abstract class Attribute {
    * `partitionBy` restarts the ranking within each group of distinct values.
    */
   rank(opts: {
-    method?: 'min' | 'dense' | 'first';
+    method?: 'min' | 'dense' | 'first' | 'max';
     pct?: boolean;
     partitionBy?: Attribute | ColumnWithJoin | (Attribute | ColumnWithJoin)[];
     orderBy?: SortOperation | SortOperation[];
@@ -110,7 +111,7 @@ export abstract class Attribute {
     let func: WindowFunction;
     let name: string;
     if (pct) {
-      if (method === 'max' as string) { func = WindowFunction.CUME_DIST; name = 'Cume Dist'; }
+      if (method === 'max') { func = WindowFunction.CUME_DIST; name = 'Cume Dist'; }
       else { func = WindowFunction.PERCENT_RANK; name = 'Percent Rank'; }
     } else if (method === 'first') { func = WindowFunction.ROW_NUMBER; name = 'Row Number'; }
     else if (method === 'dense') { func = WindowFunction.DENSE_RANK; name = 'Dense Rank'; }

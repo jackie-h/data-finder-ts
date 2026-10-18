@@ -118,9 +118,11 @@ export class FinderResult {
 function convertDate(value: Date | string | null): Date | null {
   if (value === null) return null;
   if (value instanceof Date) return value;
-  // Date-only strings (YYYY-MM-DD) must be parsed as UTC to avoid timezone-shift bugs.
-  // new Date('2023-01-15') already parses as UTC midnight, so this is consistent.
-  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value + 'T00:00:00Z' : value;
+  // Zone-less strings (YYYY-MM-DD, or YYYY-MM-DD HH:MM[:SS]) are read as UTC, matching how
+  // dates are formatted into SQL, so the value doesn't shift with the machine's timezone.
+  let normalized = value;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) normalized = value + 'T00:00:00Z';
+  else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)) normalized = value.replace(' ', 'T') + 'Z';
   const d = new Date(normalized);
   if (isNaN(d.getTime())) throw new Error(`Cannot parse date: ${value}`);
   return d;

@@ -123,19 +123,19 @@ export abstract class NumericAttribute extends Attribute {
 
   /** Sum of all values in the group. */
   sum(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.SUM, this.displayName() + ' Sum');
+    return new AggregateOperation(this.cwj(), AggregateOperator.SUM, 'Sum ' + this.displayName());
   }
   /** Smallest value in the group. */
   min(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.MIN, this.displayName() + ' Min');
+    return new AggregateOperation(this.cwj(), AggregateOperator.MIN, 'Min ' + this.displayName());
   }
   /** Largest value in the group. */
   max(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.MAX, this.displayName() + ' Max');
+    return new AggregateOperation(this.cwj(), AggregateOperator.MAX, 'Max ' + this.displayName());
   }
   /** Arithmetic mean of all values in the group. */
   average(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.AVERAGE, this.displayName() + ' Average');
+    return new AggregateOperation(this.cwj(), AggregateOperator.AVERAGE, 'Average ' + this.displayName());
   }
   /** Absolute value (distance from zero, always non-negative). */
   abs(): ScalarFunctionOperation {
