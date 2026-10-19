@@ -447,6 +447,7 @@ function buildQueryOperation(
   for (const sort of orderBy) walkRefs(sort, collect, collectNode);
   walkRefs(op, collect, collectNode);
 
+  const joinFilters = new Map<JoinTreeNodeOperation, Operation>();
   for (const node of withAncestors(requiredJoins)) {
     let combined: Operation | undefined;
     if (Object.keys(node.join.filterKwargs).length > 0) {
@@ -458,10 +459,10 @@ function buildQueryOperation(
         combined = combined === undefined ? milestonedOp : new LogicalOperation(combined, LogicalOperator.AND, milestonedOp);
       }
     }
-    node.join.filter = combined;
+    if (combined !== undefined) joinFilters.set(node, combined);
   }
 
-  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table);
+  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters);
 }
 
 class SQLQueryGenerator {
@@ -477,10 +478,12 @@ class SQLQueryGenerator {
   private _addedJoinIds = new Set<JoinTreeNodeOperation>();
   private _rootTable?: Table;
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
+  private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
 
   generate(select: SelectOperation): void {
     this._rootTable = select.table;
     this._elidableNodes = this._computeElidableNodes(select);
+    this._joinFilters = select.joinFilters;
     if (this._rootTable !== undefined) {
       this._from.add(this._tableAliasForTable(this._rootTable.qualifiedName, this._rootTable.qualifiedName));
     }
@@ -695,7 +698,11 @@ class SQLQueryGenerator {
     const sc = new TableAliasColumn(left, srcTa);
     const right = join.right;
     const tc = new TableAliasColumn(right, this._tableAliasForTable(right.owner!, node));
-    this._join.push(new Join(sc, tc, join.filter));
+    const queryFilter = this._joinFilters.get(node);
+    const filterOp = join.filter !== undefined && queryFilter !== undefined
+      ? new LogicalOperation(join.filter as Operation, LogicalOperator.AND, queryFilter)
+      : join.filter ?? queryFilter;
+    this._join.push(new Join(sc, tc, filterOp));
   }
 
   buildFilter(op: RelationalOperationElement): string {

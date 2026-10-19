@@ -370,5 +370,10 @@ export class SelectOperation {
     readonly groupBy: RelationalOperationElement[] = [],
     readonly limit?: number,
     readonly table?: Table,
+    /**
+     * Extra ON conditions for this query's joins (milestoning and property filters), keyed by join node.
+     * Held here rather than on the shared JoinOperation, so queries that use the same node can't affect each other.
+     */
+    readonly joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map(),
   ) {}
 }
