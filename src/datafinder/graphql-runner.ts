@@ -45,6 +45,17 @@ export class GraphQLPushdownError extends GraphQLUnsupportedError {
   }
 }
 
+/**
+ * A query that needs the result computed on the client (an aggregate, a function, a window, a group by).
+ * The runner leaves that to the server rather than computing it, which another backend would do differently.
+ */
+export class GraphQLClientComputationError extends GraphQLUnsupportedError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GraphQLClientComputationError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Field paths. A to-many relation is marked "[]": "projects[].name" is the name of each project.
 // ---------------------------------------------------------------------------
@@ -61,7 +72,7 @@ function isMany(element: unknown): boolean {
 /** The field path of a selected column, with to-many markers; strict mode only selects plain attributes. */
 function rawName(col: Attribute | RelationalOperationElement): string {
   if (col instanceof Attribute) return col.column().name;
-  throw new GraphQLUnsupportedError(`The GraphQL runner does not support ${col.constructor.name} columns`);
+  throw new GraphQLClientComputationError(`The GraphQL runner does not support ${col.constructor.name} columns: it does not compute them on the client`);
 }
 
 function fieldName(element: unknown, what: string): string {
@@ -327,6 +338,9 @@ async function fetchRows(
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export class GraphQLConnect implements QueryRunner {
+  /** Display names of the columns of the last query that returned. */
+  lastColumns: string[] = [];
+
   async select(
     businessDate: Date | null,
     processingDatetime: Date | null,
@@ -343,7 +357,7 @@ export class GraphQLConnect implements QueryRunner {
     // validates that every column is a plain field before anything is sent
     const fieldsStr = buildFieldsStr(columns);
     if (groupBy && groupBy.length > 0) {
-      throw new GraphQLUnsupportedError('The GraphQL runner does not support group by: aggregation is not computed on the client');
+      throw new GraphQLClientComputationError('The GraphQL runner does not support group by: aggregation is not computed on the client');
     }
 
     const isDateRange = businessDateTo !== null && businessDate !== null;
@@ -371,6 +385,7 @@ export class GraphQLConnect implements QueryRunner {
     if (sortAfter) flat = sortExpanded(flat, orderBy ?? []);
     // a nested field is absent from every row when its parent object is null in all of them
     const fields = columns.map(c => plain(rawName(c)));
+    this.lastColumns = columns.map(c => (c as Attribute).displayName());
     return flat.map(row => fields.map(f => row[f] ?? null));
   }
 }

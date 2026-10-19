@@ -34,6 +34,9 @@ jobs:
       - name: Generate TypeScript finders (all examples)
         run: npm run generate:examples
 
+      - name: Generate TypeScript finders (GraphQL examples)
+        run: npm run generate:graphql
+
       - name: Check spec tests are up to date with the Python specs
         run: |
           npm run generate:specs

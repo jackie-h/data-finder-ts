@@ -1,0 +1,106 @@
+import { GraphQLQuery, GraphQLEndpoint{% if milestone_class(cm.query.milestone) %}, {{milestone_class(cm.query.milestone)}}{% endif %} } from '@model/graphql_mapping';
+import { NoOperation, Operation, RelationalOperationElement } from '@model/relational';
+import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
+import type { Attribute } from '@datafinder/attribute';
+{% if attr_types %}
+import { {{attr_types | join(', ')}} } from '@datafinder/typed-attributes';
+{% endif %}
+{% for target_cm in related_classes(cm) %}
+
+class {{target_cm.clazz.name}}RelatedFinder {
+{% for tpm in target_cm.property_mappings %}
+{% if is_primitive_mapping(tpm) %}
+  private readonly _{{to_ts_name(tpm.property)}}: {{tpm.property.type.name}}Attribute;
+{% endif %}
+{% endfor %}
+
+  constructor(private readonly parentField: string, private readonly displayPrefix: string) {
+{% for tpm in target_cm.property_mappings %}
+{% if is_primitive_mapping(tpm) %}
+    this._{{to_ts_name(tpm.property)}} = new {{tpm.property.type.name}}Attribute(displayPrefix + ' {{display_name(tpm.property)}}', parentField + '.{{tpm.target.name}}', '{{type_str(tpm.property.type)}}', '{{cm.query.name}}');
+{% endif %}
+{% endfor %}
+  }
+
+{% for tpm in target_cm.property_mappings %}
+{% if is_primitive_mapping(tpm) %}
+  /** {{display_name(tpm.property)}} */
+  {{to_ts_name(tpm.property)}}(): {{tpm.property.type.name}}Attribute {
+    return this._{{to_ts_name(tpm.property)}};
+  }
+
+{% elif is_association_mapping(tpm) and class_mappings_by_name.get(tpm.property.type.name) %}
+  /** {{display_name(tpm.property)}} */
+  {{to_ts_name(tpm.property)}}(): {{tpm.property.type.name}}RelatedFinder {
+    return new {{tpm.property.type.name}}RelatedFinder(this.parentField + '.{{association_path(tpm)}}', this.displayPrefix + ' {{association_display(tpm)}}');
+  }
+
+{% endif %}
+{% endfor %}
+}
+{% endfor %}
+
+{% if cm.clazz.tagged_values['doc'] %}
+/** {{cm.clazz.tagged_values['doc'].value}} */
+{% endif %}
+export class {{cm.clazz.name}}Finder {
+  private readonly _query: GraphQLQuery;
+{% for pm in cm.property_mappings %}
+{% if is_primitive_mapping(pm) %}
+  private readonly _{{to_ts_name(pm.property)}}: {{pm.property.type.name}}Attribute;
+{% elif is_association_mapping(pm) and class_mappings_by_name.get(pm.property.type.name) %}
+  private readonly _{{to_ts_name(pm.property)}}: {{pm.property.type.name}}RelatedFinder;
+{% endif %}
+{% endfor %}
+
+  constructor(endpoint: GraphQLEndpoint) {
+{% if cm.query.milestone %}
+    this._query = new GraphQLQuery('{{cm.query.name}}', endpoint, {{milestone_expr(cm.query.milestone)}});
+{% else %}
+    this._query = new GraphQLQuery('{{cm.query.name}}', endpoint);
+{% endif %}
+{% for pm in cm.property_mappings %}
+{% if is_primitive_mapping(pm) %}
+    this._{{to_ts_name(pm.property)}} = new {{pm.property.type.name}}Attribute('{{display_name(pm.property)}}', '{{pm.target.name}}', '{{type_str(pm.property.type)}}', '{{cm.query.name}}');
+{% elif is_association_mapping(pm) and class_mappings_by_name.get(pm.property.type.name) %}
+    this._{{to_ts_name(pm.property)}} = new {{pm.property.type.name}}RelatedFinder('{{association_path(pm)}}', '{{association_display(pm)}}');
+{% endif %}
+{% endfor %}
+  }
+
+{% for pm in cm.property_mappings %}
+{% if is_primitive_mapping(pm) %}
+  /** {{display_name(pm.property)}} */
+  {{to_ts_name(pm.property)}}(): {{pm.property.type.name}}Attribute {
+    return this._{{to_ts_name(pm.property)}};
+  }
+
+{% elif is_association_mapping(pm) and class_mappings_by_name.get(pm.property.type.name) %}
+  /** {{display_name(pm.property)}} */
+  {{to_ts_name(pm.property)}}(): {{pm.property.type.name}}RelatedFinder {
+    return this._{{to_ts_name(pm.property)}};
+  }
+
+{% endif %}
+{% endfor %}
+  /** Returns data matching the optional filter. */
+  findAll(
+    businessDate: Date | string | null,
+    processingValidAt: Date | string | null,
+    displayColumns: (Attribute | RelationalOperationElement)[],
+    filterOp: Operation = new NoOperation(),
+  ): FinderResult {
+    return convertInputsAndSelect(businessDate, processingValidAt, displayColumns, this._query, filterOp);
+  }
+
+  /** Returns data for all records whose business date falls within the given range. */
+  findForDateRange(
+    businessDateFrom: Date | string,
+    businessDateTo: Date | string,
+    processingValidAt: Date | string,
+    displayColumns: (Attribute | RelationalOperationElement)[],
+    filterOp: Operation = new NoOperation(),
+  ): FinderResult {
+    return convertInputsAndSelectForDateRange(businessDateFrom, businessDateTo, processingValidAt, displayColumns, this._query, filterOp);
+  }
+}
