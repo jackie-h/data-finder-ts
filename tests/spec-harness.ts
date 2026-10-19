@@ -8,7 +8,6 @@ import * as path from 'node:path';
 import { expect } from 'vitest';
 import { DuckDBConnection } from '@duckdb/node-api';
 import type { FinderResult } from '../src/datafinder/runner';
-import type { DuckDbRunner } from './duckdb-runner';
 
 let _examplesDir: string | undefined;
 
@@ -40,6 +39,16 @@ export interface Expectation {
   sql?: string;
   /** Fragment that must not appear in the generated SQL. */
   unexpectedSql?: string;
+  /** Why the expectation does not apply to the GraphQL backend; the GraphQL specs skip it. */
+  skipGraphql?: string;
+}
+
+/** The backend an expectation runs against: SQL is only checked for `duckdb`. */
+export type Backend = 'duckdb' | 'graphql';
+
+/** What a runner reports about the last query it ran. */
+export interface ColumnReporter {
+  readonly lastColumns: string[];
 }
 
 function instant(text: string): number {
@@ -63,16 +72,21 @@ function normalize(value: unknown): unknown {
 /** Equivalent of TestExpectation.run: SQL fragments, then column names, then values. */
 export async function runExpectation(
   result: FinderResult,
-  runner: DuckDbRunner,
+  runner: ColumnReporter,
   expected: Expectation,
+  backend: Backend = 'duckdb',
 ): Promise<void> {
-  const sql = result.toSql();
-  if (expected.sql !== undefined) expect(sql).toContain(expected.sql);
-  if (expected.unexpectedSql !== undefined) expect(sql).not.toContain(expected.unexpectedSql);
+  if (backend === 'duckdb') {
+    const sql = result.toSql();
+    if (expected.sql !== undefined) expect(sql).toContain(expected.sql);
+    if (expected.unexpectedSql !== undefined) expect(sql).not.toContain(expected.unexpectedSql);
+  }
 
   const rows = await result.toRows();
   expect(runner.lastColumns).toEqual(expected.columns);
-  expect(rows.map(r => r.map(normalize))).toEqual(expected.rows.map(r => r.map(normalize)));
+  // a GraphQL server returns dates and timestamps as text, so an expected instant is compared with the text read as one
+  expect(rows.map((r, i) => r.map((v, j) => normalize(expected.rows[i]?.[j] instanceof Temporal && typeof v === 'string' ? ts(v) : v))))
+    .toEqual(expected.rows.map(r => r.map(normalize)));
 }
 
 /** One generated expectation: the query is built from a finder so that cases can share one. */

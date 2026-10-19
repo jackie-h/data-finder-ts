@@ -2,12 +2,10 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts, type SpecCase } from '../spec-harness';
+import { runExpectation, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { PriceFinder } from '../generated_examples/null_end_milestoning/PriceFinder';
-
-const _AT_2024 = new Date(Date.UTC(2024, 5, 1, 12, 0, 0));
-const _AT_2021 = new Date(Date.UTC(2021, 5, 1, 12, 0, 0));
+import { NULL_END_PRICE_FINDER_SPECS } from './cases/null-end-milestoning';
 
 let instance: DuckDBInstance;
 let conn: DuckDBConnection;
@@ -24,38 +22,6 @@ afterAll(() => {
   conn.disconnectSync();
   instance.closeSync();
 });
-
-const NULL_END_PRICE_FINDER_SPECS: SpecCase<PriceFinder>[] = [
-  {
-    name: 'null_end_rows_active_at_2024',
-    query: f => f.findAll(null, _AT_2024, [f.symbol()]).orderByOp(f.symbol().ascending()),
-    expected: { columns: ['Symbol'], rows: [
-        ['AAPL'],
-        ['MSFT'],
-      ] },
-  },
-  {
-    name: 'expired_row_excluded_at_2024',
-    query: f => f.findAll(null, _AT_2024, [f.symbol()], f.symbol().eq('GOOG')),
-    expected: { columns: ['Symbol'], rows: [] },
-  },
-  {
-    name: 'all_three_active_before_expiry',
-    query: f => f.findAll(null, _AT_2021, [f.symbol()]).orderByOp(f.symbol().ascending()),
-    expected: { columns: ['Symbol'], rows: [
-        ['AAPL'],
-        ['GOOG'],
-        ['MSFT'],
-      ] },
-  },
-  {
-    name: 'aapl_active_at_future_date',
-    query: f => f.findAll(null, new Date(Date.UTC(2099, 0, 1, 0, 0, 0)), [f.symbol()], f.symbol().eq('AAPL')),
-    expected: { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-  },
-];
 
 describe('NULL_END_PRICE_FINDER_SPECS', () => {
   const f = new PriceFinder();

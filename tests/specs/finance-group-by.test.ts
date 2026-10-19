@@ -2,15 +2,14 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts, type SpecCase } from '../spec-harness';
+import { runExpectation, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { TradeFinder } from '../generated_examples/finance/TradeFinder';
 import '../generated_examples/finance/AccountFinder';
 import '../generated_examples/finance/BranchFinder';
 import '../generated_examples/finance/ContractualPositionFinder';
 import '../generated_examples/finance/InstrumentFinder';
-
-const _AT = '2030-01-01 00:00:00';
+import { TRADE_GROUP_BY_FINDER_SPECS } from './cases/finance-group-by';
 
 let instance: DuckDBInstance;
 let conn: DuckDBConnection;
@@ -27,36 +26,6 @@ afterAll(() => {
   conn.disconnectSync();
   instance.closeSync();
 });
-
-const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
-  {
-    name: 'average_price_per_account',
-    query: f => f.findAll(null, _AT, [f.account().name(), f.price().average()]).groupByOp(f.account().name()).orderByOp(f.account().name().ascending()),
-    expected: { columns: ['Account Name', 'Average Price'], rows: [
-        ['Alpha Fund', 150.0],
-        ['Beta Fund', 350.0],
-        ['Gamma Fund', 500.0],
-      ] },
-  },
-  {
-    name: 'average_price_settled_only',
-    query: f => f.findAll(null, _AT, [f.account().name(), f.price().average()], f.isSettled().isTrue()).groupByOp(f.account().name()).orderByOp(f.account().name().ascending()),
-    expected: { columns: ['Account Name', 'Average Price'], rows: [
-        ['Alpha Fund', 150.0],
-        ['Beta Fund', 300.0],
-        ['Gamma Fund', 500.0],
-      ] },
-  },
-  {
-    name: 'group_count_per_account',
-    query: f => f.findAll(null, _AT, [f.account().name(), f.count()]).groupByOp(f.account().name()).orderByOp(f.account().name().ascending()),
-    expected: { columns: ['Account Name', 'Count'], rows: [
-        ['Alpha Fund', 2],
-        ['Beta Fund', 2],
-        ['Gamma Fund', 1],
-      ] },
-  },
-];
 
 describe('TRADE_GROUP_BY_FINDER_SPECS', () => {
   const f = new TradeFinder();

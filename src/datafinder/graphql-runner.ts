@@ -17,6 +17,8 @@ import {
   SortOperation,
 } from '../model/relational';
 import {
+  parseFieldPath,
+  plainFieldPath,
   GraphQLQuery,
   GraphQLFilterConvention,
   GraphQLProcessingMilestone,
@@ -45,23 +47,34 @@ export class GraphQLPushdownError extends GraphQLUnsupportedError {
   }
 }
 
+/**
+ * A query that needs the result computed on the client (an aggregate, a function, a window, a group by).
+ * The runner leaves that to the server rather than computing it, which another backend would do differently.
+ */
+export class GraphQLClientComputationError extends GraphQLUnsupportedError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GraphQLClientComputationError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Field paths. A to-many relation is marked "[]": "projects[].name" is the name of each project.
 // ---------------------------------------------------------------------------
 
-/** A field path without its to-many markers. */
+/** A field path without its to-many markers and filters: "manager.projects[].name" is "manager.projects.name". */
 function plain(name: string): string {
-  return name.replaceAll('[]', '');
+  return plainFieldPath(name);
 }
 
 function isMany(element: unknown): boolean {
-  return element instanceof ColumnWithJoin && element.column.name.includes('[]');
+  return element instanceof ColumnWithJoin && parseFieldPath(element.column.name).some(seg => seg.many);
 }
 
 /** The field path of a selected column, with to-many markers; strict mode only selects plain attributes. */
 function rawName(col: Attribute | RelationalOperationElement): string {
   if (col instanceof Attribute) return col.column().name;
-  throw new GraphQLUnsupportedError(`The GraphQL runner does not support ${col.constructor.name} columns`);
+  throw new GraphQLClientComputationError(`The GraphQL runner does not support ${col.constructor.name} columns: it does not compute them on the client`);
 }
 
 function fieldName(element: unknown, what: string): string {
@@ -93,6 +106,12 @@ function pad(n: number): string {
 
 function formatDate(d: Date): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** Serialize a plain value (a relation filter) to an inline GraphQL argument literal. */
+function gqlLiteral(value: unknown): string {
+  if (value instanceof Date) return JSON.stringify(value.toISOString());
+  return typeof value === 'string' ? JSON.stringify(value) : String(value);
 }
 
 /** Serialize a constant to an inline GraphQL argument literal. */
@@ -182,6 +201,16 @@ function opRawNames(op: RelationalOperationElement | null | undefined): Set<stri
   return new Set();
 }
 
+/** The plain path to the first to-many relation on a field path, or null. */
+function relationOf(raw: string): string | null {
+  const names: string[] = [];
+  for (const seg of parseFieldPath(raw)) {
+    names.push(seg.name);
+    if (seg.many) return names.join('.');
+  }
+  return null;
+}
+
 /** Whether the rows are expanded by a to-many relation, throwing if the server cannot answer the query as is. */
 export function checkExpansion(
   op: RelationalOperationElement | null | undefined,
@@ -189,18 +218,18 @@ export function checkExpansion(
   limit: number | undefined,
 ): boolean {
   const selected = columns.map(rawName);
-  const expands = selected.some(raw => raw.includes('[]'));
+  const expands = selected.some(raw => relationOf(raw) !== null);
   if (expands && limit !== undefined) {
     throw new GraphQLUnsupportedError(
       'A limit cannot be pushed to the server for rows expanded by a to-many relation');
   }
   // a server filters the parents on a to-many condition but returns all of their children
   for (const raw of opRawNames(op)) {
-    if (!raw.includes('[]')) continue;
-    const relation = raw.slice(0, raw.indexOf('[]') + 2);
-    if (selected.some(sel => sel.startsWith(relation))) {
+    const relation = relationOf(raw);
+    if (relation === null) continue;
+    if (selected.some(sel => plain(sel).startsWith(relation + '.'))) {
       throw new GraphQLUnsupportedError(
-        `Cannot filter and select the same to-many relation (${plain(relation)}): ` +
+        `Cannot filter and select the same to-many relation (${relation}): ` +
         "the server returns all of a matching parent's children");
     }
   }
@@ -260,16 +289,57 @@ export function sortExpanded(rows: FlatRow[], orderBy: SortOperation[]): FlatRow
 // GraphQL request helpers
 // ---------------------------------------------------------------------------
 
-/** The selection set for the columns: "account.branch.city" selects city inside branch inside account. */
-export function buildFieldsStr(columns: (Attribute | RelationalOperationElement)[]): string {
-  const tree: Record<string, any> = {};
-  for (const name of new Set(columns.map(c => plain(rawName(c))))) {
-    let node = tree;
-    for (const part of name.split('.')) node = node[part] ??= {};
+interface FieldNode {
+  children: Map<string, FieldNode>;
+  many: boolean;
+  filters?: Record<string, unknown>;
+}
+
+function filtersToWhere(filters: Record<string, unknown>): string {
+  const conditions = Object.entries(filters).map(([name, value]) => `{ ${name}: { _eq: ${gqlLiteral(value)} } }`);
+  return conditions.length === 1 ? conditions[0] : `{ _and: [${conditions.join(', ')}] }`;
+}
+
+/**
+ * The selection set for the columns: "account.branch.city" selects city inside branch inside account.
+ * A relation navigated with filters takes them as a where argument.
+ */
+export function buildFieldsStr(
+  columns: (Attribute | RelationalOperationElement)[],
+  convention?: GraphQLFilterConvention,
+): string {
+  const root = new Map<string, FieldNode>();
+  for (const col of columns) {
+    let children = root;
+    for (const seg of parseFieldPath(rawName(col))) {
+      let node = children.get(seg.name);
+      if (!node) children.set(seg.name, node = { children: new Map(), many: seg.many });
+      node.many = seg.many;
+      if (node.filters === undefined) node.filters = seg.filters;
+      else if (JSON.stringify(node.filters) !== JSON.stringify(seg.filters)) {
+        throw new GraphQLUnsupportedError(`The relation ${seg.name} is selected with different filters`);
+      }
+      children = node.children;
+    }
   }
-  const render = (node: Record<string, any>): string =>
-    Object.entries(node).map(([k, v]) => (Object.keys(v).length > 0 ? `${k} { ${render(v)} }` : k)).join(' ');
-  return render(tree);
+
+  const render = (children: Map<string, FieldNode>): string => [...children].map(([name, node]) => {
+    let args = '';
+    if (node.filters && Object.keys(node.filters).length > 0) {
+      if (!node.many) {
+        throw new GraphQLPushdownError(
+          `Cannot filter the to-one relation ${name} on the server: only a list can take a where argument`);
+      }
+      if (!convention) {
+        throw new GraphQLPushdownError(
+          'The endpoint declares no filter convention, so a relation cannot be filtered on the server');
+      }
+      args = `(${convention.filterArg}: ${filtersToWhere(node.filters)})`;
+    }
+    return node.children.size > 0 ? `${name}${args} { ${render(node.children)} }` : `${name}${args}`;
+  }).join(' ');
+
+  return render(root);
 }
 
 function buildTemporalArgs(
@@ -327,6 +397,9 @@ async function fetchRows(
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export class GraphQLConnect implements QueryRunner {
+  /** Display names of the columns of the last query that returned. */
+  lastColumns: string[] = [];
+
   async select(
     businessDate: Date | null,
     processingDatetime: Date | null,
@@ -341,9 +414,9 @@ export class GraphQLConnect implements QueryRunner {
   ): Promise<Row[]> {
     const query = table as GraphQLQuery;
     // validates that every column is a plain field before anything is sent
-    const fieldsStr = buildFieldsStr(columns);
+    const fieldsStr = buildFieldsStr(columns, query.endpoint.filterConvention);
     if (groupBy && groupBy.length > 0) {
-      throw new GraphQLUnsupportedError('The GraphQL runner does not support group by: aggregation is not computed on the client');
+      throw new GraphQLClientComputationError('The GraphQL runner does not support group by: aggregation is not computed on the client');
     }
 
     const isDateRange = businessDateTo !== null && businessDate !== null;
@@ -371,6 +444,7 @@ export class GraphQLConnect implements QueryRunner {
     if (sortAfter) flat = sortExpanded(flat, orderBy ?? []);
     // a nested field is absent from every row when its parent object is null in all of them
     const fields = columns.map(c => plain(rawName(c)));
+    this.lastColumns = columns.map(c => (c as Attribute).displayName());
     return flat.map(row => fields.map(f => row[f] ?? null));
   }
 }

@@ -2,10 +2,10 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts, type SpecCase } from '../spec-harness';
+import { runExpectation, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { EmployeeFinder } from '../generated_examples/orgchart/EmployeeFinder';
-
+import { ORGCHART_FINDER_SPECS } from './cases/orgchart';
 
 let instance: DuckDBInstance;
 let conn: DuckDBConnection;
@@ -22,48 +22,6 @@ afterAll(() => {
   conn.disconnectSync();
   instance.closeSync();
 });
-
-const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
-  {
-    name: 'all_employees',
-    query: f => f.findAll(null, null, [f.id(), f.name()]).orderByOp(f.id().ascending()),
-    expected: { columns: ['Id', 'Name'], rows: [
-        [1, 'Alice'],
-        [2, 'Bob'],
-        [3, 'Carol'],
-        [4, 'Dave'],
-      ] },
-  },
-  {
-    name: 'manager_name_for_bob',
-    query: f => f.findAll(null, null, [f.name(), f.manager().name()], f.name().eq('Bob')),
-    expected: { columns: ['Name', 'Manager Name'], rows: [
-        ['Bob', 'Alice'],
-      ] },
-  },
-  {
-    name: 'manager_name_for_dave',
-    query: f => f.findAll(null, null, [f.name(), f.manager().name()], f.name().eq('Dave')),
-    expected: { columns: ['Name', 'Manager Name'], rows: [
-        ['Dave', 'Bob'],
-      ] },
-  },
-  {
-    name: 'filter_by_manager_alice',
-    query: f => f.findAll(null, null, [f.name()], f.manager().name().eq('Alice')).orderByOp(f.name().ascending()),
-    expected: { columns: ['Name'], rows: [
-        ['Bob'],
-        ['Carol'],
-      ] },
-  },
-  {
-    name: 'filter_by_manager_bob',
-    query: f => f.findAll(null, null, [f.name()], f.manager().name().eq('Bob')),
-    expected: { columns: ['Name'], rows: [
-        ['Dave'],
-      ] },
-  },
-];
 
 describe('ORGCHART_FINDER_SPECS', () => {
   const f = new EmployeeFinder();

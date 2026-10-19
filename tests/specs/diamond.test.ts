@@ -2,10 +2,10 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts, type SpecCase } from '../spec-harness';
+import { runExpectation, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { RecordFinder } from '../generated_examples/diamond/RecordFinder';
-
+import { DIAMOND_FINDER_SPECS } from './cases/diamond';
 
 let instance: DuckDBInstance;
 let conn: DuckDBConnection;
@@ -22,53 +22,6 @@ afterAll(() => {
   conn.disconnectSync();
   instance.closeSync();
 });
-
-const DIAMOND_FINDER_SPECS: SpecCase<RecordFinder>[] = [
-  {
-    name: 'all_records',
-    query: f => f.findAll(null, null, [f.id(), f.recordName()]).orderByOp(f.id().ascending()),
-    expected: { columns: ['Id', 'Record Name'], rows: [
-        [1, 'Alpha'],
-        [2, 'Beta'],
-        [3, 'Gamma'],
-      ] },
-  },
-  {
-    name: 'filter_by_auditable_id',
-    query: f => f.findAll(null, null, [f.recordName()], f.id().eq(2)),
-    expected: { columns: ['Record Name'], rows: [
-        ['Beta'],
-      ] },
-  },
-  {
-    name: 'filter_by_created_at',
-    query: f => f.findAll(null, null, [f.recordName()], f.createdAt().eq('2024-03-01')),
-    expected: { columns: ['Record Name'], rows: [
-        ['Gamma'],
-      ] },
-  },
-  {
-    name: 'filter_by_updated_at',
-    query: f => f.findAll(null, null, [f.recordName()], f.updatedAt().eq('2024-06-01')),
-    expected: { columns: ['Record Name'], rows: [
-        ['Alpha'],
-      ] },
-  },
-  {
-    name: 'filter_by_version',
-    query: f => f.findAll(null, null, [f.recordName(), f.version()], f.version().eq(1)),
-    expected: { columns: ['Record Name', 'Version'], rows: [
-        ['Beta', 1],
-      ] },
-  },
-  {
-    name: 'full_hierarchy_projection',
-    query: f => f.findAll(null, null, [f.id(), f.createdAt(), f.updatedAt(), f.version(), f.recordName()], f.recordName().eq('Alpha')),
-    expected: { columns: ['Id', 'Created At', 'Updated At', 'Version', 'Record Name'], rows: [
-        [1, '2024-01-01', '2024-06-01', 3, 'Alpha'],
-      ] },
-  },
-];
 
 describe('DIAMOND_FINDER_SPECS', () => {
   const f = new RecordFinder();

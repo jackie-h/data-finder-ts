@@ -76,6 +76,7 @@
     "generate": "uv run python example/generate.py",
     "generate:dual-assoc": "uv run python example/generate_dual_assoc.py",
     "generate:examples": "uv run python example/generate_examples.py",
+    "generate:graphql": "uv run python example/generate_graphql_examples.py",
     "generate:specs": "uv run python scripts/generate_spec_tests.py"
   },
   "dependencies": {
