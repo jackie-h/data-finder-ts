@@ -1,5 +1,17 @@
+/** The GraphQL argument names an endpoint uses for server-side push-down of filters, sorts and limits. */
+export class GraphQLFilterConvention {
+  constructor(
+    readonly filterArg: string,  // e.g. "where", "filter"
+    readonly sortArg: string,    // e.g. "order_by", "orderBy"
+    readonly limitArg: string,   // e.g. "limit", "take", "first"
+  ) {}
+}
+
 export class GraphQLEndpoint {
-  constructor(readonly url: string) {}
+  constructor(
+    readonly url: string,
+    readonly filterConvention?: GraphQLFilterConvention,
+  ) {}
 }
 
 export class GraphQLProcessingMilestone {
