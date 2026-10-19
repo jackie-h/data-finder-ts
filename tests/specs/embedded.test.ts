@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts } from '../spec-harness';
+import { runExpectation, ts, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { TradeFinder } from '../generated_examples/finance_embedded/TradeFinder';
 import '../generated_examples/finance_embedded/AccountFinder';
@@ -29,110 +29,95 @@ afterAll(() => {
   instance.closeSync();
 });
 
-describe('EMBEDDED_TRADE_FINDER_SPECS', () => {
-  const f = new TradeFinder();
-
-  it('one_hop_embedded_only_elides_join', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.account().name(), f.symbol()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Account Name', 'Symbol'], rows: [
+const EMBEDDED_TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
+  {
+    name: 'one_hop_embedded_only_elides_join',
+    query: f => f.findAll(null, _AT, [f.account().name(), f.symbol()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Account Name', 'Symbol'], rows: [
         ['Acme Corp', 'AAPL'],
       ], unexpectedSql: 'JOIN' },
-    ));
-
-  it('one_hop_mixed_selection_forces_real_join', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.account().name(), f.account().id(), f.symbol()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Account Name', 'Account Id', 'Symbol'], rows: [
+  },
+  {
+    name: 'one_hop_mixed_selection_forces_real_join',
+    query: f => f.findAll(null, _AT, [f.account().name(), f.account().id(), f.symbol()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Account Name', 'Account Id', 'Symbol'], rows: [
         ['Acme Corp', 1, 'AAPL'],
       ], sql: 'JOIN' },
-    ));
-
-  it('two_hop_embedded_only_elides_both_joins', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.account().branch().city(), f.symbol()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Account Branch City', 'Symbol'], rows: [
+  },
+  {
+    name: 'two_hop_embedded_only_elides_both_joins',
+    query: f => f.findAll(null, _AT, [f.account().branch().city(), f.symbol()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Account Branch City', 'Symbol'], rows: [
         ['New York', 'AAPL'],
       ], unexpectedSql: 'JOIN' },
-    ));
-
-  it('two_hop_mixed_selection_forces_both_real_joins', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.account().branch().city(), f.account().branch().id(), f.symbol()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Account Branch City', 'Account Branch Id', 'Symbol'], rows: [
+  },
+  {
+    name: 'two_hop_mixed_selection_forces_both_real_joins',
+    query: f => f.findAll(null, _AT, [f.account().branch().city(), f.account().branch().id(), f.symbol()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Account Branch City', 'Account Branch Id', 'Symbol'], rows: [
         ['New York', 10, 'AAPL'],
       ], sql: 'JOIN' },
-    ));
-
-  it('filter_by_embedded_account_name_elides_join', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol()], f.account().name().eq('Acme Corp')).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol'], rows: [
+  },
+  {
+    name: 'filter_by_embedded_account_name_elides_join',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.account().name().eq('Acme Corp')).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['GOOG'],
       ], unexpectedSql: 'JOIN' },
-    ));
-
-  it('filter_mixed_with_account_id_display_forces_real_join', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol(), f.account().id()], f.account().name().eq('Acme Corp')).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol', 'Account Id'], rows: [
+  },
+  {
+    name: 'filter_mixed_with_account_id_display_forces_real_join',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().id()], f.account().name().eq('Acme Corp')).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol', 'Account Id'], rows: [
         ['AAPL', 1],
         ['GOOG', 1],
       ], sql: 'JOIN' },
-    ));
-
-  it('group_by_embedded_account_name_elides_join', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.account().name(), f.count()]).groupByOp(f.account().name()),
-      runner,
-      { columns: ['Account Name', 'Count'], rows: [
+  },
+  {
+    name: 'group_by_embedded_account_name_elides_join',
+    query: f => f.findAll(null, _BOTH_AT, [f.account().name(), f.count()]).groupByOp(f.account().name()),
+    expected: { columns: ['Account Name', 'Count'], rows: [
         ['Acme Corp', 2],
       ], unexpectedSql: 'JOIN' },
-    ));
-
-  it('group_by_mixed_with_account_id_forces_real_join', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.account().name(), f.account().id(), f.count()]).groupByOp(f.account().name(), f.account().id()),
-      runner,
-      { columns: ['Account Name', 'Account Id', 'Count'], rows: [
+  },
+  {
+    name: 'group_by_mixed_with_account_id_forces_real_join',
+    query: f => f.findAll(null, _BOTH_AT, [f.account().name(), f.account().id(), f.count()]).groupByOp(f.account().name(), f.account().id()),
+    expected: { columns: ['Account Name', 'Account Id', 'Count'], rows: [
         ['Acme Corp', 1, 2],
       ], sql: 'JOIN' },
-    ));
-
-  it('partition_by_embedded_account_name_elides_join', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol(), f.price(), f.price().rank({ method: 'min', partitionBy: [f.account().name()], orderBy: [f.price().ascending()] })]).orderByOp(f.price().ascending()),
-      runner,
-      { columns: ['Symbol', 'Price', 'Rank'], rows: [
+  },
+  {
+    name: 'partition_by_embedded_account_name_elides_join',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.price(), f.price().rank({ method: 'min', partitionBy: [f.account().name()], orderBy: [f.price().ascending()] })]).orderByOp(f.price().ascending()),
+    expected: { columns: ['Symbol', 'Price', 'Rank'], rows: [
         ['AAPL', 84.11, 1],
         ['GOOG', 200.0, 2],
       ], unexpectedSql: 'JOIN' },
-    ));
-
-  it('partition_by_mixed_with_account_id_forces_real_join', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol(), f.account().id(), f.price().rank({ method: 'min', partitionBy: [f.account().name()], orderBy: [f.price().ascending()] })]).orderByOp(f.price().ascending()),
-      runner,
-      { columns: ['Symbol', 'Account Id', 'Rank'], rows: [
+  },
+  {
+    name: 'partition_by_mixed_with_account_id_forces_real_join',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().id(), f.price().rank({ method: 'min', partitionBy: [f.account().name()], orderBy: [f.price().ascending()] })]).orderByOp(f.price().ascending()),
+    expected: { columns: ['Symbol', 'Account Id', 'Rank'], rows: [
         ['AAPL', 1, 1],
         ['GOOG', 1, 2],
       ], sql: 'JOIN' },
-    ));
-
-  it('partition_by_two_hop_embedded_branch_city_elides_both_joins', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol(), f.price(), f.price().rank({ method: 'min', partitionBy: [f.account().branch().city()], orderBy: [f.price().ascending()] })]).orderByOp(f.price().ascending()),
-      runner,
-      { columns: ['Symbol', 'Price', 'Rank'], rows: [
+  },
+  {
+    name: 'partition_by_two_hop_embedded_branch_city_elides_both_joins',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.price(), f.price().rank({ method: 'min', partitionBy: [f.account().branch().city()], orderBy: [f.price().ascending()] })]).orderByOp(f.price().ascending()),
+    expected: { columns: ['Symbol', 'Price', 'Rank'], rows: [
         ['AAPL', 84.11, 1],
         ['GOOG', 200.0, 2],
       ], unexpectedSql: 'JOIN' },
-    ));
+  },
+];
+
+describe('EMBEDDED_TRADE_FINDER_SPECS', () => {
+  const f = new TradeFinder();
+
+  for (const c of EMBEDDED_TRADE_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });
