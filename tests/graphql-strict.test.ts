@@ -13,7 +13,7 @@ import {
   sortExpanded,
 } from '../src/datafinder/graphql-runner';
 import { DoubleAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
-import { GraphQLFilterConvention } from '../src/model/graphql_mapping';
+import { GraphQLFilterConvention, formatPathSegment } from '../src/model/graphql_mapping';
 import {
   ComparisonOperation,
   ComparisonOperator,
@@ -125,5 +125,35 @@ describe('to-many relations', () => {
   it('sorts expanded rows after expansion', () => {
     const rows = [{ 'projects.name': 'Beta', name: 'Bob' }, { 'projects.name': 'Alpha', name: 'Bob' }];
     expect(sortExpanded(rows, [projectsName().ascending()]).map(r => r['projects.name'])).toEqual(['Alpha', 'Beta']);
+  });
+});
+
+describe('filtering a relation', () => {
+  const filteredProjectsName = (filters: Record<string, unknown>) =>
+    new StringAttribute('Project Name', formatPathSegment('projects', true, filters) + '.name', 'STRING', 'employees');
+
+  it('sends a filtered to-many relation a where argument', () => {
+    expect(buildFieldsStr([filteredProjectsName({ code: 'ALPHA' })], CONVENTION))
+      .toBe('projects(where: { code: { _eq: "ALPHA" } }) { name }');
+  });
+
+  it('ands several filters on a relation', () => {
+    expect(buildFieldsStr([filteredProjectsName({ code: 'ALPHA', name: 'Alpha Initiative' })], CONVENTION))
+      .toBe('projects(where: { _and: [{ code: { _eq: "ALPHA" } }, { name: { _eq: "Alpha Initiative" } }] }) { name }');
+  });
+
+  it('fails to filter a to-one relation, which takes no arguments on a server', () => {
+    const attr = new StringAttribute('Account Name', formatPathSegment('account', false, { name: 'Acme' }) + '.name', 'STRING', 'trades');
+    expect(() => buildFieldsStr([attr], CONVENTION)).toThrow(GraphQLPushdownError);
+    expect(() => buildFieldsStr([attr], CONVENTION)).toThrow(/to-one relation account/);
+  });
+
+  it('fails to filter a relation without a filter convention', () => {
+    expect(() => buildFieldsStr([filteredProjectsName({ code: 'ALPHA' })], undefined)).toThrow(/no filter convention/);
+  });
+
+  it('fails when one relation is selected with different filters', () => {
+    const columns = [filteredProjectsName({ code: 'ALPHA' }), filteredProjectsName({ code: 'BETA' })];
+    expect(() => buildFieldsStr(columns, CONVENTION)).toThrow(/different filters/);
   });
 });

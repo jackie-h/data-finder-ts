@@ -5,6 +5,8 @@ from jinja2 import Environment, FileSystemLoader
 
 from datafinder_graphql.generator import (
     association_display,
+    association_many,
+    association_name,
     association_path,
     is_association_mapping,
     is_primitive_mapping,
@@ -18,7 +20,7 @@ from model.graphql_mapping import (
     GraphQLProcessingMilestone,
 )
 from model.mapping import Mapping
-from ts_generator.generator import display_name, to_ts_name
+from ts_generator.generator import display_name, filter_ts_type, to_ts_name
 
 
 def milestone_class(ms) -> str:
@@ -73,6 +75,9 @@ def generate(mapping: Mapping, output_directory: str) -> None:
                 is_primitive_mapping=is_primitive_mapping,
                 is_association_mapping=is_association_mapping,
                 association_path=association_path,
+                association_name=association_name,
+                association_many=lambda pm: 'true' if association_many(pm) else 'false',
+                filter_ts_type=filter_ts_type,
                 association_display=association_display,
                 type_str=type_str,
                 display_name=display_name,

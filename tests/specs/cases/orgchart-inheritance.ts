@@ -62,7 +62,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
         ['Bob', 'Alpha Initiative'],
         ['Carol', null],
         ['Dave', null],
-      ], skipGraphql: 'The GraphQL finder\'s association methods do not take filter kwargs yet' },
+      ] },
   },
   {
     name: 'multihop_manager_projects_for_dave',
@@ -149,7 +149,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
         ['Bob', null],
         ['Carol', 'Gamma Tooling'],
         ['Dave', null],
-      ], skipGraphql: 'The GraphQL finder\'s association methods do not take filter kwargs yet' },
+      ] },
   },
   {
     name: 'forward_join_filter_multi_kwarg',
@@ -159,7 +159,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
         ['Bob', 'Alpha Initiative'],
         ['Carol', null],
         ['Dave', null],
-      ], skipGraphql: 'The GraphQL finder\'s association methods do not take filter kwargs yet' },
+      ] },
   },
   {
     name: 'forward_join_filter_nonexistent',
@@ -169,7 +169,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
         ['Bob', null],
         ['Carol', null],
         ['Dave', null],
-      ], skipGraphql: 'The GraphQL finder\'s association methods do not take filter kwargs yet' },
+      ] },
   },
   {
     name: 'manager_exists_filter',
@@ -219,7 +219,7 @@ export const PROJECT_FINDER_SPECS: SpecCase<ProjectFinder>[] = [
         ['Delta Ops', null],
         ['Epsilon Research', null],
         ['Gamma Tooling', 'Carol'],
-      ], skipGraphql: 'The GraphQL finder\'s association methods do not take filter kwargs yet' },
+      ], skipGraphql: 'A to-one relationship cannot be filtered on a server: only a list takes a where argument' },
   },
   {
     name: 'reverse_join_filter_nonexistent',
@@ -230,7 +230,7 @@ export const PROJECT_FINDER_SPECS: SpecCase<ProjectFinder>[] = [
         ['Delta Ops', null],
         ['Epsilon Research', null],
         ['Gamma Tooling', null],
-      ], skipGraphql: 'The GraphQL finder\'s association methods do not take filter kwargs yet' },
+      ], skipGraphql: 'A to-one relationship cannot be filtered on a server: only a list takes a where argument' },
   },
 ];
 

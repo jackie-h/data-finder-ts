@@ -378,14 +378,14 @@ export const TRADE_MULTI_HOP_FINDER_SPECS: SpecCase<TradeFinder>[] = [
     query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account({ name: 'Acme Ltd' }).branch().city()], f.symbol().eq('AAPL')),
     expected: { columns: ['Symbol', 'Account Branch City'], rows: [
         ['AAPL', 'London'],
-      ], skipGraphql: 'The GraphQL finder\'s account() does not take filter kwargs yet' },
+      ], skipGraphql: 'A to-one relationship cannot be filtered on a server: only a list takes a where argument' },
   },
   {
     name: 'ancestor_join_filter_kwargs_apply_at_the_query_time',
     query: f => f.findAll(null, _AT, [f.symbol(), f.account({ name: 'Acme Ltd' }).branch().city()], f.symbol().eq('AAPL')),
     expected: { columns: ['Symbol', 'Account Branch City'], rows: [
         ['AAPL', null],
-      ], skipGraphql: 'The GraphQL finder\'s account() does not take filter kwargs yet' },
+      ], skipGraphql: 'A to-one relationship cannot be filtered on a server: only a list takes a where argument' },
   },
 ];
 

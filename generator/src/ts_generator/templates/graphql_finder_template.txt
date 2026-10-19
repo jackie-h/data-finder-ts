@@ -1,4 +1,4 @@
-import { GraphQLQuery, GraphQLEndpoint{% if milestone_class(cm.query.milestone) %}, {{milestone_class(cm.query.milestone)}}{% endif %} } from '@model/graphql_mapping';
+import { GraphQLQuery, GraphQLEndpoint, associationSegment{% if milestone_class(cm.query.milestone) %}, {{milestone_class(cm.query.milestone)}}{% endif %} } from '@model/graphql_mapping';
 import { NoOperation, Operation, RelationalOperationElement } from '@model/relational';
 import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
 import type { Attribute } from '@datafinder/attribute';
@@ -7,7 +7,25 @@ import { {{attr_types | join(', ')}} } from '@datafinder/typed-attributes';
 {% endif %}
 {% for target_cm in related_classes(cm) %}
 
+/** Equality filters accepted when navigating to a {{target_cm.clazz.name}}. */
+type {{target_cm.clazz.name}}Filter = {
+{% for tpm in target_cm.property_mappings %}
+{% if is_primitive_mapping(tpm) %}
+  {{to_ts_name(tpm.property)}}?: {{filter_ts_type(tpm.property)}};
+{% endif %}
+{% endfor %}
+};
+
 class {{target_cm.clazz.name}}RelatedFinder {
+  /** TypeScript property name -> GraphQL field, for the filters passed when navigating to this class. */
+  static readonly FIELDS: Record<string, string> = {
+{% for tpm in target_cm.property_mappings %}
+{% if is_primitive_mapping(tpm) %}
+    {{to_ts_name(tpm.property)}}: '{{tpm.target.name}}',
+{% endif %}
+{% endfor %}
+  };
+
 {% for tpm in target_cm.property_mappings %}
 {% if is_primitive_mapping(tpm) %}
   private readonly _{{to_ts_name(tpm.property)}}: {{tpm.property.type.name}}Attribute;
@@ -31,8 +49,9 @@ class {{target_cm.clazz.name}}RelatedFinder {
 
 {% elif is_association_mapping(tpm) and class_mappings_by_name.get(tpm.property.type.name) %}
   /** {{display_name(tpm.property)}} */
-  {{to_ts_name(tpm.property)}}(): {{tpm.property.type.name}}RelatedFinder {
-    return new {{tpm.property.type.name}}RelatedFinder(this.parentField + '.{{association_path(tpm)}}', this.displayPrefix + ' {{association_display(tpm)}}');
+  {{to_ts_name(tpm.property)}}(filter?: {{tpm.property.type.name}}Filter): {{tpm.property.type.name}}RelatedFinder {
+    const segment = associationSegment('{{association_name(tpm)}}', {{association_many(tpm)}}, filter ?? {}, {{tpm.property.type.name}}RelatedFinder.FIELDS);
+    return new {{tpm.property.type.name}}RelatedFinder(this.parentField + '.' + segment, this.displayPrefix + ' {{association_display(tpm)}}');
   }
 
 {% endif %}
@@ -77,7 +96,11 @@ export class {{cm.clazz.name}}Finder {
 
 {% elif is_association_mapping(pm) and class_mappings_by_name.get(pm.property.type.name) %}
   /** {{display_name(pm.property)}} */
-  {{to_ts_name(pm.property)}}(): {{pm.property.type.name}}RelatedFinder {
+  {{to_ts_name(pm.property)}}(filter?: {{pm.property.type.name}}Filter): {{pm.property.type.name}}RelatedFinder {
+    if (filter) {
+      const segment = associationSegment('{{association_name(pm)}}', {{association_many(pm)}}, filter, {{pm.property.type.name}}RelatedFinder.FIELDS);
+      return new {{pm.property.type.name}}RelatedFinder(segment, '{{association_display(pm)}}');
+    }
     return this._{{to_ts_name(pm.property)}};
   }
 

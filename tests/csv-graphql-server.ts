@@ -291,9 +291,10 @@ export interface GraphQLTable {
   nested?: Record<string, NestedVersions>;
 }
 
-type Selection = { [name: string]: Selection | null };
+/** Each field maps to its sub-selection (null for a scalar) and the text of its arguments. */
+type Selection = { [name: string]: { sub: Selection | null; args: string } };
 
-/** Parse "{ a b { c } d(arg: 1) { e } }" into {a: null, b: {c: null}, d: {e: null}}. */
+/** Parse "{ a b { c } d(arg: 1) { e } }" into {a: {sub: null, args: ""}, b: {sub: {c: ...}, args: ""}, d: {..., args: "arg: 1"}}. */
 function parseSelection(s: string, pos = 0): [Selection, number] {
   const fields: Selection = {};
   pos++; // skip '{'
@@ -306,18 +307,22 @@ function parseSelection(s: string, pos = 0): [Selection, number] {
     const name = found[0];
     pos = m.lastIndex;
     while (' \t\n\r'.includes(s[pos] ?? 'x')) pos++;
-    if (s[pos] === '(') { // skip the arguments
+    let args = '';
+    if (s[pos] === '(') {
+      const argsStart = pos + 1;
       let depth = 0;
       while (pos < s.length) {
-        if (s[pos] === '"') pos = s.indexOf('"', pos + 1);
-        else if (s[pos] === '(') depth++;
-        else if (s[pos] === ')' && --depth === 0) { pos++; break; }
+        if (s[pos] === '"') {
+          for (pos++; s[pos] !== '"'; pos++) if (s[pos] === '\\') pos++;
+        } else if (s[pos] === '(') depth++;
+        else if (s[pos] === ')' && --depth === 0) { args = s.slice(argsStart, pos); pos++; break; }
         pos++;
       }
       while (' \t\n\r'.includes(s[pos] ?? 'x')) pos++;
     }
-    if (s[pos] === '{') [fields[name], pos] = parseSelection(s, pos);
-    else fields[name] = null;
+    let sub: Selection | null = null;
+    if (s[pos] === '{') [sub, pos] = parseSelection(s, pos);
+    fields[name] = { sub, args };
   }
   return [fields, pos + 1];
 }
@@ -327,7 +332,16 @@ function select(value: any, selection: Selection | null): any {
   if (selection === null) return value;
   if (Array.isArray(value)) return value.map(item => select(item, selection));
   if (value === null || value === undefined) return null;
-  return Object.fromEntries(Object.entries(selection).map(([name, sub]) => [name, select(value[name], sub)]));
+  return Object.fromEntries(Object.entries(selection).map(([name, { sub, args }]) => [name, selectField(value[name], sub, args)]));
+}
+
+function selectField(value: any, selection: Selection | null, args: string): any {
+  if (args) {
+    // a list relationship takes where, order_by and limit; an object relationship takes no arguments
+    if (!Array.isArray(value)) throw new GraphQLServerError('field does not accept arguments');
+    value = applyLimit(applyOrderBy(applyWhere(value, args), args), args);
+  }
+  return select(value, selection);
 }
 
 function resolveNested(rows: Row[], nested: Record<string, NestedVersions>, asOfStr: string | null): Row[] {
@@ -352,25 +366,27 @@ function resolveNested(rows: Row[], nested: Record<string, NestedVersions>, asOf
 }
 
 function serveQuery(tables: Record<string, GraphQLTable>, query: string): Row {
-  const m = /^\s*\{\s*(\w+)/.exec(query);
-  if (!m || !(m[1] in tables)) return {};
-  const name = m[1];
+  const [selection] = parseSelection(query.slice(query.indexOf('{')));
+  const roots = Object.entries(selection);
+  if (roots.length !== 1) throw new GraphQLServerError('expected a single root field');
+  const [[name, { sub, args }]] = roots;
+  if (!(name in tables)) return {};
   const table = tables[name];
   let rows = table.rows;
+  // the arguments of the root field alone: a nested field's where must not filter the root rows
   if (table.businessDateKey) {
-    const businessDate = extractArg(query, 'businessDate');
+    const businessDate = extractArg(args, 'businessDate');
     if (businessDate) rows = rows.filter(r => r[table.businessDateKey!] === businessDate);
   }
   if (table.processingMilestoned) {
-    const asOf = extractArg(query, 'asOf');
+    const asOf = extractArg(args, 'asOf');
     if (asOf) rows = filterProcessing(rows, parseDt(asOf), '_in_z', '_out_z');
   }
-  if (table.nested) rows = resolveNested(rows, table.nested, extractArg(query, 'asOf'));
-  rows = applyWhere(rows, query);
-  rows = applyOrderBy(rows, query);
-  rows = applyLimit(rows, query);
-  const [selection] = parseSelection(query.slice(query.indexOf('{')));
-  return { [name]: select(rows, selection[name]) };
+  if (table.nested) rows = resolveNested(rows, table.nested, extractArg(args, 'asOf'));
+  rows = applyWhere(rows, args);
+  rows = applyOrderBy(rows, args);
+  rows = applyLimit(rows, args);
+  return { [name]: select(rows, sub) };
 }
 
 export async function startGraphQLServer(tables: Record<string, GraphQLTable>): Promise<{ server: http.Server; url: string }> {
