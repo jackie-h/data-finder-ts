@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts } from '../spec-harness';
+import { runExpectation, ts, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { PositionFinder } from '../generated_examples/positions/PositionFinder';
 
@@ -26,339 +26,274 @@ afterAll(() => {
   instance.closeSync();
 });
 
+const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
+  {
+    name: 'year_extract',
+    query: f => f.findAll(null, null, [f.tradeDate().year()], f.id().eq(1)),
+    expected: { columns: ['Year Trade Date'], rows: [
+        [2024],
+      ] },
+  },
+  {
+    name: 'month_extract',
+    query: f => f.findAll(null, null, [f.tradeDate().month()], f.id().eq(1)),
+    expected: { columns: ['Month Trade Date'], rows: [
+        [3],
+      ] },
+  },
+  {
+    name: 'day_extract',
+    query: f => f.findAll(null, null, [f.tradeDate().day()], f.id().eq(1)),
+    expected: { columns: ['Day Trade Date'], rows: [
+        [15],
+      ] },
+  },
+  {
+    name: 'quarter_extract',
+    query: f => f.findAll(null, null, [f.tradeDate().quarter()], f.id().eq(2)),
+    expected: { columns: ['Quarter Trade Date'], rows: [
+        [3],
+      ] },
+  },
+  {
+    name: 'week_extract',
+    query: f => f.findAll(null, null, [f.tradeDate().week()], f.id().eq(1)),
+    expected: { columns: ['Week Trade Date'], rows: [
+        [11],
+      ] },
+  },
+  {
+    name: 'subtract_months_one',
+    query: f => f.findAll(null, null, [f.tradeDate().subtractMonths(1)], f.id().eq(1)),
+    expected: { columns: ['Subtract Months Trade Date'], rows: [
+        [ts('2024-02-15T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'add_days_ten',
+    query: f => f.findAll(null, null, [f.tradeDate().addDays(10)], f.id().eq(1)),
+    expected: { columns: ['Add Days Trade Date'], rows: [
+        [ts('2024-03-25T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'subtract_days_five',
+    query: f => f.findAll(null, null, [f.tradeDate().subtractDays(5)], f.id().eq(1)),
+    expected: { columns: ['Subtract Days Trade Date'], rows: [
+        [ts('2024-03-10T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'add_months_one',
+    query: f => f.findAll(null, null, [f.tradeDate().addMonths(1)], f.id().eq(1)),
+    expected: { columns: ['Add Months Trade Date'], rows: [
+        [ts('2024-04-15T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'add_years_one',
+    query: f => f.findAll(null, null, [f.tradeDate().addYears(1)], f.id().eq(1)),
+    expected: { columns: ['Add Years Trade Date'], rows: [
+        [ts('2025-03-15T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'diff_days',
+    query: f => f.findAll(null, null, [f.tradeDate().diffDays(new Date(Date.UTC(2024, 2, 25)))], f.id().eq(1)),
+    expected: { columns: ['Diff Days Trade Date'], rows: [
+        [10],
+      ] },
+  },
+  {
+    name: 'diff_months',
+    query: f => f.findAll(null, null, [f.tradeDate().diffMonths(new Date(Date.UTC(2024, 5, 15)))], f.id().eq(1)),
+    expected: { columns: ['Diff Months Trade Date'], rows: [
+        [3],
+      ] },
+  },
+  {
+    name: 'diff_years',
+    query: f => f.findAll(null, null, [f.tradeDate().diffYears(new Date(Date.UTC(2026, 2, 15)))], f.id().eq(1)),
+    expected: { columns: ['Diff Years Trade Date'], rows: [
+        [2],
+      ] },
+  },
+  {
+    name: 'day_of_week',
+    query: f => f.findAll(null, null, [f.tradeDate().dayOfWeek()], f.id().eq(1)),
+    expected: { columns: ['Day Of Week Trade Date'], rows: [
+        [5],
+      ] },
+  },
+  {
+    name: 'subtract_years_one',
+    query: f => f.findAll(null, null, [f.tradeDate().subtractYears(1)], f.id().eq(1)),
+    expected: { columns: ['Subtract Years Trade Date'], rows: [
+        [ts('2023-03-15T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'add_timedelta_days',
+    query: f => f.findAll(null, null, [f.tradeDate().addDays(5)], f.id().eq(1)),
+    expected: { columns: ['Add Days Trade Date'], rows: [
+        [ts('2024-03-20T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'sub_timedelta_days',
+    query: f => f.findAll(null, null, [f.tradeDate().subtractDays(5)], f.id().eq(1)),
+    expected: { columns: ['Subtract Days Trade Date'], rows: [
+        [ts('2024-03-10T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'trade_date_eq',
+    query: f => f.findAll(null, null, [f.id()], f.tradeDate().eq(_D1)),
+    expected: { columns: ['Id'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'trade_date_gt',
+    query: f => f.findAll(null, null, [f.id()], f.tradeDate().gt(_D2)).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [3],
+      ] },
+  },
+  {
+    name: 'trade_date_lt',
+    query: f => f.findAll(null, null, [f.id()], f.tradeDate().lt(_D2)),
+    expected: { columns: ['Id'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'trade_date_ge',
+    query: f => f.findAll(null, null, [f.id()], f.tradeDate().gte(_D2)).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+      ] },
+  },
+  {
+    name: 'trade_date_le',
+    query: f => f.findAll(null, null, [f.id()], f.tradeDate().lte(_D2)).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [1],
+        [2],
+      ] },
+  },
+  {
+    name: 'npv_eq',
+    query: f => f.findAll(null, null, [f.id()], f.npv().eq(500.0)),
+    expected: { columns: ['Id'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'npv_gt',
+    query: f => f.findAll(null, null, [f.id()], f.npv().gt(500.0)).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+      ] },
+  },
+  {
+    name: 'npv_lt',
+    query: f => f.findAll(null, null, [f.id()], f.npv().lt(800.0)),
+    expected: { columns: ['Id'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'npv_ge',
+    query: f => f.findAll(null, null, [f.id()], f.npv().gte(800.0)).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+      ] },
+  },
+  {
+    name: 'npv_le',
+    query: f => f.findAll(null, null, [f.id()], f.npv().lte(800.0)).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [1],
+        [2],
+      ] },
+  },
+  {
+    name: 'npv_min',
+    query: f => f.findAll(null, null, [f.npv().min()]),
+    expected: { columns: ['Min Npv'], rows: [
+        [500.0],
+      ] },
+  },
+  {
+    name: 'npv_max',
+    query: f => f.findAll(null, null, [f.npv().max()]),
+    expected: { columns: ['Max Npv'], rows: [
+        [1200.0],
+      ] },
+  },
+  {
+    name: 'npv_average',
+    query: f => f.findAll(null, null, [f.npv().average()]),
+    expected: { columns: ['Average Npv'], rows: [
+        [833.3333333333334],
+      ] },
+  },
+  {
+    name: 'npv_eq_operator',
+    query: f => f.findAll(null, null, [f.id()], f.npv().eq(500.0)),
+    expected: { columns: ['Id'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'id_eq_operator',
+    query: f => f.findAll(null, null, [f.id()], f.id().eq(1)),
+    expected: { columns: ['Id'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'id_gt',
+    query: f => f.findAll(null, null, [f.id()], f.id().gt(1)).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+      ] },
+  },
+  {
+    name: 'id_lt',
+    query: f => f.findAll(null, null, [f.id()], f.id().lt(3)),
+    expected: { columns: ['Id'], rows: [
+        [1],
+        [2],
+      ] },
+  },
+  {
+    name: 'id_ge',
+    query: f => f.findAll(null, null, [f.id()], f.id().gte(2)).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+      ] },
+  },
+  {
+    name: 'id_le',
+    query: f => f.findAll(null, null, [f.id()], f.id().lte(2)).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [1],
+        [2],
+      ] },
+  },
+];
+
 describe('POSITION_DATE_FINDER_SPECS', () => {
   const f = new PositionFinder();
 
-  it('year_extract', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().year()], f.id().eq(1)),
-      runner,
-      { columns: ['Year Trade Date'], rows: [
-        [2024],
-      ] },
-    ));
-
-  it('month_extract', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().month()], f.id().eq(1)),
-      runner,
-      { columns: ['Month Trade Date'], rows: [
-        [3],
-      ] },
-    ));
-
-  it('day_extract', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().day()], f.id().eq(1)),
-      runner,
-      { columns: ['Day Trade Date'], rows: [
-        [15],
-      ] },
-    ));
-
-  it('quarter_extract', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().quarter()], f.id().eq(2)),
-      runner,
-      { columns: ['Quarter Trade Date'], rows: [
-        [3],
-      ] },
-    ));
-
-  it('week_extract', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().week()], f.id().eq(1)),
-      runner,
-      { columns: ['Week Trade Date'], rows: [
-        [11],
-      ] },
-    ));
-
-  it('subtract_months_one', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().subtractMonths(1)], f.id().eq(1)),
-      runner,
-      { columns: ['Subtract Months Trade Date'], rows: [
-        [ts('2024-02-15T00:00:00.000000')],
-      ] },
-    ));
-
-  it('add_days_ten', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().addDays(10)], f.id().eq(1)),
-      runner,
-      { columns: ['Add Days Trade Date'], rows: [
-        [ts('2024-03-25T00:00:00.000000')],
-      ] },
-    ));
-
-  it('subtract_days_five', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().subtractDays(5)], f.id().eq(1)),
-      runner,
-      { columns: ['Subtract Days Trade Date'], rows: [
-        [ts('2024-03-10T00:00:00.000000')],
-      ] },
-    ));
-
-  it('add_months_one', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().addMonths(1)], f.id().eq(1)),
-      runner,
-      { columns: ['Add Months Trade Date'], rows: [
-        [ts('2024-04-15T00:00:00.000000')],
-      ] },
-    ));
-
-  it('add_years_one', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().addYears(1)], f.id().eq(1)),
-      runner,
-      { columns: ['Add Years Trade Date'], rows: [
-        [ts('2025-03-15T00:00:00.000000')],
-      ] },
-    ));
-
-  it('diff_days', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().diffDays(new Date(Date.UTC(2024, 2, 25)))], f.id().eq(1)),
-      runner,
-      { columns: ['Diff Days Trade Date'], rows: [
-        [10],
-      ] },
-    ));
-
-  it('diff_months', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().diffMonths(new Date(Date.UTC(2024, 5, 15)))], f.id().eq(1)),
-      runner,
-      { columns: ['Diff Months Trade Date'], rows: [
-        [3],
-      ] },
-    ));
-
-  it('diff_years', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().diffYears(new Date(Date.UTC(2026, 2, 15)))], f.id().eq(1)),
-      runner,
-      { columns: ['Diff Years Trade Date'], rows: [
-        [2],
-      ] },
-    ));
-
-  it('day_of_week', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().dayOfWeek()], f.id().eq(1)),
-      runner,
-      { columns: ['Day Of Week Trade Date'], rows: [
-        [5],
-      ] },
-    ));
-
-  it('subtract_years_one', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().subtractYears(1)], f.id().eq(1)),
-      runner,
-      { columns: ['Subtract Years Trade Date'], rows: [
-        [ts('2023-03-15T00:00:00.000000')],
-      ] },
-    ));
-
-  it('add_timedelta_days', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().addDays(5)], f.id().eq(1)),
-      runner,
-      { columns: ['Add Days Trade Date'], rows: [
-        [ts('2024-03-20T00:00:00.000000')],
-      ] },
-    ));
-
-  it('sub_timedelta_days', () =>
-    runExpectation(
-      f.findAll(null, null, [f.tradeDate().subtractDays(5)], f.id().eq(1)),
-      runner,
-      { columns: ['Subtract Days Trade Date'], rows: [
-        [ts('2024-03-10T00:00:00.000000')],
-      ] },
-    ));
-
-  it('trade_date_eq', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.tradeDate().eq(_D1)),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('trade_date_gt', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.tradeDate().gt(_D2)).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
-        [3],
-      ] },
-    ));
-
-  it('trade_date_lt', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.tradeDate().lt(_D2)),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('trade_date_ge', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.tradeDate().gte(_D2)).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
-        [2],
-        [3],
-      ] },
-    ));
-
-  it('trade_date_le', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.tradeDate().lte(_D2)).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-        [2],
-      ] },
-    ));
-
-  it('npv_eq', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.npv().eq(500.0)),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('npv_gt', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.npv().gt(500.0)).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
-        [2],
-        [3],
-      ] },
-    ));
-
-  it('npv_lt', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.npv().lt(800.0)),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('npv_ge', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.npv().gte(800.0)).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
-        [2],
-        [3],
-      ] },
-    ));
-
-  it('npv_le', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.npv().lte(800.0)).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-        [2],
-      ] },
-    ));
-
-  it('npv_min', () =>
-    runExpectation(
-      f.findAll(null, null, [f.npv().min()]),
-      runner,
-      { columns: ['Min Npv'], rows: [
-        [500.0],
-      ] },
-    ));
-
-  it('npv_max', () =>
-    runExpectation(
-      f.findAll(null, null, [f.npv().max()]),
-      runner,
-      { columns: ['Max Npv'], rows: [
-        [1200.0],
-      ] },
-    ));
-
-  it('npv_average', () =>
-    runExpectation(
-      f.findAll(null, null, [f.npv().average()]),
-      runner,
-      { columns: ['Average Npv'], rows: [
-        [833.3333333333334],
-      ] },
-    ));
-
-  it('npv_eq_operator', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.npv().eq(500.0)),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('id_eq_operator', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.id().eq(1)),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('id_gt', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.id().gt(1)).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
-        [2],
-        [3],
-      ] },
-    ));
-
-  it('id_lt', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.id().lt(3)),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-        [2],
-      ] },
-    ));
-
-  it('id_ge', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.id().gte(2)).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
-        [2],
-        [3],
-      ] },
-    ));
-
-  it('id_le', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()], f.id().lte(2)).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
-        [1],
-        [2],
-      ] },
-    ));
+  for (const c of POSITION_DATE_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });

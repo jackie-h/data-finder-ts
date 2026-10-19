@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts } from '../spec-harness';
+import { runExpectation, ts, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { PriceFinder } from '../generated_examples/null_end_milestoning/PriceFinder';
 
@@ -25,43 +25,42 @@ afterAll(() => {
   instance.closeSync();
 });
 
-describe('NULL_END_PRICE_FINDER_SPECS', () => {
-  const f = new PriceFinder();
-
-  it('null_end_rows_active_at_2024', () =>
-    runExpectation(
-      f.findAll(null, _AT_2024, [f.symbol()]).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol'], rows: [
+const NULL_END_PRICE_FINDER_SPECS: SpecCase<PriceFinder>[] = [
+  {
+    name: 'null_end_rows_active_at_2024',
+    query: f => f.findAll(null, _AT_2024, [f.symbol()]).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['MSFT'],
       ] },
-    ));
-
-  it('expired_row_excluded_at_2024', () =>
-    runExpectation(
-      f.findAll(null, _AT_2024, [f.symbol()], f.symbol().eq('GOOG')),
-      runner,
-      { columns: ['Symbol'], rows: [] },
-    ));
-
-  it('all_three_active_before_expiry', () =>
-    runExpectation(
-      f.findAll(null, _AT_2021, [f.symbol()]).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol'], rows: [
+  },
+  {
+    name: 'expired_row_excluded_at_2024',
+    query: f => f.findAll(null, _AT_2024, [f.symbol()], f.symbol().eq('GOOG')),
+    expected: { columns: ['Symbol'], rows: [] },
+  },
+  {
+    name: 'all_three_active_before_expiry',
+    query: f => f.findAll(null, _AT_2021, [f.symbol()]).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['GOOG'],
         ['MSFT'],
       ] },
-    ));
-
-  it('aapl_active_at_future_date', () =>
-    runExpectation(
-      f.findAll(null, new Date(Date.UTC(2099, 0, 1, 0, 0, 0)), [f.symbol()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Symbol'], rows: [
+  },
+  {
+    name: 'aapl_active_at_future_date',
+    query: f => f.findAll(null, new Date(Date.UTC(2099, 0, 1, 0, 0, 0)), [f.symbol()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
       ] },
-    ));
+  },
+];
+
+describe('NULL_END_PRICE_FINDER_SPECS', () => {
+  const f = new PriceFinder();
+
+  for (const c of NULL_END_PRICE_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });

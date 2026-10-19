@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts } from '../spec-harness';
+import { runExpectation, ts, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { TradeFinder } from '../generated_examples/finance/TradeFinder';
 import '../generated_examples/finance/AccountFinder';
@@ -28,96 +28,83 @@ afterAll(() => {
   instance.closeSync();
 });
 
+const TRADE_NUMERIC_FINDER_SPECS: SpecCase<TradeFinder>[] = [
+  {
+    name: 'abs_negative_price',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().abs()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Symbol', 'Abs Price'], rows: [
+        ['AAPL', 25.5],
+      ] },
+  },
+  {
+    name: 'ceil_price',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().ceil()], f.symbol().eq('GOOG')),
+    expected: { columns: ['Symbol', 'Ceil Price'], rows: [
+        ['GOOG', 36],
+      ] },
+  },
+  {
+    name: 'floor_price',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().floor()], f.symbol().eq('MSFT')),
+    expected: { columns: ['Symbol', 'Floor Price'], rows: [
+        ['MSFT', 100],
+      ] },
+  },
+  {
+    name: 'sqrt_price',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().sqrt()], f.symbol().eq('TSLA')),
+    expected: { columns: ['Symbol', 'Sqrt Price'], rows: [
+        ['TSLA', 3.0],
+      ] },
+  },
+  {
+    name: 'mod_price_by_10',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().mod(10)], f.symbol().eq('GOOG')),
+    expected: { columns: ['Symbol', 'Mod Price'], rows: [
+        ['GOOG', 6.0],
+      ] },
+  },
+  {
+    name: 'power_price_squared',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().power(2)], f.symbol().eq('TSLA')),
+    expected: { columns: ['Symbol', 'Power Price'], rows: [
+        ['TSLA', 81.0],
+      ] },
+  },
+  {
+    name: 'round_price_no_decimals',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().round()], f.symbol().eq('MSFT')),
+    expected: { columns: ['Symbol', 'Round Price'], rows: [
+        ['MSFT', 100],
+      ] },
+  },
+  {
+    name: 'round_price_one_decimal',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().round(1)], f.symbol().eq('AAPL')),
+    expected: { columns: ['Symbol', 'Round Price'], rows: [
+        ['AAPL', -25.5],
+      ] },
+  },
+  {
+    name: 'mod_operator',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().mod(10)], f.symbol().eq('GOOG')),
+    expected: { columns: ['Symbol', 'Mod Price'], rows: [
+        ['GOOG', 6.0],
+      ] },
+  },
+  {
+    name: 'pow_operator',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.price().power(2)], f.symbol().eq('TSLA')),
+    expected: { columns: ['Symbol', 'Power Price'], rows: [
+        ['TSLA', 81.0],
+      ] },
+  },
+];
+
 describe('TRADE_NUMERIC_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
-  it('abs_negative_price', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().abs()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Symbol', 'Abs Price'], rows: [
-        ['AAPL', 25.5],
-      ] },
-    ));
-
-  it('ceil_price', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().ceil()], f.symbol().eq('GOOG')),
-      runner,
-      { columns: ['Symbol', 'Ceil Price'], rows: [
-        ['GOOG', 36],
-      ] },
-    ));
-
-  it('floor_price', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().floor()], f.symbol().eq('MSFT')),
-      runner,
-      { columns: ['Symbol', 'Floor Price'], rows: [
-        ['MSFT', 100],
-      ] },
-    ));
-
-  it('sqrt_price', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().sqrt()], f.symbol().eq('TSLA')),
-      runner,
-      { columns: ['Symbol', 'Sqrt Price'], rows: [
-        ['TSLA', 3.0],
-      ] },
-    ));
-
-  it('mod_price_by_10', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().mod(10)], f.symbol().eq('GOOG')),
-      runner,
-      { columns: ['Symbol', 'Mod Price'], rows: [
-        ['GOOG', 6.0],
-      ] },
-    ));
-
-  it('power_price_squared', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().power(2)], f.symbol().eq('TSLA')),
-      runner,
-      { columns: ['Symbol', 'Power Price'], rows: [
-        ['TSLA', 81.0],
-      ] },
-    ));
-
-  it('round_price_no_decimals', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().round()], f.symbol().eq('MSFT')),
-      runner,
-      { columns: ['Symbol', 'Round Price'], rows: [
-        ['MSFT', 100],
-      ] },
-    ));
-
-  it('round_price_one_decimal', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().round(1)], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Symbol', 'Round Price'], rows: [
-        ['AAPL', -25.5],
-      ] },
-    ));
-
-  it('mod_operator', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().mod(10)], f.symbol().eq('GOOG')),
-      runner,
-      { columns: ['Symbol', 'Mod Price'], rows: [
-        ['GOOG', 6.0],
-      ] },
-    ));
-
-  it('pow_operator', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.price().power(2)], f.symbol().eq('TSLA')),
-      runner,
-      { columns: ['Symbol', 'Power Price'], rows: [
-        ['TSLA', 81.0],
-      ] },
-    ));
+  for (const c of TRADE_NUMERIC_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });

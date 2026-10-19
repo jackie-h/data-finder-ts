@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts } from '../spec-harness';
+import { runExpectation, ts, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { CompanyFinder } from '../generated_examples/companies/CompanyFinder';
 
@@ -23,159 +23,132 @@ afterAll(() => {
   instance.closeSync();
 });
 
+const COMPANIES_STRING_SCALAR_SPECS: SpecCase<CompanyFinder>[] = [
+  {
+    name: 'upper',
+    query: f => f.findAll(null, null, [f.name().toUpperCase()], f.id().eq(2)),
+    expected: { columns: ['Upper Name'], rows: [
+        ['BETA CORP'],
+      ] },
+  },
+  {
+    name: 'lower',
+    query: f => f.findAll(null, null, [f.name().toLowerCase()], f.id().eq(3)),
+    expected: { columns: ['Lower Name'], rows: [
+        ['hello world'],
+      ] },
+  },
+  {
+    name: 'strip',
+    query: f => f.findAll(null, null, [f.name().trim()], f.id().eq(1)),
+    expected: { columns: ['Trim Name'], rows: [
+        ['Acme Corp'],
+      ] },
+  },
+  {
+    name: 'lstrip',
+    query: f => f.findAll(null, null, [f.name().trimStart()], f.id().eq(1)),
+    expected: { columns: ['Trim Start Name'], rows: [
+        ['Acme Corp  '],
+      ] },
+  },
+  {
+    name: 'rstrip',
+    query: f => f.findAll(null, null, [f.name().trimEnd()], f.id().eq(1)),
+    expected: { columns: ['Trim End Name'], rows: [
+        ['  Acme Corp'],
+      ] },
+  },
+  {
+    name: 'length',
+    query: f => f.findAll(null, null, [f.name().length()], f.id().eq(2)),
+    expected: { columns: ['Length Name'], rows: [
+        [9],
+      ] },
+  },
+  {
+    name: 'reverse',
+    query: f => f.findAll(null, null, [f.name().reverse()], f.id().eq(2)),
+    expected: { columns: ['Reverse Name'], rows: [
+        ['proc ateb'],
+      ] },
+  },
+  {
+    name: 'left_four',
+    query: f => f.findAll(null, null, [f.name().left(4)], f.id().eq(2)),
+    expected: { columns: ['Left Name'], rows: [
+        ['beta'],
+      ] },
+  },
+  {
+    name: 'right_four',
+    query: f => f.findAll(null, null, [f.name().right(4)], f.id().eq(2)),
+    expected: { columns: ['Right Name'], rows: [
+        ['corp'],
+      ] },
+  },
+  {
+    name: 'repeat_twice',
+    query: f => f.findAll(null, null, [f.category().repeat(2)], f.id().eq(1)),
+    expected: { columns: ['Repeat Category'], rows: [
+        ['TechnologyTechnology'],
+      ] },
+  },
+  {
+    name: 'replace',
+    query: f => f.findAll(null, null, [f.name().replace('corp', 'inc')], f.id().eq(2)),
+    expected: { columns: ['Replace Name'], rows: [
+        ['beta inc'],
+      ] },
+  },
+  {
+    name: 'substring_from_six',
+    query: f => f.findAll(null, null, [f.name().substring(6)], f.id().eq(3)),
+    expected: { columns: ['Substring Name'], rows: [
+        ['World'],
+      ] },
+  },
+  {
+    name: 'substring_zero_five',
+    query: f => f.findAll(null, null, [f.name().substring(0, 5)], f.id().eq(3)),
+    expected: { columns: ['Substring Name'], rows: [
+        ['Hello'],
+      ] },
+  },
+  {
+    name: 'slice_stop_only',
+    query: f => f.findAll(null, null, [f.name().left(4)], f.id().eq(2)),
+    expected: { columns: ['Left Name'], rows: [
+        ['beta'],
+      ] },
+  },
+  {
+    name: 'slice_negative_start',
+    query: f => f.findAll(null, null, [f.name().right(4)], f.id().eq(2)),
+    expected: { columns: ['Right Name'], rows: [
+        ['corp'],
+      ] },
+  },
+  {
+    name: 'slice_reverse',
+    query: f => f.findAll(null, null, [f.name().reverse()], f.id().eq(2)),
+    expected: { columns: ['Reverse Name'], rows: [
+        ['proc ateb'],
+      ] },
+  },
+  {
+    name: 'mul_operator',
+    query: f => f.findAll(null, null, [f.name().repeat(2)], f.id().eq(2)),
+    expected: { columns: ['Repeat Name'], rows: [
+        ['beta corpbeta corp'],
+      ] },
+  },
+];
+
 describe('COMPANIES_STRING_SCALAR_SPECS', () => {
   const f = new CompanyFinder();
 
-  it('upper', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().toUpperCase()], f.id().eq(2)),
-      runner,
-      { columns: ['Upper Name'], rows: [
-        ['BETA CORP'],
-      ] },
-    ));
-
-  it('lower', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().toLowerCase()], f.id().eq(3)),
-      runner,
-      { columns: ['Lower Name'], rows: [
-        ['hello world'],
-      ] },
-    ));
-
-  it('strip', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().trim()], f.id().eq(1)),
-      runner,
-      { columns: ['Trim Name'], rows: [
-        ['Acme Corp'],
-      ] },
-    ));
-
-  it('lstrip', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().trimStart()], f.id().eq(1)),
-      runner,
-      { columns: ['Trim Start Name'], rows: [
-        ['Acme Corp  '],
-      ] },
-    ));
-
-  it('rstrip', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().trimEnd()], f.id().eq(1)),
-      runner,
-      { columns: ['Trim End Name'], rows: [
-        ['  Acme Corp'],
-      ] },
-    ));
-
-  it('length', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().length()], f.id().eq(2)),
-      runner,
-      { columns: ['Length Name'], rows: [
-        [9],
-      ] },
-    ));
-
-  it('reverse', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().reverse()], f.id().eq(2)),
-      runner,
-      { columns: ['Reverse Name'], rows: [
-        ['proc ateb'],
-      ] },
-    ));
-
-  it('left_four', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().left(4)], f.id().eq(2)),
-      runner,
-      { columns: ['Left Name'], rows: [
-        ['beta'],
-      ] },
-    ));
-
-  it('right_four', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().right(4)], f.id().eq(2)),
-      runner,
-      { columns: ['Right Name'], rows: [
-        ['corp'],
-      ] },
-    ));
-
-  it('repeat_twice', () =>
-    runExpectation(
-      f.findAll(null, null, [f.category().repeat(2)], f.id().eq(1)),
-      runner,
-      { columns: ['Repeat Category'], rows: [
-        ['TechnologyTechnology'],
-      ] },
-    ));
-
-  it('replace', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().replace('corp', 'inc')], f.id().eq(2)),
-      runner,
-      { columns: ['Replace Name'], rows: [
-        ['beta inc'],
-      ] },
-    ));
-
-  it('substring_from_six', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().substring(6)], f.id().eq(3)),
-      runner,
-      { columns: ['Substring Name'], rows: [
-        ['World'],
-      ] },
-    ));
-
-  it('substring_zero_five', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().substring(0, 5)], f.id().eq(3)),
-      runner,
-      { columns: ['Substring Name'], rows: [
-        ['Hello'],
-      ] },
-    ));
-
-  it('slice_stop_only', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().left(4)], f.id().eq(2)),
-      runner,
-      { columns: ['Left Name'], rows: [
-        ['beta'],
-      ] },
-    ));
-
-  it('slice_negative_start', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().right(4)], f.id().eq(2)),
-      runner,
-      { columns: ['Right Name'], rows: [
-        ['corp'],
-      ] },
-    ));
-
-  it('slice_reverse', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().reverse()], f.id().eq(2)),
-      runner,
-      { columns: ['Reverse Name'], rows: [
-        ['proc ateb'],
-      ] },
-    ));
-
-  it('mul_operator', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().repeat(2)], f.id().eq(2)),
-      runner,
-      { columns: ['Repeat Name'], rows: [
-        ['beta corpbeta corp'],
-      ] },
-    ));
+  for (const c of COMPANIES_STRING_SCALAR_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });

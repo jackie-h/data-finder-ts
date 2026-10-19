@@ -75,6 +75,13 @@ SKIPPED_SPECS = {
     'TRADE_VIEW_FINDER_SPECS': 'SQL views are not ported',
 }
 
+# Spec groups whose expectations must also pass when run in a different order, and when every query is built
+# before any is run (the Python project's test_trade_specs_do_not_depend_on_order). They share one finder.
+ORDER_INDEPENDENT = {
+    'finance_specs': ['TRADE_FINDER_SPECS', 'TRADE_MULTI_HOP_FINDER_SPECS', 'TRADE_EXISTS_FINDER_SPECS',
+                      'TRADE_IS_NONE_FINDER_SPECS'],
+}
+
 COMPARE_METHODS = {ast.Eq: 'eq', ast.NotEq: 'ne', ast.Gt: 'gt', ast.Lt: 'lt', ast.GtE: 'gte', ast.LtE: 'lte'}
 TIMEDELTA_UNITS = {'days': 'Days', 'hours': 'Hours', 'minutes': 'Minutes', 'seconds': 'Seconds'}
 # Keyword arguments of window functions, which become a single options object in TypeScript.
@@ -247,6 +254,7 @@ def generate_module(module_name: str) -> str:
     imports: dict[str, str] = {}   # finder class -> import path
     side_effects: set[str] = set()
     blocks = []
+    order_finders: set[str] = set()
     for var_name, spec_call in specs:
         if var_name in SKIPPED_SPECS:
             print(f'... skipped {var_name}: {SKIPPED_SPECS[var_name]}')
@@ -279,12 +287,50 @@ def generate_module(module_name: str) -> str:
             if 'duckdb' in exp.unexpected_sql:
                 fields.append(f"unexpectedSql: {js_str(exp.unexpected_sql['duckdb'])}")
             cases.append(
-                f"  it({js_str(exp.name)}, () =>\n"
-                f"    runExpectation(\n      {query},\n      runner,\n      {{ {', '.join(fields)} }},\n    ));\n"
+                f"  {{\n    name: {js_str(exp.name)},\n    query: f => {query},\n"
+                f"    expected: {{ {', '.join(fields)} }},\n  }},\n"
             )
         blocks.append(
-            f"describe({js_str(var_name)}, () => {{\n  const f = new {spec.finder_name}();\n\n" + '\n'.join(cases) + '});\n'
+            f"const {var_name}: SpecCase<{spec.finder_name}>[] = [\n" + ''.join(cases) + '];\n\n'
+            f"describe({js_str(var_name)}, () => {{\n  const f = new {spec.finder_name}();\n\n"
+            f"  for (const c of {var_name}) {{\n"
+            f"    it(c.name, () => runExpectation(c.query(f), runner, c.expected));\n  }}\n}});\n"
         )
+        if var_name in ORDER_INDEPENDENT.get(module_name, []):
+            order_finders.add(spec.finder_name)
+
+    if module_name in ORDER_INDEPENDENT:
+        assert len(order_finders) == 1, order_finders
+        finder = order_finders.pop()
+        names = ORDER_INDEPENDENT[module_name]
+        blocks.append(f"""// Related finders, and the join nodes under them, are shared between queries. A query that is missing a join
+// condition can pass only because an earlier query left its condition on a shared node, so each spec must also
+// pass when it runs in a different order.
+const ORDER_INDEPENDENT_SPECS: SpecCase<{finder}>[] = [{', '.join('...' + n for n in names)}];
+
+describe('trade specs do not depend on order', () => {{
+  const orders: [string, SpecCase<{finder}>[]][] = [
+    ['reversed', [...ORDER_INDEPENDENT_SPECS].reverse()],
+    ['shuffled-1', shuffled(ORDER_INDEPENDENT_SPECS, 1)],
+    ['shuffled-2', shuffled(ORDER_INDEPENDENT_SPECS, 2)],
+    ['shuffled-3', shuffled(ORDER_INDEPENDENT_SPECS, 3)],
+  ];
+
+  it.each(orders)('%s', async (_label, order) => {{
+    const f = new {finder}();
+    for (const c of order) await runExpectation(c.query(f), runner, c.expected);
+  }});
+
+  it('passes when every query is built before any is run', async () => {{
+    const f = new {finder}();
+    const built = ORDER_INDEPENDENT_SPECS.map(c => ({{ c, result: c.query(f) }}));
+    for (const {{ c, result }} of built.reverse()) await runExpectation(result, runner, c.expected);
+  }});
+}});
+""")
+        harness_extra = ', shuffled'
+    else:
+        harness_extra = ''
 
     side_effects -= set(imports.values())
     header = [
@@ -292,7 +338,7 @@ def generate_module(module_name: str) -> str:
         "import { describe, it, beforeAll, afterAll } from 'vitest';",
         "import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';",
         "import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';",
-        "import { runExpectation, ts } from '../spec-harness';",
+        f"import {{ runExpectation, ts, type SpecCase{harness_extra} }} from '../spec-harness';",
         "import { seeds } from '../spec-seeds';",
     ]
     header += [f"import {{ {name} }} from '{path}';" for name, path in sorted(imports.items())]

@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts } from '../spec-harness';
+import { runExpectation, ts, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { CompanyFinder } from '../generated_examples/companies/CompanyFinder';
 
@@ -23,450 +23,375 @@ afterAll(() => {
   instance.closeSync();
 });
 
-describe('COMPANY_FINDER_SPECS', () => {
-  const f = new CompanyFinder();
-
-  it('count_all', () =>
-    runExpectation(
-      f.findAll(null, null, [f.count()]),
-      runner,
-      { columns: ['Count'], rows: [
+const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
+  {
+    name: 'count_all',
+    query: f => f.findAll(null, null, [f.count()]),
+    expected: { columns: ['Count'], rows: [
         [5],
       ] },
-    ));
-
-  it('count_technology', () =>
-    runExpectation(
-      f.findAll(null, null, [f.count()], f.category().eq('Technology')),
-      runner,
-      { columns: ['Count'], rows: [
+  },
+  {
+    name: 'count_technology',
+    query: f => f.findAll(null, null, [f.count()], f.category().eq('Technology')),
+    expected: { columns: ['Count'], rows: [
         [2],
       ] },
-    ));
-
-  it('count_no_matches', () =>
-    runExpectation(
-      f.findAll(null, null, [f.count()], f.category().eq('Nonexistent')),
-      runner,
-      { columns: ['Count'], rows: [
+  },
+  {
+    name: 'count_no_matches',
+    query: f => f.findAll(null, null, [f.count()], f.category().eq('Nonexistent')),
+    expected: { columns: ['Count'], rows: [
         [0],
       ] },
-    ));
-
-  it('count_name_attribute', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().count()]),
-      runner,
-      { columns: ['Name Count'], rows: [
+  },
+  {
+    name: 'count_name_attribute',
+    query: f => f.findAll(null, null, [f.name().count()]),
+    expected: { columns: ['Name Count'], rows: [
         [5],
       ] },
-    ));
-
-  it('group_by_category_count', () =>
-    runExpectation(
-      f.findAll(null, null, [f.category(), f.count()]).groupByOp(f.category()).orderByOp(f.category().ascending()),
-      runner,
-      { columns: ['Category', 'Count'], rows: [
+  },
+  {
+    name: 'group_by_category_count',
+    query: f => f.findAll(null, null, [f.category(), f.count()]).groupByOp(f.category()).orderByOp(f.category().ascending()),
+    expected: { columns: ['Category', 'Count'], rows: [
         ['Finance', 2],
         ['Manufacturing', 1],
         ['Technology', 2],
       ] },
-    ));
-
-  it('sort_by_name_asc', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'sort_by_name_asc',
+    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
         ['Beta Corp'],
         ['Delta Ltd'],
         ['Gamma LLC'],
       ] },
-    ));
-
-  it('sort_by_id_desc', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()]).orderByOp(f.id().descending()),
-      runner,
-      { columns: ['Id'], rows: [
+  },
+  {
+    name: 'sort_by_id_desc',
+    query: f => f.findAll(null, null, [f.id()]).orderByOp(f.id().descending()),
+    expected: { columns: ['Id'], rows: [
         [5],
         [4],
         [3],
         [2],
         [1],
       ] },
-    ));
-
-  it('sort_by_category_asc_name_desc', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name(), f.category()]).orderByOp(f.category().ascending(), f.name().descending()),
-      runner,
-      { columns: ['Name', 'Category'], rows: [
+  },
+  {
+    name: 'sort_by_category_asc_name_desc',
+    query: f => f.findAll(null, null, [f.name(), f.category()]).orderByOp(f.category().ascending(), f.name().descending()),
+    expected: { columns: ['Name', 'Category'], rows: [
         ['Gamma LLC', 'Finance'],
         ['Delta Ltd', 'Finance'],
         ['Acme Industries', 'Manufacturing'],
         ['Beta Corp', 'Technology'],
         ['Acme Corp', 'Technology'],
       ] },
-    ));
-
-  it('sort_filter_technology_asc', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'sort_filter_technology_asc',
+    query: f => f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
       ] },
-    ));
-
-  it('limit_two_by_name', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()).limit(2),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'limit_two_by_name',
+    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()).limit(2),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
       ] },
-    ));
-
-  it('string_eq_exact_match', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.name().eq('Acme Corp')),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'string_eq_exact_match',
+    query: f => f.findAll(null, null, [f.name()], f.name().eq('Acme Corp')),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },
-    ));
-
-  it('string_eq_operator', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.name().eq('Acme Corp')),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'string_eq_operator',
+    query: f => f.findAll(null, null, [f.name()], f.name().eq('Acme Corp')),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },
-    ));
-
-  it('string_ne_excludes_row', () =>
-    runExpectation(
-      f.findAll(null, null, [f.count()], f.name().ne('Acme Corp')),
-      runner,
-      { columns: ['Count'], rows: [
+  },
+  {
+    name: 'string_ne_excludes_row',
+    query: f => f.findAll(null, null, [f.count()], f.name().ne('Acme Corp')),
+    expected: { columns: ['Count'], rows: [
         [4],
       ] },
-    ));
-
-  it('string_contains_corp', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.name().contains('Corp')).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'string_contains_corp',
+    query: f => f.findAll(null, null, [f.name()], f.name().contains('Corp')).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
       ] },
-    ));
-
-  it('string_contains_acme', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.name().contains('Acme')).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'string_contains_acme',
+    query: f => f.findAll(null, null, [f.name()], f.name().contains('Acme')).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
       ] },
-    ));
-
-  it('string_starts_with_acme', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.name().startsWith('Acme')).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'string_starts_with_acme',
+    query: f => f.findAll(null, null, [f.name()], f.name().startsWith('Acme')).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
       ] },
-    ));
-
-  it('string_ends_with_corp', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.name().endsWith('Corp')).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'string_ends_with_corp',
+    query: f => f.findAll(null, null, [f.name()], f.name().endsWith('Corp')).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
       ] },
-    ));
-
-  it('string_ends_with_llc', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.name().endsWith('LLC')),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'string_ends_with_llc',
+    query: f => f.findAll(null, null, [f.name()], f.name().endsWith('LLC')),
+    expected: { columns: ['Name'], rows: [
         ['Gamma LLC'],
       ] },
-    ));
-
-  it('string_category_starts_with_fin', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.category().startsWith('Fin')).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'string_category_starts_with_fin',
+    query: f => f.findAll(null, null, [f.name()], f.category().startsWith('Fin')).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
         ['Delta Ltd'],
         ['Gamma LLC'],
       ] },
-    ));
-
-  it('string_category_ne_technology', () =>
-    runExpectation(
-      f.findAll(null, null, [f.count()], f.category().ne('Technology')),
-      runner,
-      { columns: ['Count'], rows: [
+  },
+  {
+    name: 'string_category_ne_technology',
+    query: f => f.findAll(null, null, [f.count()], f.category().ne('Technology')),
+    expected: { columns: ['Count'], rows: [
         [3],
       ] },
-    ));
-
-  it('rank_min_by_id', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.id().rank({ method: 'min', orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Rank'], rows: [
+  },
+  {
+    name: 'rank_min_by_id',
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'min', orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Rank'], rows: [
         [1, 1],
         [2, 2],
         [3, 3],
         [4, 4],
         [5, 5],
       ] },
-    ));
-
-  it('rank_dense_with_partition_by_category', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.id().rank({ method: 'dense', partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Dense Rank'], rows: [
+  },
+  {
+    name: 'rank_dense_with_partition_by_category',
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'dense', partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Dense Rank'], rows: [
         [1, 1],
         [2, 1],
         [3, 2],
         [4, 1],
         [5, 2],
       ] },
-    ));
-
-  it('shift_lag_second_row', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.id().shift(1, { orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Lag Id'], rows: [
+  },
+  {
+    name: 'shift_lag_second_row',
+    query: f => f.findAll(null, null, [f.id(), f.id().shift(1, { orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Lag Id'], rows: [
         [1, null],
         [2, 1],
         [3, 2],
         [4, 3],
         [5, 4],
       ] },
-    ));
-
-  it('shift_lead_last_row', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.id().shift(-1, { orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Lead Id'], rows: [
+  },
+  {
+    name: 'shift_lead_last_row',
+    query: f => f.findAll(null, null, [f.id(), f.id().shift(-1, { orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Lead Id'], rows: [
         [1, 2],
         [2, 3],
         [3, 4],
         [4, 5],
         [5, null],
       ] },
-    ));
-
-  it('qcut_two_buckets', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.id().qcut(2, { orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Quantile'], rows: [
+  },
+  {
+    name: 'qcut_two_buckets',
+    query: f => f.findAll(null, null, [f.id(), f.id().qcut(2, { orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Quantile'], rows: [
         [1, 1],
         [2, 1],
         [3, 1],
         [4, 2],
         [5, 2],
       ] },
-    ));
-
-  it('first_id_per_category', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.category(), f.id().first({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Category', 'First Id'], rows: [
+  },
+  {
+    name: 'first_id_per_category',
+    query: f => f.findAll(null, null, [f.id(), f.category(), f.id().first({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Category', 'First Id'], rows: [
         [1, 'Technology', 1],
         [2, 'Manufacturing', 2],
         [3, 'Technology', 1],
         [4, 'Finance', 4],
         [5, 'Finance', 4],
       ] },
-    ));
-
-  it('last_id_per_category', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.category(), f.id().last({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Category', 'Last Id'], rows: [
+  },
+  {
+    name: 'last_id_per_category',
+    query: f => f.findAll(null, null, [f.id(), f.category(), f.id().last({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Category', 'Last Id'], rows: [
         [1, 'Technology', 1],
         [2, 'Manufacturing', 2],
         [3, 'Technology', 3],
         [4, 'Finance', 4],
         [5, 'Finance', 5],
       ] },
-    ));
-
-  it('rank_method_first', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.id().rank({ method: 'first', orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Row Number'], rows: [
+  },
+  {
+    name: 'rank_method_first',
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'first', orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Row Number'], rows: [
         [1, 1],
         [2, 2],
         [3, 3],
         [4, 4],
         [5, 5],
       ] },
-    ));
-
-  it('rank_pct', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.id().rank({ pct: true, orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Percent Rank'], rows: [
+  },
+  {
+    name: 'rank_pct',
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ pct: true, orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Percent Rank'], rows: [
         [1.0, 0.0],
         [2.0, 0.25],
         [3.0, 0.5],
         [4.0, 0.75],
         [5.0, 1.0],
       ] },
-    ));
-
-  it('rank_pct_method_max', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.id().rank({ pct: true, method: 'max', orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Cume Dist'], rows: [
+  },
+  {
+    name: 'rank_pct_method_max',
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ pct: true, method: 'max', orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Cume Dist'], rows: [
         [1.0, 0.2],
         [2.0, 0.4],
         [3.0, 0.6],
         [4.0, 0.8],
         [5.0, 1.0],
       ] },
-    ));
-
-  it('count_with_contains_filter', () =>
-    runExpectation(
-      f.findAll(null, null, [f.count()], f.name().contains('Corp')),
-      runner,
-      { columns: ['Count'], rows: [
+  },
+  {
+    name: 'count_with_contains_filter',
+    query: f => f.findAll(null, null, [f.count()], f.name().contains('Corp')),
+    expected: { columns: ['Count'], rows: [
         [2],
       ] },
-    ));
-
-  it('count_finance_category', () =>
-    runExpectation(
-      f.findAll(null, null, [f.count()], f.category().eq('Finance')),
-      runner,
-      { columns: ['Count'], rows: [
+  },
+  {
+    name: 'count_finance_category',
+    query: f => f.findAll(null, null, [f.count()], f.category().eq('Finance')),
+    expected: { columns: ['Count'], rows: [
         [2],
       ] },
-    ));
-
-  it('count_id_attribute', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id().count()]),
-      runner,
-      { columns: ['Id Count'], rows: [
+  },
+  {
+    name: 'count_id_attribute',
+    query: f => f.findAll(null, null, [f.id().count()]),
+    expected: { columns: ['Id Count'], rows: [
         [5],
       ] },
-    ));
-
-  it('count_name_technology_filter', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().count()], f.category().eq('Technology')),
-      runner,
-      { columns: ['Name Count'], rows: [
+  },
+  {
+    name: 'count_name_technology_filter',
+    query: f => f.findAll(null, null, [f.name().count()], f.category().eq('Technology')),
+    expected: { columns: ['Name Count'], rows: [
         [2],
       ] },
-    ));
-
-  it('count_name_ne_technology', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name().count()], f.category().ne('Technology')),
-      runner,
-      { columns: ['Name Count'], rows: [
+  },
+  {
+    name: 'count_name_ne_technology',
+    query: f => f.findAll(null, null, [f.name().count()], f.category().ne('Technology')),
+    expected: { columns: ['Name Count'], rows: [
         [3],
       ] },
-    ));
-
-  it('sort_by_id_asc', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id()]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id'], rows: [
+  },
+  {
+    name: 'sort_by_id_asc',
+    query: f => f.findAll(null, null, [f.id()]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
         [1],
         [2],
         [3],
         [4],
         [5],
       ] },
-    ));
-
-  it('sort_by_name_desc', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()]).orderByOp(f.name().descending()),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'sort_by_name_desc',
+    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().descending()),
+    expected: { columns: ['Name'], rows: [
         ['Gamma LLC'],
         ['Delta Ltd'],
         ['Beta Corp'],
         ['Acme Industries'],
         ['Acme Corp'],
       ] },
-    ));
-
-  it('sort_by_category_asc_name_asc', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name(), f.category()]).orderByOp(f.category().ascending(), f.name().ascending()),
-      runner,
-      { columns: ['Name', 'Category'], rows: [
+  },
+  {
+    name: 'sort_by_category_asc_name_asc',
+    query: f => f.findAll(null, null, [f.name(), f.category()]).orderByOp(f.category().ascending(), f.name().ascending()),
+    expected: { columns: ['Name', 'Category'], rows: [
         ['Delta Ltd', 'Finance'],
         ['Gamma LLC', 'Finance'],
         ['Acme Industries', 'Manufacturing'],
         ['Acme Corp', 'Technology'],
         ['Beta Corp', 'Technology'],
       ] },
-    ));
-
-  it('limit_one', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()).limit(1),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'limit_one',
+    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()).limit(1),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },
-    ));
-
-  it('limit_three', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()).limit(3),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'limit_three',
+    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()).limit(3),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
         ['Beta Corp'],
       ] },
-    ));
-
-  it('limit_with_filter', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderByOp(f.name().ascending()).limit(1),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'limit_with_filter',
+    query: f => f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderByOp(f.name().ascending()).limit(1),
+    expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },
-    ));
+  },
+];
+
+describe('COMPANY_FINDER_SPECS', () => {
+  const f = new CompanyFinder();
+
+  for (const c of COMPANY_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });
