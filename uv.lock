@@ -14,7 +14,7 @@ supported-markers = [
 
 [[package]]
 name = "data-finder"
-version = "0.1.15"
+version = "0.1.16"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -22,9 +22,9 @@ dependencies = [
     { name = "pandas", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "sqlglot", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7c/11/48f8c0b5bd5a11f77e2f183ff0a0cb2d8d7db53b658f09cbb79a8e191e7d/data_finder-0.1.15.tar.gz", hash = "sha256:92ac22e2397f267a26c94c40c5b66840f82283d31f9cb3eafbd944ed106200a0", size = 84314, upload-time = "2026-07-27T23:41:13.344Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/22/4a/e266f962b3c1dd8774ebd26c675397489f41d5edd0884dce821d0bd19771/data_finder-0.1.16.tar.gz", hash = "sha256:62b86fdbf1e3d7ae37dcb0fe4b704ee5c32f14d4c91e1ea1c1c94b66bf45f0a5", size = 94929, upload-time = "2026-10-18T23:39:54.897Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/38/52a33b6e54be6f3eeaf7a931b5faf24a60d879ca3ddc960da1a86c711e21/data_finder-0.1.15-py3-none-any.whl", hash = "sha256:b90e67b11a8c8271bff8358bf363f372f77a472375b791cbf158f604bb3d1cc6", size = 112198, upload-time = "2026-07-27T23:41:12.076Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/cc/f980783f03899fe575ac9cf994e3c90376d3e88aa385a670dd5c0abb903a/data_finder-0.1.16-py3-none-any.whl", hash = "sha256:ffca39eeea10a659b0281db42c5bca2e2baa6f73f31dbc9d8f0cf6db3bfc995a", size = 123588, upload-time = "2026-10-18T23:39:53.495Z" },
 ]
 
 [package.optional-dependencies]
@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "data-finder", extras = ["markdown"], specifier = ">=0.1.15" }]
+requires-dist = [{ name = "data-finder", extras = ["markdown"], specifier = ">=0.1.16" }]
 
 [[package]]
 name = "jinja2"

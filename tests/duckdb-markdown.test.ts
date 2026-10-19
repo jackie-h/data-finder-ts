@@ -24,8 +24,8 @@ beforeAll(async () => {
   await run('CREATE SCHEMA trading');
   await run('CREATE SCHEMA ref_data');
 
-  await run(`CREATE TABLE ref_data.account_master(ID INT, ACCT_NAME VARCHAR)`);
-  await run(`INSERT INTO ref_data.account_master VALUES (1, 'Acme Corp')`);
+  await run(`CREATE TABLE ref_data.account_master(ID INT, ACCT_NAME VARCHAR, BRANCH_ID INT, in_z TIMESTAMP, out_z TIMESTAMP)`);
+  await run(`INSERT INTO ref_data.account_master VALUES (1, 'Acme Corp', NULL, '2020-01-01', '9999-12-31 23:59:59')`);
 
   await run(`CREATE TABLE ref_data.price(SYM VARCHAR, PRICE DOUBLE, in_z TIMESTAMP, out_z TIMESTAMP)`);
   await run(`INSERT INTO ref_data.price VALUES ('AAPL', 150.0, '2020-01-01', '9999-12-31')`);

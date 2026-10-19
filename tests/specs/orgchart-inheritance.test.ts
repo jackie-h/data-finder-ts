@@ -105,7 +105,7 @@ describe('EMPLOYEE_INHERITANCE_FINDER_SPECS', () => {
     runExpectation(
       f.findAll(null, null, [f.manager().projects().name()], f.firstName().eq('Dave')).orderByOp(f.manager().projects().name().ascending()),
       runner,
-      { columns: ['Project Name'], rows: [
+      { columns: ['Manager Project Name'], rows: [
         ['Alpha Initiative'],
         ['Beta Platform'],
       ] },
@@ -124,7 +124,7 @@ describe('EMPLOYEE_INHERITANCE_FINDER_SPECS', () => {
     runExpectation(
       f.findAll(null, null, [f.manager().projects().name()], f.manager().firstName().eq('Alice')).orderByOp(f.manager().projects().name().ascending()),
       runner,
-      { columns: ['Project Name'], rows: [
+      { columns: ['Manager Project Name'], rows: [
         ['Epsilon Research'],
         ['Epsilon Research'],
       ] },
