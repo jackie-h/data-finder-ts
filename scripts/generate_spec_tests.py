@@ -55,6 +55,8 @@ METHOD_NAMES = {
     'group_by': 'groupByOp',
     'upper': 'toUpperCase',
     'lower': 'toLowerCase',
+    'is_none': 'isNull',
+    'is_not_none': 'isNotNull',
     'strip': 'trim',
     'lstrip': 'trimStart',
     'rstrip': 'trimEnd',
@@ -66,6 +68,11 @@ COLUMN_LABELS = {
     'strip': {'Strip Name': 'Trim Name'},
     'lstrip': {'Lstrip Name': 'Trim Start Name'},
     'rstrip': {'Rstrip Name': 'Trim End Name'},
+}
+
+# Specs that exercise Python features the TypeScript port doesn't have (SQL views: View / to_view).
+SKIPPED_SPECS = {
+    'TRADE_VIEW_FINDER_SPECS': 'SQL views are not ported',
 }
 
 COMPARE_METHODS = {ast.Eq: 'eq', ast.NotEq: 'ne', ast.Gt: 'gt', ast.Lt: 'lt', ast.GtE: 'gte', ast.LtE: 'lte'}
@@ -241,6 +248,9 @@ def generate_module(module_name: str) -> str:
     side_effects: set[str] = set()
     blocks = []
     for var_name, spec_call in specs:
+        if var_name in SKIPPED_SPECS:
+            print(f'... skipped {var_name}: {SKIPPED_SPECS[var_name]}')
+            continue
         spec = getattr(module, var_name)
         directory = mapping_dir(spec.mapping_file)
         mapping = load(os.path.join(EXAMPLES_DIR, spec.mapping_file))

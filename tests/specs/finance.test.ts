@@ -7,11 +7,18 @@ import { seeds } from '../spec-seeds';
 import { AccountFinder } from '../generated_examples/finance/AccountFinder';
 import { ContractualPositionFinder } from '../generated_examples/finance/ContractualPositionFinder';
 import { TradeFinder } from '../generated_examples/finance/TradeFinder';
+import '../generated_examples/finance/BranchFinder';
 import '../generated_examples/finance/InstrumentFinder';
 
 const _AT = '2023-12-01 12:00:00';
 const _BOTH_AT = '2021-06-01 12:00:00';
 const _VALID_FROM = new Date(Date.UTC(2020, 0, 1, 0, 0, 0));
+const _MSFT_WITHOUT_LIVE_ACCOUNT_AT = '2024-03-01 12:00:00';
+const _MSFT_WITH_LIVE_ACCOUNT_AT = '2024-09-01 12:00:00';
+const _FOREVER = new Date(Date.UTC(9999, 11, 31, 23, 59, 59));
+const _START_OF_2020 = new Date(Date.UTC(2020, 0, 1, 0, 0, 0));
+const _START_OF_2022 = new Date(Date.UTC(2022, 0, 1, 0, 0, 0));
+const _START_OF_2024 = new Date(Date.UTC(2024, 0, 1, 0, 0, 0));
 
 let instance: DuckDBInstance;
 let conn: DuckDBConnection;
@@ -34,7 +41,7 @@ describe('ACCOUNT_FINDER_SPECS', () => {
 
   it('account_by_id', () =>
     runExpectation(
-      f.findAll(null, null, [f.id(), f.name()], f.id().eq(1)),
+      f.findAll(null, _AT, [f.id(), f.name()], f.id().eq(1)),
       runner,
       { columns: ['Id', 'Name'], rows: [
         [1, 'Acme Corp'],
@@ -456,6 +463,208 @@ describe('TRADE_FINDER_SPECS', () => {
       runner,
       { columns: ['Diff Seconds Valid From'], rows: [
         [60],
+      ] },
+    ));
+});
+
+describe('TRADE_MULTI_HOP_FINDER_SPECS', () => {
+  const f = new TradeFinder();
+
+  it('account_name_in_2021', () =>
+    runExpectation(
+      f.findAll(null, _BOTH_AT, [f.symbol(), f.account().name()]).orderByOp(f.symbol().ascending()),
+      runner,
+      { columns: ['Symbol', 'Account Name'], rows: [
+        ['AAPL', 'Acme Ltd'],
+        ['GOOG', 'Acme Ltd'],
+      ] },
+    ));
+
+  it('ancestor_join_is_milestoned', () =>
+    runExpectation(
+      f.findAll(null, _AT, [f.symbol(), f.account().branch().city()], f.symbol().eq('AAPL')),
+      runner,
+      { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', 'New York'],
+      ] },
+    ));
+
+  it('ancestor_join_follows_the_query_time', () =>
+    runExpectation(
+      f.findAll(null, _BOTH_AT, [f.symbol(), f.account().branch().city()]).orderByOp(f.symbol().ascending()),
+      runner,
+      { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', 'London'],
+        ['GOOG', 'London'],
+      ] },
+    ));
+
+  it('ancestor_join_keeps_its_filter_kwargs', () =>
+    runExpectation(
+      f.findAll(null, _BOTH_AT, [f.symbol(), f.account({ name: 'Acme Ltd' }).branch().city()], f.symbol().eq('AAPL')),
+      runner,
+      { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', 'London'],
+      ] },
+    ));
+
+  it('ancestor_join_filter_kwargs_apply_at_the_query_time', () =>
+    runExpectation(
+      f.findAll(null, _AT, [f.symbol(), f.account({ name: 'Acme Ltd' }).branch().city()], f.symbol().eq('AAPL')),
+      runner,
+      { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', null],
+      ] },
+    ));
+});
+
+describe('TRADE_EXISTS_FINDER_SPECS', () => {
+  const f = new TradeFinder();
+
+  it('exists_returns_each_trade_once', () =>
+    runExpectation(
+      f.findAll(null, _AT, [f.symbol()], f.account().exists()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+    ));
+
+  it('exists_returns_each_trade_once_in_2021', () =>
+    runExpectation(
+      f.findAll(null, _BOTH_AT, [f.symbol()], f.account().exists()).orderByOp(f.symbol().ascending()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['GOOG'],
+      ] },
+    ));
+
+  it('exists_excludes_trade_whose_account_is_not_yet_live', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+    ));
+
+  it('not_exists_finds_trade_whose_account_is_not_yet_live', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().notExists()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+    ));
+
+  it('exists_once_the_account_is_live', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists()).orderByOp(f.symbol().ascending()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['MSFT'],
+      ] },
+    ));
+
+  it('not_exists_is_empty_once_the_account_is_live', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().notExists()),
+      runner,
+      { columns: ['Symbol'], rows: [] },
+    ));
+
+  it('exists_through_a_milestoned_ancestor', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().exists()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+    ));
+
+  it('exists_combined_with_a_filter', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists().andOp(f.symbol().eq('AAPL'))),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+    ));
+});
+
+describe('TRADE_IS_NONE_FINDER_SPECS', () => {
+  const f = new TradeFinder();
+
+  it('is_not_none_returns_each_trade_once', () =>
+    runExpectation(
+      f.findAll(null, _AT, [f.symbol()], f.account().name().isNotNull()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+    ));
+
+  it('is_none_finds_trade_whose_account_is_not_yet_live', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+    ));
+
+  it('is_not_none_excludes_trade_whose_account_is_not_yet_live', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNotNull()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+    ));
+
+  it('is_none_is_empty_once_the_account_is_live', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull()),
+      runner,
+      { columns: ['Symbol'], rows: [] },
+    ));
+
+  it('is_not_none_once_the_account_is_live', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNotNull()).orderByOp(f.symbol().ascending()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['MSFT'],
+      ] },
+    ));
+
+  it('is_none_through_a_milestoned_ancestor', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().city().isNull()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+    ));
+
+  it('is_not_none_through_a_milestoned_ancestor', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().city().isNotNull()),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+    ));
+
+  it('is_none_combined_with_a_filter', () =>
+    runExpectation(
+      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull().andOp(f.symbol().eq('MSFT'))),
+      runner,
+      { columns: ['Symbol'], rows: [
+        ['MSFT'],
       ] },
     ));
 });

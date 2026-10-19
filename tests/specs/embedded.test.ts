@@ -54,7 +54,7 @@ describe('EMBEDDED_TRADE_FINDER_SPECS', () => {
     runExpectation(
       f.findAll(null, _AT, [f.account().branch().city(), f.symbol()], f.symbol().eq('AAPL')),
       runner,
-      { columns: ['Branch City', 'Symbol'], rows: [
+      { columns: ['Account Branch City', 'Symbol'], rows: [
         ['New York', 'AAPL'],
       ], unexpectedSql: 'JOIN' },
     ));
@@ -63,7 +63,7 @@ describe('EMBEDDED_TRADE_FINDER_SPECS', () => {
     runExpectation(
       f.findAll(null, _AT, [f.account().branch().city(), f.account().branch().id(), f.symbol()], f.symbol().eq('AAPL')),
       runner,
-      { columns: ['Branch City', 'Branch Id', 'Symbol'], rows: [
+      { columns: ['Account Branch City', 'Account Branch Id', 'Symbol'], rows: [
         ['New York', 10, 'AAPL'],
       ], sql: 'JOIN' },
     ));

@@ -29,9 +29,9 @@ beforeAll(async () => {
 
   await conn.run('CREATE SCHEMA ref_data');
   await conn.run('CREATE SCHEMA trading');
-  await conn.run('CREATE TABLE ref_data.account_master (ID INT, ACCT_NAME VARCHAR)');
+  await conn.run('CREATE TABLE ref_data.account_master (ID INT, ACCT_NAME VARCHAR, BRANCH_ID INT, in_z TIMESTAMP, out_z TIMESTAMP)');
   for (const [id, name] of ACCOUNTS) {
-    await conn.run(`INSERT INTO ref_data.account_master VALUES (${id}, '${name}')`);
+    await conn.run(`INSERT INTO ref_data.account_master VALUES (${id}, '${name}', NULL, '2020-01-01', '9999-12-31 23:59:59')`);
   }
   await conn.run(`CREATE TABLE trading.trades (
     sym VARCHAR, price DOUBLE, is_settled BOOLEAN, account_id INT,

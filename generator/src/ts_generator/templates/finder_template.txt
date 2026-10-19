@@ -8,6 +8,7 @@ import {
 } from '@model/milestoning';
 import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
 import { ExistsOperation, NotExistsOperation } from '@model/relational';
+import { displayPrefix } from '@datafinder/finder';
 import type { Attribute } from '@datafinder/attribute';
 import { EmbeddedAttributes, embeddedUnder } from '@datafinder/embedded';
 import { titleCase } from '@datafinder/naming';
@@ -126,7 +127,7 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
     this._node = new JoinTreeNodeOperation(join, parentJoin);
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
-    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(titleCase(relationName) + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node, embedded?.['{{rpm.property.id}}']);
+    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(displayPrefix(relationName, parentJoin) + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node, embedded?.['{{rpm.property.id}}']);
 {% elif rpm.property.type.name != rcm.clazz.name %}
     this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node, {% if flatten_embedded(rpm.target) %}embeddedFor_{{to_ts_name(rpm.property)}}(embedded, this._node, '{{rpm.property.name}}'){% else %}embeddedUnder(embedded, '{{rpm.property.id}}.'){% endif %});
 {% endif %}

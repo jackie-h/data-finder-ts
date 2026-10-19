@@ -6,6 +6,7 @@ import { runExpectation, ts } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { TradeFinder } from '../generated_examples/finance/TradeFinder';
 import '../generated_examples/finance/AccountFinder';
+import '../generated_examples/finance/BranchFinder';
 import '../generated_examples/finance/ContractualPositionFinder';
 import '../generated_examples/finance/InstrumentFinder';
 

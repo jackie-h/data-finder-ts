@@ -10,7 +10,8 @@ type Seed = (conn: DuckDBConnection) => Promise<void>;
 
 const TRADES_DDL =
   'CREATE TABLE trading.trades (sym VARCHAR, price DOUBLE, is_settled BOOLEAN, account_id INT, in_z TIMESTAMP, out_z TIMESTAMP)';
-const ACCOUNTS_DDL = 'CREATE TABLE ref_data.account_master (ID INT, ACCT_NAME VARCHAR)';
+const ACCOUNTS_DDL =
+  'CREATE TABLE ref_data.account_master (ID INT, ACCT_NAME VARCHAR, BRANCH_ID INT, in_z TIMESTAMP, out_z TIMESTAMP)';
 const PRICE_DDL = 'CREATE TABLE ref_data.price (SYM VARCHAR, PRICE DOUBLE, in_z TIMESTAMP, out_z TIMESTAMP)';
 
 async function run(conn: DuckDBConnection, ...statements: string[]): Promise<void> {
@@ -22,6 +23,8 @@ function finance(accounts: string, trades: string, opts: { prices?: string; posi
   return async conn => {
     await run(conn, 'CREATE SCHEMA trading', 'CREATE SCHEMA ref_data', ACCOUNTS_DDL);
     await loadCsv(conn, 'ref_data.account_master', accounts);
+    await run(conn, 'CREATE TABLE ref_data.branch (ID INT, CITY VARCHAR)');
+    await loadCsv(conn, 'ref_data.branch', 'finance_branches.csv');
     await run(conn, PRICE_DDL);
     if (opts.prices) await loadCsv(conn, 'ref_data.price', opts.prices);
     await run(conn, TRADES_DDL);
