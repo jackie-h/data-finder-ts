@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts } from '../spec-harness';
+import { runExpectation, ts, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { EmployeeFinder } from '../generated_examples/orgchart_inheritance/EmployeeFinder';
 import { ProjectFinder } from '../generated_examples/orgchart_inheritance/ProjectFinder';
@@ -24,287 +24,249 @@ afterAll(() => {
   instance.closeSync();
 });
 
-describe('EMPLOYEE_INHERITANCE_FINDER_SPECS', () => {
-  const f = new EmployeeFinder();
-
-  it('all_employees_inherited_name', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.lastName()]).orderByOp(f.firstName().ascending()),
-      runner,
-      { columns: ['First Name', 'Last Name'], rows: [
+const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
+  {
+    name: 'all_employees_inherited_name',
+    query: f => f.findAll(null, null, [f.firstName(), f.lastName()]).orderByOp(f.firstName().ascending()),
+    expected: { columns: ['First Name', 'Last Name'], rows: [
         ['Alice', 'Smith'],
         ['Bob', 'Jones'],
         ['Carol', 'White'],
         ['Dave', 'Brown'],
       ] },
-    ));
-
-  it('filter_by_inherited_first_name', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.department()], f.firstName().eq('Alice')),
-      runner,
-      { columns: ['First Name', 'Department'], rows: [
+  },
+  {
+    name: 'filter_by_inherited_first_name',
+    query: f => f.findAll(null, null, [f.firstName(), f.department()], f.firstName().eq('Alice')),
+    expected: { columns: ['First Name', 'Department'], rows: [
         ['Alice', 'Executive'],
       ] },
-    ));
-
-  it('filter_by_inherited_email', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName()], f.email().eq('bob@example.com')),
-      runner,
-      { columns: ['First Name'], rows: [
+  },
+  {
+    name: 'filter_by_inherited_email',
+    query: f => f.findAll(null, null, [f.firstName()], f.email().eq('bob@example.com')),
+    expected: { columns: ['First Name'], rows: [
         ['Bob'],
       ] },
-    ));
-
-  it('filter_by_department_engineering', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName()], f.department().eq('Engineering')).orderByOp(f.firstName().ascending()),
-      runner,
-      { columns: ['First Name'], rows: [
+  },
+  {
+    name: 'filter_by_department_engineering',
+    query: f => f.findAll(null, null, [f.firstName()], f.department().eq('Engineering')).orderByOp(f.firstName().ascending()),
+    expected: { columns: ['First Name'], rows: [
         ['Bob'],
         ['Carol'],
       ] },
-    ));
-
-  it('manager_name_for_bob', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.manager().firstName()], f.firstName().eq('Bob')),
-      runner,
-      { columns: ['First Name', 'Manager First Name'], rows: [
+  },
+  {
+    name: 'manager_name_for_bob',
+    query: f => f.findAll(null, null, [f.firstName(), f.manager().firstName()], f.firstName().eq('Bob')),
+    expected: { columns: ['First Name', 'Manager First Name'], rows: [
         ['Bob', 'Alice'],
       ] },
-    ));
-
-  it('employees_with_all_projects', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.projects().name()]).orderByOp(f.firstName().ascending(), f.projects().name().ascending()),
-      runner,
-      { columns: ['First Name', 'Project Name'], rows: [
+  },
+  {
+    name: 'employees_with_all_projects',
+    query: f => f.findAll(null, null, [f.firstName(), f.projects().name()]).orderByOp(f.firstName().ascending(), f.projects().name().ascending()),
+    expected: { columns: ['First Name', 'Project Name'], rows: [
         ['Alice', 'Epsilon Research'],
         ['Bob', 'Alpha Initiative'],
         ['Bob', 'Beta Platform'],
         ['Carol', 'Gamma Tooling'],
         ['Dave', 'Delta Ops'],
       ] },
-    ));
-
-  it('forward_join_filter_code_alpha', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.projects({ code: 'ALPHA' }).name()]).orderByOp(f.firstName().ascending()),
-      runner,
-      { columns: ['First Name', 'Project Name'], rows: [
+  },
+  {
+    name: 'forward_join_filter_code_alpha',
+    query: f => f.findAll(null, null, [f.firstName(), f.projects({ code: 'ALPHA' }).name()]).orderByOp(f.firstName().ascending()),
+    expected: { columns: ['First Name', 'Project Name'], rows: [
         ['Alice', null],
         ['Bob', 'Alpha Initiative'],
         ['Carol', null],
         ['Dave', null],
       ] },
-    ));
-
-  it('multihop_manager_projects_for_dave', () =>
-    runExpectation(
-      f.findAll(null, null, [f.manager().projects().name()], f.firstName().eq('Dave')).orderByOp(f.manager().projects().name().ascending()),
-      runner,
-      { columns: ['Manager Project Name'], rows: [
+  },
+  {
+    name: 'multihop_manager_projects_for_dave',
+    query: f => f.findAll(null, null, [f.manager().projects().name()], f.firstName().eq('Dave')).orderByOp(f.manager().projects().name().ascending()),
+    expected: { columns: ['Manager Project Name'], rows: [
         ['Alpha Initiative'],
         ['Beta Platform'],
       ] },
-    ));
-
-  it('filter_by_manager_project_code', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName()], f.manager().projects().code().eq('ALPHA')),
-      runner,
-      { columns: ['First Name'], rows: [
+  },
+  {
+    name: 'filter_by_manager_project_code',
+    query: f => f.findAll(null, null, [f.firstName()], f.manager().projects().code().eq('ALPHA')),
+    expected: { columns: ['First Name'], rows: [
         ['Dave'],
       ] },
-    ));
-
-  it('filter_by_manager_name_select_project', () =>
-    runExpectation(
-      f.findAll(null, null, [f.manager().projects().name()], f.manager().firstName().eq('Alice')).orderByOp(f.manager().projects().name().ascending()),
-      runner,
-      { columns: ['Manager Project Name'], rows: [
+  },
+  {
+    name: 'filter_by_manager_name_select_project',
+    query: f => f.findAll(null, null, [f.manager().projects().name()], f.manager().firstName().eq('Alice')).orderByOp(f.manager().projects().name().ascending()),
+    expected: { columns: ['Manager Project Name'], rows: [
         ['Epsilon Research'],
         ['Epsilon Research'],
       ] },
-    ));
-
-  it('filter_by_inherited_last_name', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName()], f.lastName().eq('Jones')),
-      runner,
-      { columns: ['First Name'], rows: [
+  },
+  {
+    name: 'filter_by_inherited_last_name',
+    query: f => f.findAll(null, null, [f.firstName()], f.lastName().eq('Jones')),
+    expected: { columns: ['First Name'], rows: [
         ['Bob'],
       ] },
-    ));
-
-  it('project_all_inherited_columns', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.firstName(), f.lastName(), f.email(), f.department()], f.firstName().eq('Dave')),
-      runner,
-      { columns: ['Id', 'First Name', 'Last Name', 'Email', 'Department'], rows: [
+  },
+  {
+    name: 'project_all_inherited_columns',
+    query: f => f.findAll(null, null, [f.id(), f.firstName(), f.lastName(), f.email(), f.department()], f.firstName().eq('Dave')),
+    expected: { columns: ['Id', 'First Name', 'Last Name', 'Email', 'Department'], rows: [
         [4, 'Dave', 'Brown', 'dave@example.com', 'QA'],
       ] },
-    ));
-
-  it('manager_name_for_all', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.manager().firstName()]).orderByOp(f.firstName().ascending()),
-      runner,
-      { columns: ['First Name', 'Manager First Name'], rows: [
+  },
+  {
+    name: 'manager_name_for_all',
+    query: f => f.findAll(null, null, [f.firstName(), f.manager().firstName()]).orderByOp(f.firstName().ascending()),
+    expected: { columns: ['First Name', 'Manager First Name'], rows: [
         ['Alice', null],
         ['Bob', 'Alice'],
         ['Carol', 'Alice'],
         ['Dave', 'Bob'],
       ] },
-    ));
-
-  it('filter_by_manager_alice', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName()], f.manager().firstName().eq('Alice')).orderByOp(f.firstName().ascending()),
-      runner,
-      { columns: ['First Name'], rows: [
+  },
+  {
+    name: 'filter_by_manager_alice',
+    query: f => f.findAll(null, null, [f.firstName()], f.manager().firstName().eq('Alice')).orderByOp(f.firstName().ascending()),
+    expected: { columns: ['First Name'], rows: [
         ['Bob'],
         ['Carol'],
       ] },
-    ));
-
-  it('manager_email_for_bob', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.manager().email()], f.firstName().eq('Bob')),
-      runner,
-      { columns: ['First Name', 'Manager Email'], rows: [
+  },
+  {
+    name: 'manager_email_for_bob',
+    query: f => f.findAll(null, null, [f.firstName(), f.manager().email()], f.firstName().eq('Bob')),
+    expected: { columns: ['First Name', 'Manager Email'], rows: [
         ['Bob', 'alice@example.com'],
       ] },
-    ));
-
-  it('employee_projects_for_bob', () =>
-    runExpectation(
-      f.findAll(null, null, [f.projects().code()], f.firstName().eq('Bob')).orderByOp(f.projects().code().ascending()),
-      runner,
-      { columns: ['Project Code'], rows: [
+  },
+  {
+    name: 'employee_projects_for_bob',
+    query: f => f.findAll(null, null, [f.projects().code()], f.firstName().eq('Bob')).orderByOp(f.projects().code().ascending()),
+    expected: { columns: ['Project Code'], rows: [
         ['ALPHA'],
         ['BETA'],
       ] },
-    ));
-
-  it('filter_employee_by_project_name', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName()], f.projects().name().eq('Delta Ops')),
-      runner,
-      { columns: ['First Name'], rows: [
+  },
+  {
+    name: 'filter_employee_by_project_name',
+    query: f => f.findAll(null, null, [f.firstName()], f.projects().name().eq('Delta Ops')),
+    expected: { columns: ['First Name'], rows: [
         ['Dave'],
       ] },
-    ));
-
-  it('forward_join_filter_name_gamma', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.projects({ name: 'Gamma Tooling' }).name()]).orderByOp(f.firstName().ascending()),
-      runner,
-      { columns: ['First Name', 'Project Name'], rows: [
+  },
+  {
+    name: 'forward_join_filter_name_gamma',
+    query: f => f.findAll(null, null, [f.firstName(), f.projects({ name: 'Gamma Tooling' }).name()]).orderByOp(f.firstName().ascending()),
+    expected: { columns: ['First Name', 'Project Name'], rows: [
         ['Alice', null],
         ['Bob', null],
         ['Carol', 'Gamma Tooling'],
         ['Dave', null],
       ] },
-    ));
-
-  it('forward_join_filter_multi_kwarg', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.projects({ name: 'Alpha Initiative', code: 'ALPHA' }).name()]).orderByOp(f.firstName().ascending()),
-      runner,
-      { columns: ['First Name', 'Project Name'], rows: [
+  },
+  {
+    name: 'forward_join_filter_multi_kwarg',
+    query: f => f.findAll(null, null, [f.firstName(), f.projects({ name: 'Alpha Initiative', code: 'ALPHA' }).name()]).orderByOp(f.firstName().ascending()),
+    expected: { columns: ['First Name', 'Project Name'], rows: [
         ['Alice', null],
         ['Bob', 'Alpha Initiative'],
         ['Carol', null],
         ['Dave', null],
       ] },
-    ));
-
-  it('forward_join_filter_nonexistent', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName(), f.projects({ code: 'NONEXISTENT' }).name()]).orderByOp(f.firstName().ascending()),
-      runner,
-      { columns: ['First Name', 'Project Name'], rows: [
+  },
+  {
+    name: 'forward_join_filter_nonexistent',
+    query: f => f.findAll(null, null, [f.firstName(), f.projects({ code: 'NONEXISTENT' }).name()]).orderByOp(f.firstName().ascending()),
+    expected: { columns: ['First Name', 'Project Name'], rows: [
         ['Alice', null],
         ['Bob', null],
         ['Carol', null],
         ['Dave', null],
       ] },
-    ));
-
-  it('manager_exists_filter', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName()], f.manager().exists()).orderByOp(f.firstName().ascending()),
-      runner,
-      { columns: ['First Name'], rows: [
+  },
+  {
+    name: 'manager_exists_filter',
+    query: f => f.findAll(null, null, [f.firstName()], f.manager().exists()).orderByOp(f.firstName().ascending()),
+    expected: { columns: ['First Name'], rows: [
         ['Bob'],
         ['Carol'],
         ['Dave'],
       ] },
-    ));
-
-  it('manager_not_exists_filter', () =>
-    runExpectation(
-      f.findAll(null, null, [f.firstName()], f.manager().notExists()),
-      runner,
-      { columns: ['First Name'], rows: [
+  },
+  {
+    name: 'manager_not_exists_filter',
+    query: f => f.findAll(null, null, [f.firstName()], f.manager().notExists()),
+    expected: { columns: ['First Name'], rows: [
         ['Alice'],
       ] },
-    ));
+  },
+];
+
+describe('EMPLOYEE_INHERITANCE_FINDER_SPECS', () => {
+  const f = new EmployeeFinder();
+
+  for (const c of EMPLOYEE_INHERITANCE_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });
 
-describe('PROJECT_FINDER_SPECS', () => {
-  const f = new ProjectFinder();
-
-  it('all_projects_with_assignee', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name(), f.assignee().firstName()]).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name', 'Assignee First Name'], rows: [
+const PROJECT_FINDER_SPECS: SpecCase<ProjectFinder>[] = [
+  {
+    name: 'all_projects_with_assignee',
+    query: f => f.findAll(null, null, [f.name(), f.assignee().firstName()]).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name', 'Assignee First Name'], rows: [
         ['Alpha Initiative', 'Bob'],
         ['Beta Platform', 'Bob'],
         ['Delta Ops', 'Dave'],
         ['Epsilon Research', 'Alice'],
         ['Gamma Tooling', 'Carol'],
       ] },
-    ));
-
-  it('filter_projects_by_assignee_engineering', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name(), f.code()], f.assignee().department().eq('Engineering')).orderByOp(f.code().ascending()),
-      runner,
-      { columns: ['Name', 'Code'], rows: [
+  },
+  {
+    name: 'filter_projects_by_assignee_engineering',
+    query: f => f.findAll(null, null, [f.name(), f.code()], f.assignee().department().eq('Engineering')).orderByOp(f.code().ascending()),
+    expected: { columns: ['Name', 'Code'], rows: [
         ['Alpha Initiative', 'ALPHA'],
         ['Beta Platform', 'BETA'],
         ['Gamma Tooling', 'GAMMA'],
       ] },
-    ));
-
-  it('filter_assignee_by_join_kwarg_dept', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name(), f.assignee({ department: 'Engineering' }).firstName()]).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name', 'Assignee First Name'], rows: [
+  },
+  {
+    name: 'filter_assignee_by_join_kwarg_dept',
+    query: f => f.findAll(null, null, [f.name(), f.assignee({ department: 'Engineering' }).firstName()]).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name', 'Assignee First Name'], rows: [
         ['Alpha Initiative', 'Bob'],
         ['Beta Platform', 'Bob'],
         ['Delta Ops', null],
         ['Epsilon Research', null],
         ['Gamma Tooling', 'Carol'],
       ] },
-    ));
-
-  it('reverse_join_filter_nonexistent', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name(), f.assignee({ department: 'UNKNOWN' }).firstName()]).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name', 'Assignee First Name'], rows: [
+  },
+  {
+    name: 'reverse_join_filter_nonexistent',
+    query: f => f.findAll(null, null, [f.name(), f.assignee({ department: 'UNKNOWN' }).firstName()]).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name', 'Assignee First Name'], rows: [
         ['Alpha Initiative', null],
         ['Beta Platform', null],
         ['Delta Ops', null],
         ['Epsilon Research', null],
         ['Gamma Tooling', null],
       ] },
-    ));
+  },
+];
+
+describe('PROJECT_FINDER_SPECS', () => {
+  const f = new ProjectFinder();
+
+  for (const c of PROJECT_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });

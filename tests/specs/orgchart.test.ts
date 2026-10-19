@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts } from '../spec-harness';
+import { runExpectation, ts, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { EmployeeFinder } from '../generated_examples/orgchart/EmployeeFinder';
 
@@ -23,55 +23,52 @@ afterAll(() => {
   instance.closeSync();
 });
 
-describe('ORGCHART_FINDER_SPECS', () => {
-  const f = new EmployeeFinder();
-
-  it('all_employees', () =>
-    runExpectation(
-      f.findAll(null, null, [f.id(), f.name()]).orderByOp(f.id().ascending()),
-      runner,
-      { columns: ['Id', 'Name'], rows: [
+const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
+  {
+    name: 'all_employees',
+    query: f => f.findAll(null, null, [f.id(), f.name()]).orderByOp(f.id().ascending()),
+    expected: { columns: ['Id', 'Name'], rows: [
         [1, 'Alice'],
         [2, 'Bob'],
         [3, 'Carol'],
         [4, 'Dave'],
       ] },
-    ));
-
-  it('manager_name_for_bob', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name(), f.manager().name()], f.name().eq('Bob')),
-      runner,
-      { columns: ['Name', 'Manager Name'], rows: [
+  },
+  {
+    name: 'manager_name_for_bob',
+    query: f => f.findAll(null, null, [f.name(), f.manager().name()], f.name().eq('Bob')),
+    expected: { columns: ['Name', 'Manager Name'], rows: [
         ['Bob', 'Alice'],
       ] },
-    ));
-
-  it('manager_name_for_dave', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name(), f.manager().name()], f.name().eq('Dave')),
-      runner,
-      { columns: ['Name', 'Manager Name'], rows: [
+  },
+  {
+    name: 'manager_name_for_dave',
+    query: f => f.findAll(null, null, [f.name(), f.manager().name()], f.name().eq('Dave')),
+    expected: { columns: ['Name', 'Manager Name'], rows: [
         ['Dave', 'Bob'],
       ] },
-    ));
-
-  it('filter_by_manager_alice', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.manager().name().eq('Alice')).orderByOp(f.name().ascending()),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'filter_by_manager_alice',
+    query: f => f.findAll(null, null, [f.name()], f.manager().name().eq('Alice')).orderByOp(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
         ['Bob'],
         ['Carol'],
       ] },
-    ));
-
-  it('filter_by_manager_bob', () =>
-    runExpectation(
-      f.findAll(null, null, [f.name()], f.manager().name().eq('Bob')),
-      runner,
-      { columns: ['Name'], rows: [
+  },
+  {
+    name: 'filter_by_manager_bob',
+    query: f => f.findAll(null, null, [f.name()], f.manager().name().eq('Bob')),
+    expected: { columns: ['Name'], rows: [
         ['Dave'],
       ] },
-    ));
+  },
+];
+
+describe('ORGCHART_FINDER_SPECS', () => {
+  const f = new EmployeeFinder();
+
+  for (const c of ORGCHART_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });

@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
-import { runExpectation, ts } from '../spec-harness';
+import { runExpectation, ts, type SpecCase, shuffled } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { AccountFinder } from '../generated_examples/finance/AccountFinder';
 import { ContractualPositionFinder } from '../generated_examples/finance/ContractualPositionFinder';
@@ -36,692 +36,611 @@ afterAll(() => {
   instance.closeSync();
 });
 
+const ACCOUNT_FINDER_SPECS: SpecCase<AccountFinder>[] = [
+  {
+    name: 'account_by_id',
+    query: f => f.findAll(null, _AT, [f.id(), f.name()], f.id().eq(1)),
+    expected: { columns: ['Id', 'Name'], rows: [
+        [1, 'Acme Corp'],
+      ] },
+  },
+];
+
 describe('ACCOUNT_FINDER_SPECS', () => {
   const f = new AccountFinder();
 
-  it('account_by_id', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.id(), f.name()], f.id().eq(1)),
-      runner,
-      { columns: ['Id', 'Name'], rows: [
-        [1, 'Acme Corp'],
-      ] },
-    ));
+  for (const c of ACCOUNT_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });
+
+const TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
+  {
+    name: 'aapl_with_account',
+    query: f => f.findAll(null, _AT, [f.account().name(), f.symbol(), f.price()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Account Name', 'Symbol', 'Price'], rows: [
+        ['Acme Corp', 'AAPL', 84.11],
+      ] },
+  },
+  {
+    name: 'goog_expired',
+    query: f => f.findAll(null, _AT, [f.symbol()], f.symbol().eq('GOOG')),
+    expected: { columns: ['Symbol'], rows: [] },
+  },
+  {
+    name: 'price_sum_single_active_trade',
+    query: f => f.findAll(null, _AT, [f.price().sum()]),
+    expected: { columns: ['Sum Price'], rows: [
+        [84.11],
+      ] },
+  },
+  {
+    name: 'both_trades_active_in_2021',
+    query: f => f.findAll(null, '2021-06-01 12:00:00', [f.symbol()]).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['GOOG'],
+      ] },
+  },
+  {
+    name: 'filter_by_is_settled_true',
+    query: f => f.findAll(null, _AT, [f.symbol()], f.isSettled().eq(true)),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'is_settled_is_false',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.isSettled().isFalse()),
+    expected: { columns: ['Symbol'], rows: [
+        ['GOOG'],
+      ] },
+  },
+  {
+    name: 'valid_to_eq',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().eq(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))),
+    expected: { columns: ['Symbol'], rows: [
+        ['GOOG'],
+      ] },
+  },
+  {
+    name: 'valid_to_gt',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().gt(new Date(Date.UTC(2022, 5, 1, 0, 0, 0)))),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'valid_to_lt',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().lt(new Date(Date.UTC(2022, 5, 1, 0, 0, 0)))),
+    expected: { columns: ['Symbol'], rows: [
+        ['GOOG'],
+      ] },
+  },
+  {
+    name: 'valid_to_ge',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().gte(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['GOOG'],
+      ] },
+  },
+  {
+    name: 'valid_to_le',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().lte(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))),
+    expected: { columns: ['Symbol'], rows: [
+        ['GOOG'],
+      ] },
+  },
+  {
+    name: 'valid_from_year',
+    query: f => f.findAll(null, _AT, [f.validFrom().year()]),
+    expected: { columns: ['Year Valid From'], rows: [
+        [2020],
+      ] },
+  },
+  {
+    name: 'valid_from_month',
+    query: f => f.findAll(null, _AT, [f.validFrom().month()]),
+    expected: { columns: ['Month Valid From'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'valid_from_day',
+    query: f => f.findAll(null, _AT, [f.validFrom().day()]),
+    expected: { columns: ['Day Valid From'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'valid_from_hour',
+    query: f => f.findAll(null, _AT, [f.validFrom().hour()]),
+    expected: { columns: ['Hour Valid From'], rows: [
+        [0],
+      ] },
+  },
+  {
+    name: 'valid_from_minute',
+    query: f => f.findAll(null, _AT, [f.validFrom().minute()]),
+    expected: { columns: ['Minute Valid From'], rows: [
+        [0],
+      ] },
+  },
+  {
+    name: 'valid_from_second',
+    query: f => f.findAll(null, _AT, [f.validFrom().second()]),
+    expected: { columns: ['Second Valid From'], rows: [
+        [0],
+      ] },
+  },
+  {
+    name: 'valid_from_quarter',
+    query: f => f.findAll(null, _AT, [f.validFrom().quarter()]),
+    expected: { columns: ['Quarter Valid From'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'valid_from_week',
+    query: f => f.findAll(null, _AT, [f.validFrom().week()]),
+    expected: { columns: ['Week Valid From'], rows: [
+        [1],
+      ] },
+  },
+  {
+    name: 'valid_from_day_of_week',
+    query: f => f.findAll(null, _AT, [f.validFrom().dayOfWeek()]),
+    expected: { columns: ['Day Of Week Valid From'], rows: [
+        [3],
+      ] },
+  },
+  {
+    name: 'valid_from_add_hours',
+    query: f => f.findAll(null, _AT, [f.validFrom().addHours(2)]),
+    expected: { columns: ['Add Hours Valid From'], rows: [
+        [ts('2020-01-01T02:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_add_minutes',
+    query: f => f.findAll(null, _AT, [f.validFrom().addMinutes(30)]),
+    expected: { columns: ['Add Minutes Valid From'], rows: [
+        [ts('2020-01-01T00:30:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_add_seconds',
+    query: f => f.findAll(null, _AT, [f.validFrom().addSeconds(60)]),
+    expected: { columns: ['Add Seconds Valid From'], rows: [
+        [ts('2020-01-01T00:01:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_subtract_hours',
+    query: f => f.findAll(null, _AT, [f.validFrom().subtractHours(1)]),
+    expected: { columns: ['Subtract Hours Valid From'], rows: [
+        [ts('2019-12-31T23:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_subtract_minutes',
+    query: f => f.findAll(null, _AT, [f.validFrom().subtractMinutes(5)]),
+    expected: { columns: ['Subtract Minutes Valid From'], rows: [
+        [ts('2019-12-31T23:55:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_subtract_seconds',
+    query: f => f.findAll(null, _AT, [f.validFrom().subtractSeconds(30)]),
+    expected: { columns: ['Subtract Seconds Valid From'], rows: [
+        [ts('2019-12-31T23:59:30.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_add_months',
+    query: f => f.findAll(null, _AT, [f.validFrom().addMonths(2)]),
+    expected: { columns: ['Add Months Valid From'], rows: [
+        [ts('2020-03-01T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_add_years',
+    query: f => f.findAll(null, _AT, [f.validFrom().addYears(1)]),
+    expected: { columns: ['Add Years Valid From'], rows: [
+        [ts('2021-01-01T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_subtract_months',
+    query: f => f.findAll(null, _AT, [f.validFrom().subtractMonths(1)]),
+    expected: { columns: ['Subtract Months Valid From'], rows: [
+        [ts('2019-12-01T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_subtract_years',
+    query: f => f.findAll(null, _AT, [f.validFrom().subtractYears(1)]),
+    expected: { columns: ['Subtract Years Valid From'], rows: [
+        [ts('2019-01-01T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_add_days',
+    query: f => f.findAll(null, _AT, [f.validFrom().addDays(1)]),
+    expected: { columns: ['Add Days Valid From'], rows: [
+        [ts('2020-01-02T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_subtract_days',
+    query: f => f.findAll(null, _AT, [f.validFrom().subtractDays(1)]),
+    expected: { columns: ['Subtract Days Valid From'], rows: [
+        [ts('2019-12-31T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_add_timedelta',
+    query: f => f.findAll(null, _AT, [f.validFrom().addHours(2)]),
+    expected: { columns: ['Add Hours Valid From'], rows: [
+        [ts('2020-01-01T02:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_sub_timedelta',
+    query: f => f.findAll(null, _AT, [f.validFrom().subtractHours(1)]),
+    expected: { columns: ['Subtract Hours Valid From'], rows: [
+        [ts('2019-12-31T23:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_add_timedelta_days',
+    query: f => f.findAll(null, _AT, [f.validFrom().addDays(1)]),
+    expected: { columns: ['Add Days Valid From'], rows: [
+        [ts('2020-01-02T00:00:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_add_timedelta_minutes',
+    query: f => f.findAll(null, _AT, [f.validFrom().addMinutes(30)]),
+    expected: { columns: ['Add Minutes Valid From'], rows: [
+        [ts('2020-01-01T00:30:00.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_add_timedelta_seconds',
+    query: f => f.findAll(null, _AT, [f.validFrom().addSeconds(30)]),
+    expected: { columns: ['Add Seconds Valid From'], rows: [
+        [ts('2020-01-01T00:00:30.000000')],
+      ] },
+  },
+  {
+    name: 'valid_from_eq_operator',
+    query: f => f.findAll(null, _AT, [f.symbol()], f.validFrom().eq(_VALID_FROM)),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'is_settled_is_true',
+    query: f => f.findAll(null, _AT, [f.symbol()], f.isSettled().isTrue()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'is_settled_eq_operator',
+    query: f => f.findAll(null, _AT, [f.symbol()], f.isSettled().eq(true)),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'valid_from_diff_days',
+    query: f => f.findAll(null, _AT, [f.validFrom().diffDays(new Date(Date.UTC(2020, 1, 1, 0, 0, 0)))]),
+    expected: { columns: ['Diff Days Valid From'], rows: [
+        [31],
+      ] },
+  },
+  {
+    name: 'valid_from_diff_months',
+    query: f => f.findAll(null, _AT, [f.validFrom().diffMonths(new Date(Date.UTC(2020, 3, 1, 0, 0, 0)))]),
+    expected: { columns: ['Diff Months Valid From'], rows: [
+        [3],
+      ] },
+  },
+  {
+    name: 'valid_from_diff_years',
+    query: f => f.findAll(null, _AT, [f.validFrom().diffYears(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))]),
+    expected: { columns: ['Diff Years Valid From'], rows: [
+        [2],
+      ] },
+  },
+  {
+    name: 'valid_from_diff_hours',
+    query: f => f.findAll(null, _AT, [f.validFrom().diffHours(new Date(Date.UTC(2020, 0, 2, 0, 0, 0)))]),
+    expected: { columns: ['Diff Hours Valid From'], rows: [
+        [24],
+      ] },
+  },
+  {
+    name: 'valid_from_diff_minutes',
+    query: f => f.findAll(null, _AT, [f.validFrom().diffMinutes(new Date(Date.UTC(2020, 0, 1, 2, 0, 0)))]),
+    expected: { columns: ['Diff Minutes Valid From'], rows: [
+        [120],
+      ] },
+  },
+  {
+    name: 'valid_from_diff_seconds',
+    query: f => f.findAll(null, _AT, [f.validFrom().diffSeconds(new Date(Date.UTC(2020, 0, 1, 0, 1, 0)))]),
+    expected: { columns: ['Diff Seconds Valid From'], rows: [
+        [60],
+      ] },
+  },
+];
 
 describe('TRADE_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
-  it('aapl_with_account', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.account().name(), f.symbol(), f.price()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Account Name', 'Symbol', 'Price'], rows: [
-        ['Acme Corp', 'AAPL', 84.11],
-      ] },
-    ));
-
-  it('goog_expired', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol()], f.symbol().eq('GOOG')),
-      runner,
-      { columns: ['Symbol'], rows: [] },
-    ));
-
-  it('price_sum_single_active_trade', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.price().sum()]),
-      runner,
-      { columns: ['Sum Price'], rows: [
-        [84.11],
-      ] },
-    ));
-
-  it('both_trades_active_in_2021', () =>
-    runExpectation(
-      f.findAll(null, '2021-06-01 12:00:00', [f.symbol()]).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-        ['GOOG'],
-      ] },
-    ));
-
-  it('filter_by_is_settled_true', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol()], f.isSettled().eq(true)),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('is_settled_is_false', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol()], f.isSettled().isFalse()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['GOOG'],
-      ] },
-    ));
-
-  it('valid_to_eq', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().eq(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['GOOG'],
-      ] },
-    ));
-
-  it('valid_to_gt', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().gt(new Date(Date.UTC(2022, 5, 1, 0, 0, 0)))),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('valid_to_lt', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().lt(new Date(Date.UTC(2022, 5, 1, 0, 0, 0)))),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['GOOG'],
-      ] },
-    ));
-
-  it('valid_to_ge', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().gte(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-        ['GOOG'],
-      ] },
-    ));
-
-  it('valid_to_le', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().lte(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['GOOG'],
-      ] },
-    ));
-
-  it('valid_from_year', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().year()]),
-      runner,
-      { columns: ['Year Valid From'], rows: [
-        [2020],
-      ] },
-    ));
-
-  it('valid_from_month', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().month()]),
-      runner,
-      { columns: ['Month Valid From'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('valid_from_day', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().day()]),
-      runner,
-      { columns: ['Day Valid From'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('valid_from_hour', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().hour()]),
-      runner,
-      { columns: ['Hour Valid From'], rows: [
-        [0],
-      ] },
-    ));
-
-  it('valid_from_minute', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().minute()]),
-      runner,
-      { columns: ['Minute Valid From'], rows: [
-        [0],
-      ] },
-    ));
-
-  it('valid_from_second', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().second()]),
-      runner,
-      { columns: ['Second Valid From'], rows: [
-        [0],
-      ] },
-    ));
-
-  it('valid_from_quarter', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().quarter()]),
-      runner,
-      { columns: ['Quarter Valid From'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('valid_from_week', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().week()]),
-      runner,
-      { columns: ['Week Valid From'], rows: [
-        [1],
-      ] },
-    ));
-
-  it('valid_from_day_of_week', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().dayOfWeek()]),
-      runner,
-      { columns: ['Day Of Week Valid From'], rows: [
-        [3],
-      ] },
-    ));
-
-  it('valid_from_add_hours', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addHours(2)]),
-      runner,
-      { columns: ['Add Hours Valid From'], rows: [
-        [ts('2020-01-01T02:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_add_minutes', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addMinutes(30)]),
-      runner,
-      { columns: ['Add Minutes Valid From'], rows: [
-        [ts('2020-01-01T00:30:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_add_seconds', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addSeconds(60)]),
-      runner,
-      { columns: ['Add Seconds Valid From'], rows: [
-        [ts('2020-01-01T00:01:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_subtract_hours', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().subtractHours(1)]),
-      runner,
-      { columns: ['Subtract Hours Valid From'], rows: [
-        [ts('2019-12-31T23:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_subtract_minutes', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().subtractMinutes(5)]),
-      runner,
-      { columns: ['Subtract Minutes Valid From'], rows: [
-        [ts('2019-12-31T23:55:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_subtract_seconds', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().subtractSeconds(30)]),
-      runner,
-      { columns: ['Subtract Seconds Valid From'], rows: [
-        [ts('2019-12-31T23:59:30.000000')],
-      ] },
-    ));
-
-  it('valid_from_add_months', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addMonths(2)]),
-      runner,
-      { columns: ['Add Months Valid From'], rows: [
-        [ts('2020-03-01T00:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_add_years', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addYears(1)]),
-      runner,
-      { columns: ['Add Years Valid From'], rows: [
-        [ts('2021-01-01T00:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_subtract_months', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().subtractMonths(1)]),
-      runner,
-      { columns: ['Subtract Months Valid From'], rows: [
-        [ts('2019-12-01T00:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_subtract_years', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().subtractYears(1)]),
-      runner,
-      { columns: ['Subtract Years Valid From'], rows: [
-        [ts('2019-01-01T00:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_add_days', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addDays(1)]),
-      runner,
-      { columns: ['Add Days Valid From'], rows: [
-        [ts('2020-01-02T00:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_subtract_days', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().subtractDays(1)]),
-      runner,
-      { columns: ['Subtract Days Valid From'], rows: [
-        [ts('2019-12-31T00:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_add_timedelta', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addHours(2)]),
-      runner,
-      { columns: ['Add Hours Valid From'], rows: [
-        [ts('2020-01-01T02:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_sub_timedelta', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().subtractHours(1)]),
-      runner,
-      { columns: ['Subtract Hours Valid From'], rows: [
-        [ts('2019-12-31T23:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_add_timedelta_days', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addDays(1)]),
-      runner,
-      { columns: ['Add Days Valid From'], rows: [
-        [ts('2020-01-02T00:00:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_add_timedelta_minutes', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addMinutes(30)]),
-      runner,
-      { columns: ['Add Minutes Valid From'], rows: [
-        [ts('2020-01-01T00:30:00.000000')],
-      ] },
-    ));
-
-  it('valid_from_add_timedelta_seconds', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().addSeconds(30)]),
-      runner,
-      { columns: ['Add Seconds Valid From'], rows: [
-        [ts('2020-01-01T00:00:30.000000')],
-      ] },
-    ));
-
-  it('valid_from_eq_operator', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol()], f.validFrom().eq(_VALID_FROM)),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('is_settled_is_true', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol()], f.isSettled().isTrue()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('is_settled_eq_operator', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol()], f.isSettled().eq(true)),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('valid_from_diff_days', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().diffDays(new Date(Date.UTC(2020, 1, 1, 0, 0, 0)))]),
-      runner,
-      { columns: ['Diff Days Valid From'], rows: [
-        [31],
-      ] },
-    ));
-
-  it('valid_from_diff_months', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().diffMonths(new Date(Date.UTC(2020, 3, 1, 0, 0, 0)))]),
-      runner,
-      { columns: ['Diff Months Valid From'], rows: [
-        [3],
-      ] },
-    ));
-
-  it('valid_from_diff_years', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().diffYears(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))]),
-      runner,
-      { columns: ['Diff Years Valid From'], rows: [
-        [2],
-      ] },
-    ));
-
-  it('valid_from_diff_hours', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().diffHours(new Date(Date.UTC(2020, 0, 2, 0, 0, 0)))]),
-      runner,
-      { columns: ['Diff Hours Valid From'], rows: [
-        [24],
-      ] },
-    ));
-
-  it('valid_from_diff_minutes', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().diffMinutes(new Date(Date.UTC(2020, 0, 1, 2, 0, 0)))]),
-      runner,
-      { columns: ['Diff Minutes Valid From'], rows: [
-        [120],
-      ] },
-    ));
-
-  it('valid_from_diff_seconds', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.validFrom().diffSeconds(new Date(Date.UTC(2020, 0, 1, 0, 1, 0)))]),
-      runner,
-      { columns: ['Diff Seconds Valid From'], rows: [
-        [60],
-      ] },
-    ));
+  for (const c of TRADE_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });
+
+const TRADE_MULTI_HOP_FINDER_SPECS: SpecCase<TradeFinder>[] = [
+  {
+    name: 'account_name_in_2021',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().name()]).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol', 'Account Name'], rows: [
+        ['AAPL', 'Acme Ltd'],
+        ['GOOG', 'Acme Ltd'],
+      ] },
+  },
+  {
+    name: 'ancestor_join_is_milestoned',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.account().branch().city()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', 'New York'],
+      ] },
+  },
+  {
+    name: 'ancestor_join_follows_the_query_time',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().branch().city()]).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', 'London'],
+        ['GOOG', 'London'],
+      ] },
+  },
+  {
+    name: 'ancestor_join_keeps_its_filter_kwargs',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account({ name: 'Acme Ltd' }).branch().city()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', 'London'],
+      ] },
+  },
+  {
+    name: 'ancestor_join_filter_kwargs_apply_at_the_query_time',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.account({ name: 'Acme Ltd' }).branch().city()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', null],
+      ] },
+  },
+];
 
 describe('TRADE_MULTI_HOP_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
-  it('account_name_in_2021', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol(), f.account().name()]).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol', 'Account Name'], rows: [
-        ['AAPL', 'Acme Ltd'],
-        ['GOOG', 'Acme Ltd'],
-      ] },
-    ));
-
-  it('ancestor_join_is_milestoned', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.account().branch().city()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Symbol', 'Account Branch City'], rows: [
-        ['AAPL', 'New York'],
-      ] },
-    ));
-
-  it('ancestor_join_follows_the_query_time', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol(), f.account().branch().city()]).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol', 'Account Branch City'], rows: [
-        ['AAPL', 'London'],
-        ['GOOG', 'London'],
-      ] },
-    ));
-
-  it('ancestor_join_keeps_its_filter_kwargs', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol(), f.account({ name: 'Acme Ltd' }).branch().city()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Symbol', 'Account Branch City'], rows: [
-        ['AAPL', 'London'],
-      ] },
-    ));
-
-  it('ancestor_join_filter_kwargs_apply_at_the_query_time', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol(), f.account({ name: 'Acme Ltd' }).branch().city()], f.symbol().eq('AAPL')),
-      runner,
-      { columns: ['Symbol', 'Account Branch City'], rows: [
-        ['AAPL', null],
-      ] },
-    ));
+  for (const c of TRADE_MULTI_HOP_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });
+
+const TRADE_EXISTS_FINDER_SPECS: SpecCase<TradeFinder>[] = [
+  {
+    name: 'exists_returns_each_trade_once',
+    query: f => f.findAll(null, _AT, [f.symbol()], f.account().exists()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'exists_returns_each_trade_once_in_2021',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.account().exists()).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['GOOG'],
+      ] },
+  },
+  {
+    name: 'exists_excludes_trade_whose_account_is_not_yet_live',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'not_exists_finds_trade_whose_account_is_not_yet_live',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().notExists()),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+  },
+  {
+    name: 'exists_once_the_account_is_live',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists()).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['MSFT'],
+      ] },
+  },
+  {
+    name: 'not_exists_is_empty_once_the_account_is_live',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().notExists()),
+    expected: { columns: ['Symbol'], rows: [] },
+  },
+  {
+    name: 'exists_through_a_milestoned_ancestor',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().exists()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'exists_combined_with_a_filter',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists().andOp(f.symbol().eq('AAPL'))),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+];
 
 describe('TRADE_EXISTS_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
-  it('exists_returns_each_trade_once', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol()], f.account().exists()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('exists_returns_each_trade_once_in_2021', () =>
-    runExpectation(
-      f.findAll(null, _BOTH_AT, [f.symbol()], f.account().exists()).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-        ['GOOG'],
-      ] },
-    ));
-
-  it('exists_excludes_trade_whose_account_is_not_yet_live', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('not_exists_finds_trade_whose_account_is_not_yet_live', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().notExists()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['MSFT'],
-      ] },
-    ));
-
-  it('exists_once_the_account_is_live', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists()).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-        ['MSFT'],
-      ] },
-    ));
-
-  it('not_exists_is_empty_once_the_account_is_live', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().notExists()),
-      runner,
-      { columns: ['Symbol'], rows: [] },
-    ));
-
-  it('exists_through_a_milestoned_ancestor', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().exists()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('exists_combined_with_a_filter', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists().andOp(f.symbol().eq('AAPL'))),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
+  for (const c of TRADE_EXISTS_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });
+
+const TRADE_IS_NONE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
+  {
+    name: 'is_not_none_returns_each_trade_once',
+    query: f => f.findAll(null, _AT, [f.symbol()], f.account().name().isNotNull()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'is_none_finds_trade_whose_account_is_not_yet_live',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull()),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+  },
+  {
+    name: 'is_not_none_excludes_trade_whose_account_is_not_yet_live',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNotNull()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'is_none_is_empty_once_the_account_is_live',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull()),
+    expected: { columns: ['Symbol'], rows: [] },
+  },
+  {
+    name: 'is_not_none_once_the_account_is_live',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNotNull()).orderByOp(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['MSFT'],
+      ] },
+  },
+  {
+    name: 'is_none_through_a_milestoned_ancestor',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().city().isNull()),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+  },
+  {
+    name: 'is_not_none_through_a_milestoned_ancestor',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().city().isNotNull()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+      ] },
+  },
+  {
+    name: 'is_none_combined_with_a_filter',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull().andOp(f.symbol().eq('MSFT'))),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+  },
+];
 
 describe('TRADE_IS_NONE_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
-  it('is_not_none_returns_each_trade_once', () =>
-    runExpectation(
-      f.findAll(null, _AT, [f.symbol()], f.account().name().isNotNull()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('is_none_finds_trade_whose_account_is_not_yet_live', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['MSFT'],
-      ] },
-    ));
-
-  it('is_not_none_excludes_trade_whose_account_is_not_yet_live', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNotNull()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('is_none_is_empty_once_the_account_is_live', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull()),
-      runner,
-      { columns: ['Symbol'], rows: [] },
-    ));
-
-  it('is_not_none_once_the_account_is_live', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNotNull()).orderByOp(f.symbol().ascending()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-        ['MSFT'],
-      ] },
-    ));
-
-  it('is_none_through_a_milestoned_ancestor', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().city().isNull()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['MSFT'],
-      ] },
-    ));
-
-  it('is_not_none_through_a_milestoned_ancestor', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().city().isNotNull()),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['AAPL'],
-      ] },
-    ));
-
-  it('is_none_combined_with_a_filter', () =>
-    runExpectation(
-      f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull().andOp(f.symbol().eq('MSFT'))),
-      runner,
-      { columns: ['Symbol'], rows: [
-        ['MSFT'],
-      ] },
-    ));
+  for (const c of TRADE_IS_NONE_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
 });
+
+const CONTRACTUAL_POSITION_FINDER_SPECS: SpecCase<ContractualPositionFinder>[] = [
+  {
+    name: 'position_jan15_current',
+    query: f => f.findAll('2023-01-15', _AT, [f.quantity(), f.npv()]),
+    expected: { columns: ['Quantity', 'Npv'], rows: [
+        [100.0, 500.0],
+      ] },
+  },
+  {
+    name: 'position_jan16_current',
+    query: f => f.findAll('2023-01-16', _AT, [f.quantity(), f.npv()]),
+    expected: { columns: ['Quantity', 'Npv'], rows: [
+        [200.0, 1000.0],
+      ] },
+  },
+  {
+    name: 'position_jan15_before_update',
+    query: f => f.findAll('2023-01-15', '2023-01-12 12:00:00', [f.quantity()]),
+    expected: { columns: ['Quantity'], rows: [
+        [90.0],
+      ] },
+  },
+  {
+    name: 'range_jan15_jan16',
+    query: f => f.findForDateRange('2023-01-15', '2023-01-16', _AT, [f.quantity()]).orderByOp(f.quantity().ascending()),
+    expected: { columns: ['Quantity'], rows: [
+        [100.0],
+        [200.0],
+      ] },
+  },
+  {
+    name: 'range_jan15_only',
+    query: f => f.findForDateRange('2023-01-15', '2023-01-15', _AT, [f.quantity()]),
+    expected: { columns: ['Quantity'], rows: [
+        [100.0],
+      ] },
+  },
+  {
+    name: 'range_before_data',
+    query: f => f.findForDateRange('2023-01-01', '2023-01-14', _AT, [f.quantity()]),
+    expected: { columns: ['Quantity'], rows: [] },
+  },
+];
 
 describe('CONTRACTUAL_POSITION_FINDER_SPECS', () => {
   const f = new ContractualPositionFinder();
 
-  it('position_jan15_current', () =>
-    runExpectation(
-      f.findAll('2023-01-15', _AT, [f.quantity(), f.npv()]),
-      runner,
-      { columns: ['Quantity', 'Npv'], rows: [
-        [100.0, 500.0],
-      ] },
-    ));
+  for (const c of CONTRACTUAL_POSITION_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
+});
 
-  it('position_jan16_current', () =>
-    runExpectation(
-      f.findAll('2023-01-16', _AT, [f.quantity(), f.npv()]),
-      runner,
-      { columns: ['Quantity', 'Npv'], rows: [
-        [200.0, 1000.0],
-      ] },
-    ));
+// Related finders, and the join nodes under them, are shared between queries. A query that is missing a join
+// condition can pass only because an earlier query left its condition on a shared node, so each spec must also
+// pass when it runs in a different order.
+const ORDER_INDEPENDENT_SPECS: SpecCase<TradeFinder>[] = [...TRADE_FINDER_SPECS, ...TRADE_MULTI_HOP_FINDER_SPECS, ...TRADE_EXISTS_FINDER_SPECS, ...TRADE_IS_NONE_FINDER_SPECS];
 
-  it('position_jan15_before_update', () =>
-    runExpectation(
-      f.findAll('2023-01-15', '2023-01-12 12:00:00', [f.quantity()]),
-      runner,
-      { columns: ['Quantity'], rows: [
-        [90.0],
-      ] },
-    ));
+describe('trade specs do not depend on order', () => {
+  const orders: [string, SpecCase<TradeFinder>[]][] = [
+    ['reversed', [...ORDER_INDEPENDENT_SPECS].reverse()],
+    ['shuffled-1', shuffled(ORDER_INDEPENDENT_SPECS, 1)],
+    ['shuffled-2', shuffled(ORDER_INDEPENDENT_SPECS, 2)],
+    ['shuffled-3', shuffled(ORDER_INDEPENDENT_SPECS, 3)],
+  ];
 
-  it('range_jan15_jan16', () =>
-    runExpectation(
-      f.findForDateRange('2023-01-15', '2023-01-16', _AT, [f.quantity()]).orderByOp(f.quantity().ascending()),
-      runner,
-      { columns: ['Quantity'], rows: [
-        [100.0],
-        [200.0],
-      ] },
-    ));
+  it.each(orders)('%s', async (_label, order) => {
+    const f = new TradeFinder();
+    for (const c of order) await runExpectation(c.query(f), runner, c.expected);
+  });
 
-  it('range_jan15_only', () =>
-    runExpectation(
-      f.findForDateRange('2023-01-15', '2023-01-15', _AT, [f.quantity()]),
-      runner,
-      { columns: ['Quantity'], rows: [
-        [100.0],
-      ] },
-    ));
-
-  it('range_before_data', () =>
-    runExpectation(
-      f.findForDateRange('2023-01-01', '2023-01-14', _AT, [f.quantity()]),
-      runner,
-      { columns: ['Quantity'], rows: [] },
-    ));
+  it('passes when every query is built before any is run', async () => {
+    const f = new TradeFinder();
+    const built = ORDER_INDEPENDENT_SPECS.map(c => ({ c, result: c.query(f) }));
+    for (const { c, result } of built.reverse()) await runExpectation(result, runner, c.expected);
+  });
 });
