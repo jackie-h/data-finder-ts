@@ -144,9 +144,11 @@ af.findAll(null, null, [af.count()]).toSql()
 // → SELECT COUNT(*) FROM ref_data.account_master
 ```
 
+`.countDistinct()` counts the different non-NULL values (`COUNT(DISTINCT column)`); use it with `.groupBy()` to count per group. The GraphQL runner does not compute aggregates on the client.
+
 ## Replacing a missing value
 
-`.orElse(default, ...)` selects (`COALESCE` in SQL) the value, or the first default that is not NULL when it is. It works on any attribute, including one reached through an association (for example a manager that may not exist). Defaults are strings, numbers or booleans.
+`.orElse(default, ...)` (`COALESCE` in SQL) selects the value, or the first default that is not NULL when it is. It works on any attribute, including one reached through an association (for example a manager that may not exist). Defaults are strings, numbers or booleans.
 
 ```ts
 ef.findAll(null, null, [ef.name(), ef.manager().name().orElse('nobody')])

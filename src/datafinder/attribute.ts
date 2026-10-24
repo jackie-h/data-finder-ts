@@ -72,6 +72,11 @@ export abstract class Attribute implements Aliasable {
     return new Alias(this, name);
   }
 
+  /** The number of different non-NULL values in the group: `COUNT(DISTINCT column)`. Use with `groupBy` to count per group. */
+  countDistinct(): AggregateOperation {
+    return new AggregateOperation(this.cwj(), AggregateOperator.COUNT_DISTINCT, this._displayName + ' Count Distinct');
+  }
+
   /** The value, or the first default that is not NULL when it is NULL: `name().orElse('N/A')`. */
   orElse(...defaults: (string | number | boolean)[]): ScalarFunctionOperation {
     if (defaults.length === 0) throw new Error('orElse needs at least one default');

@@ -182,6 +182,9 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
     const sql = fn + '(' + parts.join(', ') + ')';
     return sql + (operation.window !== undefined ? ' ' + windowSpecToString(operation.window) : ' OVER ()');
   }
+  if (operation instanceof AggregateOperation && operation.operator === AggregateOperator.COUNT_DISTINCT) {
+    return 'COUNT(DISTINCT ' + sqlOperationToString(operation.element) + ')';
+  }
   if (operation instanceof AggregateOperation) {
     const fn = AGGREGATE_SQL_NAMES[operation.operator] ?? operation.operator;
     let sql = fn + '(' + sqlOperationToString(operation.element) + ')';
