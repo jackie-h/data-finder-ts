@@ -1,4 +1,5 @@
 import { Attribute, AttributeValue } from './attribute';
+import { NumericFunctions, StringFunctions } from './scalar-functions';
 import {
   ComparisonOperation,
   ComparisonOperator,
@@ -11,6 +12,7 @@ import {
   ConstantOperation,
   DateOnly,
   escapeLike,
+  applyMixins,
   DATE_ONLY_PATTERN,
   BooleanConstantOperation,
   DecimalConstantOperation,
@@ -49,60 +51,6 @@ export class StringAttribute extends Attribute {
     return new AggregateOperation(this.cwj(), AggregateOperator.STRING_AGG, 'Join ' + this.displayName(), undefined, separator, orderBy);
   }
 
-  /** Convert every character to uppercase. */
-  toUpperCase(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.UPPER, 'Upper ' + this.displayName());
-  }
-  /** Convert every character to lowercase. */
-  toLowerCase(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.LOWER, 'Lower ' + this.displayName());
-  }
-  /** Remove leading and trailing whitespace. */
-  trim(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.TRIM, 'Trim ' + this.displayName());
-  }
-  /** Remove leading whitespace. */
-  trimStart(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.LTRIM, 'Trim Start ' + this.displayName());
-  }
-  /** Remove trailing whitespace. */
-  trimEnd(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.RTRIM, 'Trim End ' + this.displayName());
-  }
-  /** Return the number of characters in the string. */
-  length(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.LENGTH, 'Length ' + this.displayName());
-  }
-  /** Return the string with characters in reverse order. */
-  reverse(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.REVERSE, 'Reverse ' + this.displayName());
-  }
-  /** Return the first `n` characters. */
-  left(n: number): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.LEFT, 'Left ' + this.displayName(), n);
-  }
-  /** Return the last `n` characters. */
-  right(n: number): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.RIGHT, 'Right ' + this.displayName(), n);
-  }
-  /** Return the string repeated `n` times. */
-  repeat(n: number): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.REPEAT, 'Repeat ' + this.displayName(), n);
-  }
-  /** Replace all occurrences of `fromStr` with `toStr`. */
-  replace(fromStr: string, toStr: string): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.REPLACE, 'Replace ' + this.displayName(), undefined, [fromStr, toStr]);
-  }
-  /**
-   * Extract a portion of the string.
-   * `start` is zero-based (following Python convention); `length` is optional.
-   */
-  substring(start: number, length?: number): ScalarFunctionOperation {
-    // Python convention: 0-based start; SQL SUBSTRING is 1-based, so add 1
-    const args: (number)[] = length !== undefined ? [start + 1, length] : [start + 1];
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.SUBSTRING, 'Substring ' + this.displayName(), undefined, args);
-  }
-
   /** Filter to rows where this attribute equals `value`. */
   eq(value: string): Operation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new StringConstantOperation(value));
@@ -128,6 +76,9 @@ export class StringAttribute extends Attribute {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_LIKE, new StringConstantOperation(`%${escapeLike(value)}%`));
   }
 }
+
+export interface StringAttribute extends StringFunctions {}
+applyMixins(StringAttribute, [StringFunctions]);
 
 export abstract class NumericAttribute extends Attribute {
   constructor(
@@ -156,35 +107,10 @@ export abstract class NumericAttribute extends Attribute {
   average(): AggregateOperation {
     return new AggregateOperation(this.cwj(), AggregateOperator.AVERAGE, 'Average ' + this.displayName());
   }
-  /** Absolute value (distance from zero, always non-negative). */
-  abs(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.ABS, 'Abs ' + this.displayName());
-  }
-  /** Round up to the nearest integer. */
-  ceil(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.CEILING, 'Ceil ' + this.displayName());
-  }
-  /** Round down to the nearest integer. */
-  floor(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.FLOOR, 'Floor ' + this.displayName());
-  }
-  /** Square root. */
-  sqrt(): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.SQRT, 'Sqrt ' + this.displayName());
-  }
-  /** Remainder after dividing by `n`. */
-  mod(n: number): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.MOD, 'Mod ' + this.displayName(), n);
-  }
-  /** Raise to the power of `n`. */
-  power(n: number): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.POWER, 'Power ' + this.displayName(), n);
-  }
-  /** Round to `d` decimal places, or to the nearest integer when `d` is omitted. */
-  round(d?: number): ScalarFunctionOperation {
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.ROUND, 'Round ' + this.displayName(), d);
-  }
 }
+
+export interface NumericAttribute extends NumericFunctions {}
+applyMixins(NumericAttribute, [NumericFunctions]);
 
 export class DoubleAttribute extends NumericAttribute {
   constructor(

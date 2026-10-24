@@ -12,6 +12,7 @@ import {
   ConstantOperation,
   JoinTreeNodeOperation,
   Alias,
+  RelationalOperationElement,
   Aliasable,
   ScalarFunction,
   ScalarFunctionOperation,
@@ -53,6 +54,16 @@ export abstract class Attribute implements Aliasable {
 
   /** Alternate attribute on a flat column of the owning table, used in place of this one when its join is elided. */
   embedded(): Attribute | undefined { return this._embedded; }
+
+  /** @internal The expression a function of this attribute applies to: its column. */
+  functionInput(): RelationalOperationElement {
+    return this.cwj();
+  }
+
+  /** @internal What a function of this attribute is labelled after: its display name. */
+  functionLabel(): string {
+    return this._displayName;
+  }
 
   cwj(): ColumnWithJoin {
     return new ColumnWithJoin(this._column, this._parent, this._embedded?.cwj());

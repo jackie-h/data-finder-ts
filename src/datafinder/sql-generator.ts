@@ -791,20 +791,8 @@ class SQLQueryGenerator {
       );
       this._select.push(new Alias(rewrittenAgg, alias));
     } else if (col instanceof ScalarFunctionOperation) {
-      const colNested = this._resolve(findColumn(col));
-      const node = colNested.parent;
-      let ta: TableAlias;
-      if (node !== undefined) {
-        ta = this._tableAliasForTable(colNested.column.owner!, node);
-      } else {
-        ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
-        this._from.add(ta);
-      }
-      const alias = col.displayName ?? col.func + ' ' + findColumn(col).column.name;
-      this._select.push(new Alias(
-        new ScalarFunctionOperation(new TableAliasColumn(colNested.column, ta), col.func, undefined, col.secondArg, col.extraArgs),
-        alias,
-      ));
+      // rewritten as a whole, so a function of a function keeps every step
+      this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? col.func + ' ' + findColumn(col).column.name));
     } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation || col instanceof DateDiffOperation) {
       const colNested = this._resolve(findColumn(col as RelationalOperationElement));
       const node = colNested.parent;
@@ -897,6 +885,13 @@ class SQLQueryGenerator {
       return sql;
     }
     if (op instanceof ConstantOperation) return constantValueString(op);
+    if (op instanceof ScalarFunctionOperation) {
+      // an expression compared in a filter needs its columns' joins, then is written as in a select list
+      const required = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
+      this._collectRequiredJoins(op, required);
+      for (const node of required.values()) this._addJoin(node);
+      return sqlOperationToString(this._rewriteOperation(op));
+    }
     if (op instanceof ColumnWithJoin) {
       const { column, parent: node } = this._resolve(op);
       let ta: TableAlias;
