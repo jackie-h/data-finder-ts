@@ -74,7 +74,7 @@ describe('pushing filters, sorts and limits', () => {
   });
 
   it('fails an and with an unpushable side', () => {
-    const op = price().eq(2.0).andOp(fieldComparedToField());
+    const op = price().eq(2.0).and(fieldComparedToField());
     expect(() => buildServerArgs(op, undefined, undefined, CONVENTION)).toThrow(GraphQLPushdownError);
   });
 });

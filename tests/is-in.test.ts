@@ -45,7 +45,7 @@ describe('SQL rendering', () => {
   });
 
   it('combines with other filters', () => {
-    expect(where(name.isIn(['John', 'Peter']).andOp(id.isNotIn([1]))))
+    expect(where(name.isIn(['John', 'Peter']).and(id.isNotIn([1]))))
       .toBe("t0.first_name IN ('John', 'Peter') AND (t0.id NOT IN (1) OR t0.id IS NULL)");
   });
 
