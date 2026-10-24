@@ -45,6 +45,7 @@ import {
   SelectOperation,
   BinaryOperation,
   CaseOperation,
+  DateTruncOperation,
   ArithmeticOperation,
   ArithmeticOperator,
   containsAggregate,
@@ -270,6 +271,9 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
   if (operation instanceof DateExtractOperation) {
     return 'EXTRACT(' + operation.part + ' FROM ' + sqlOperationToString(operation.element) + ')';
   }
+  if (operation instanceof DateTruncOperation) {
+    return "CAST(DATE_TRUNC('" + operation.part.toLowerCase() + "', " + sqlOperationToString(operation.element) + ') AS DATE)';
+  }
   if (operation instanceof DateArithmeticOperation) {
     const op = operation.isAdd ? '+' : '-';
     return sqlOperationToString(operation.element) + ' ' + op + ' INTERVAL ' + operation.n + ' ' + operation.unit;
@@ -436,7 +440,7 @@ function walkRefs(
   } else if (op instanceof WindowFunctionOperation) {
     if (op.element) walkRefs(op.element, visit, visitExists);
     if (op.window) walkWindowSpec(op.window, visit, visitExists);
-  } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation ||
+  } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation || op instanceof DateTruncOperation ||
              op instanceof DateArithmeticOperation || op instanceof DateDiffOperation ||
              op instanceof IsNullOperation || op instanceof IsNotNullOperation ||
              op instanceof InOperation || op instanceof NotInOperation) {
@@ -751,6 +755,9 @@ class SQLQueryGenerator {
     if (op instanceof DateExtractOperation) {
       return new DateExtractOperation(this._rewriteOperation(op.element), op.part, op.displayName);
     }
+    if (op instanceof DateTruncOperation) {
+      return new DateTruncOperation(this._rewriteOperation(op.element), op.part, op.displayName);
+    }
     if (op instanceof DateArithmeticOperation) {
       return new DateArithmeticOperation(this._rewriteOperation(op.element), op.n, op.unit, op.isAdd, op.displayName);
     }
@@ -855,6 +862,8 @@ class SQLQueryGenerator {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (col instanceof ArithmeticOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
+    } else if (col instanceof DateTruncOperation) {
+      this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? findColumn(col).column.name));
     } else if (isCondition(col)) {
       this._select.push(new Alias(new RenderedSql(this.buildFilter(col)), 'Expression'));
     } else if (col instanceof ConstantOperation) {
@@ -925,7 +934,7 @@ class SQLQueryGenerator {
       return sql;
     }
     if (op instanceof ConstantOperation) return constantValueString(op);
-    if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation) {
+    if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation || op instanceof DateTruncOperation) {
       // an expression compared in a filter needs its columns' joins, then is written as in a select list
       const required = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
       this._collectRequiredJoins(op, required);
