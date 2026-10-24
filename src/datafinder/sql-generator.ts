@@ -44,6 +44,7 @@ import {
   NotExistsOperation,
   SelectOperation,
   BinaryOperation,
+  CaseOperation,
   containsAggregate,
   containsAggregateOrWindow,
 } from '../model/relational';
@@ -179,6 +180,20 @@ function windowSpecToString(window: WindowSpecification): string {
   return 'OVER (' + parts.join(' ') + ')';
 }
 
+/**
+ * A condition or CASE already written as SQL, to be selected as a column. It is rendered while the query is being
+ * built, where its columns can be resolved to table aliases, not when the text of the select is put together.
+ */
+class RenderedSql extends RelationalOperationElement {
+  constructor(readonly sql: string) { super(); }
+}
+
+function isCondition(op: unknown): boolean {
+  return op instanceof ComparisonOperation || op instanceof LogicalOperation || op instanceof IsNullOperation
+    || op instanceof IsNotNullOperation || op instanceof InOperation || op instanceof NotInOperation
+    || op instanceof ExistsOperation || op instanceof NotExistsOperation;
+}
+
 function sqlOperationToString(operation: RelationalOperationElement): string {
   if (operation instanceof TableAliasColumn) {
     return operation.tableAlias.alias + '.' + operation.column.name;
@@ -229,6 +244,7 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
   }
   if (operation instanceof CountAllOperation) return 'COUNT(*)';
   if (operation instanceof ConstantOperation) return selectedConstantString(operation);
+  if (operation instanceof RenderedSql) return operation.sql;
   if (operation instanceof Alias) {
     return sqlOperationToString(operation.element) + ' AS "' + operation.name + '"';
   }
@@ -383,6 +399,10 @@ function walkRefs(
     walkRefs((op as UnaryOperation).element, visit, visitExists);
   } else if (op instanceof Alias) {
     walkRefs(op.element, visit, visitExists);
+  } else if (op instanceof CaseOperation) {
+    walkRefs(op.condition, visit, visitExists);
+    walkRefs(op.then, visit, visitExists);
+    walkRefs(op.fallback, visit, visitExists);
   } else if (op instanceof SortOperation) {
     walkRefs(op.column, visit, visitExists);
   } else if (op instanceof LogicalOperation || op instanceof ComparisonOperation) {
@@ -662,6 +682,7 @@ class SQLQueryGenerator {
         op.window ? this._rewriteWindowSpec(op.window) : undefined,
       );
     }
+    if (op instanceof CaseOperation) return new RenderedSql(this._caseSql(op));
     if (op instanceof WindowFunctionOperation) {
       const el = op.element ? this._rewriteOperation(op.element) : null;
       return new WindowFunctionOperation(el, op.func, op.displayName, op.secondArg, [...op.extraArgs],
@@ -680,6 +701,15 @@ class SQLQueryGenerator {
       return new DateDiffOperation(this._rewriteOperation(op.element), (op as DateDiffOperation).other, (op as DateDiffOperation).unit, op.displayName);
     }
     return op;
+  }
+
+  /** The CASE written out now: its condition can only be rendered while the query is being built. */
+  private _caseSql(op: CaseOperation): string {
+    const branch = (value: RelationalOperationElement): string =>
+      value instanceof ConstantOperation ? constantValueString(value) : sqlOperationToString(this._rewriteOperation(value));
+    let sql = 'CASE WHEN ' + this.buildFilter(op.condition) + ' THEN ' + branch(op.then);
+    if (op.fallback !== undefined) sql += ' ELSE ' + branch(op.fallback);
+    return sql + ' END';
   }
 
   private processSelect(cols: (Attribute | RelationalOperationElement)[]): void {
@@ -775,6 +805,10 @@ class SQLQueryGenerator {
         aliasedOp = new DateDiffOperation(new TableAliasColumn(colNested.column, ta), (col as DateDiffOperation).other, (col as DateDiffOperation).unit);
       }
       this._select.push(new Alias(aliasedOp, alias));
+    } else if (col instanceof CaseOperation) {
+      this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
+    } else if (isCondition(col)) {
+      this._select.push(new Alias(new RenderedSql(this.buildFilter(col)), 'Expression'));
     } else if (col instanceof ConstantOperation) {
       this._select.push(new Alias(col, 'Constant'));
     } else if (col instanceof CountAllOperation) {

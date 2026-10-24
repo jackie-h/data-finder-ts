@@ -437,6 +437,19 @@ export class Alias extends RelationalOperationElement implements Aliasable {
   alias(name: string): Alias { return new Alias(this.element, name); }
 }
 
+/** `CASE WHEN condition THEN then ELSE fallback END`; without a `fallback` the value is NULL. */
+export class CaseOperation extends Operation implements Aliasable {
+  constructor(
+    readonly condition: RelationalOperationElement,
+    readonly then: RelationalOperationElement,
+    readonly fallback?: RelationalOperationElement,
+    readonly displayName?: string,
+  ) { super(); }
+
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+}
+
 /** Returned by `RelatedFinder.exists()`. A backend translates it to a join-presence check. */
 export class ExistsOperation extends RelationalOperationElement {
   constructor(readonly node: JoinTreeNodeOperation) { super(); }

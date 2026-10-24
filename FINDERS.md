@@ -162,6 +162,21 @@ cf.findAll(null, null, [cf.name(), constant('EU').alias('Region')])
 
 The GraphQL runner fills a constant in itself rather than reading it from the server, so a query needs at least one real field too.
 
+## Conditions as columns, and `when`
+
+A condition (a comparison, a null check, `isIn`, `exists`, or `.and()` / `.or()` of those) can be selected as a column: true or false for each row, named "Expression" unless wrapped in an `Alias`. A comparison with a missing value is missing, not false.
+
+`when(condition).then(value).otherwise(value)` is a value that depends on a condition (`CASE WHEN`). Further cases follow with `.when(...).then(...)`; with no `otherwise` the value is missing. A value is a column, an expression or a plain value.
+
+```ts
+import { when } from 'data-finder-ts';
+
+cf.findAll(null, null, [cf.name(), when(cf.category().eq('Technology')).then('tech').otherwise('other')])
+cf.findAll(null, null, [when(cf.id().lt(2)).then('low').when(cf.id().lt(4)).then('mid').otherwise('high')])
+```
+
+The object `when(...)` returns has a `then` method, so don't `await` it before calling `.then(value)`. The GraphQL runner does not compute either on the client.
+
 ## Replacing a missing value
 
 `.orElse(default)` (`COALESCE` in SQL) selects the value, or `default` when it is NULL. It works on any attribute, including one reached through an association (for example a manager that may not exist). The default is a string, number or boolean.
