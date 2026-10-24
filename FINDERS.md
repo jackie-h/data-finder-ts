@@ -150,6 +150,18 @@ af.findAll(null, null, [af.count()]).toSql()
 
 With no `.groupBy()`, a query that selects aggregates is grouped by its other columns, as a DataFrame's `groupby(columns).agg(...)` is: `cf.findAll(null, null, [cf.category(), cf.id().count()])` counts per category. A query that selects only aggregates over the root's own columns is not grouped, so the aggregate covers every row. An aggregate read through a to-many association is computed for each row of the root, as Legend does, so the root's primary key is grouped by too: `ef.findAll(null, null, [ef.name(), ef.employees().id().count()])` gives each employee the count of their own reports, 0 for none. An explicit `.groupBy()` is used as given.
 
+## Constant columns
+
+`constant(value)` selects a fixed value next to the columns. It is named "Constant" unless `.alias()` gives it a name. A `DateOnly` is a date and any other `Date` a timestamp; a number is an integer or a float.
+
+```ts
+import { constant } from 'data-finder-ts';
+
+cf.findAll(null, null, [cf.name(), constant('EU').alias('Region')])
+```
+
+The GraphQL runner fills a constant in itself rather than reading it from the server, so a query needs at least one real field too.
+
 ## Replacing a missing value
 
 `.orElse(default)` (`COALESCE` in SQL) selects the value, or `default` when it is NULL. It works on any attribute, including one reached through an association (for example a manager that may not exist). The default is a string, number or boolean.

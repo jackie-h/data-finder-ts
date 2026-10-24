@@ -12,6 +12,7 @@ import './generated_examples/finance/AccountFinder';
 import './generated_examples/finance/BranchFinder';
 import './generated_examples/finance/ContractualPositionFinder';
 import './generated_examples/finance/InstrumentFinder';
+import { constant } from '../src/datafinder';
 import { toSql } from '../src/datafinder/sql-generator';
 import { DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, CountAllOperation, JoinOperation, JoinTreeNodeOperation, NoOperation, Table } from '../src/model/relational';
@@ -85,6 +86,12 @@ describe('the SQL', () => {
   it('a scalar function of a column is grouped by its expression', () => {
     const { root, name, age } = firmAndEmployeeAges(false);
     expect(toSql(null, null, [name.toUpperCase(), age.average()], root, new NoOperation()).endsWith('GROUP BY UPPER(t0.LEGALNAME)')).toBe(true);
+  });
+
+  it('a constant is not grouped (a bare number in GROUP BY would be a column position)', () => {
+    const { root, name, price } = firmAndEmployeeAges();
+    const sql = toSql(null, null, [name, constant(7).alias('Seven'), price.sum()], root, new NoOperation());
+    expect(sql.endsWith('GROUP BY t0.LEGALNAME')).toBe(true);
   });
 
   it('window functions are not grouped', () => {

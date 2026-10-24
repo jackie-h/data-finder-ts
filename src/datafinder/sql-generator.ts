@@ -155,6 +155,17 @@ function constantValueString(op: ConstantOperation): string {
   throw new Error('Unknown constant operation');
 }
 
+/**
+ * A constant in the select list. A bare quoted literal would come back as text, so dates are typed, and a
+ * bare 1.5 would come back as a DECIMAL, so a float is cast to DOUBLE.
+ */
+function selectedConstantString(op: ConstantOperation): string {
+  if (op instanceof FloatConstantOperation) return 'CAST(' + constantValueString(op) + ' AS DOUBLE)';
+  if (op instanceof DateTimeConstantOperation) return 'TIMESTAMP ' + constantValueString(op);
+  if (op instanceof DateConstantOperation) return 'DATE ' + constantValueString(op);
+  return constantValueString(op);
+}
+
 function windowSpecToString(window: WindowSpecification): string {
   const parts: string[] = [];
   if (window.partitionBy.length > 0) {
@@ -217,6 +228,7 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
     return "DATE_DIFF('" + operation.unit.toLowerCase() + "', " + sqlOperationToString(operation.element) + ', ' + otherSql + ')';
   }
   if (operation instanceof CountAllOperation) return 'COUNT(*)';
+  if (operation instanceof ConstantOperation) return selectedConstantString(operation);
   if (operation instanceof Alias) {
     return sqlOperationToString(operation.element) + ' AS "' + operation.name + '"';
   }
@@ -506,6 +518,11 @@ function reachesToMany(op: RelationalOperationElement): boolean {
   return false;
 }
 
+/** A column with any alias around it taken off. */
+function unaliased(op: unknown): unknown {
+  return op instanceof Alias ? unaliased(op.element) : op;
+}
+
 class SQLQueryGenerator {
   private _select: Alias[] = [];
   private _from: Set<TableAlias> = new Set();
@@ -555,7 +572,8 @@ class SQLQueryGenerator {
    * grouped by those columns (as a DataFrame's `groupby(columns).agg(...)` does). An aggregate read through a
    * to-many association is computed for each row of the root table, as Legend does, so the root's primary key
    * is grouped by too. A query that selects only aggregates over the root's own columns is not grouped: the
-   * aggregate covers every row.
+   * aggregate covers every row. A constant needs no grouping: a bare
+   * `GROUP BY 7` would be a column position.
    */
   private _groupByPartsFor(select: SelectOperation): string[] {
     if (select.groupBy.length > 0) return select.groupBy.map(a => this._attrToColString(a as Attribute));
@@ -565,7 +583,7 @@ class SQLQueryGenerator {
     const keys = perRoot ? select.table!.columns.filter(c => c.primaryKey).map(c => this._columnToString(c)) : [];
     const grouped = select.display
       .map((column, i) => ({ column, shown: this._select[i] }))
-      .filter(({ column }) => !containsAggregateOrWindow(column))
+      .filter(({ column }) => !containsAggregateOrWindow(column) && !(unaliased(column) instanceof ConstantOperation))
       .map(({ shown }) => sqlOperationToString(shown.element));
     return [...new Set([...keys, ...grouped])];
   }
@@ -757,6 +775,8 @@ class SQLQueryGenerator {
         aliasedOp = new DateDiffOperation(new TableAliasColumn(colNested.column, ta), (col as DateDiffOperation).other, (col as DateDiffOperation).unit);
       }
       this._select.push(new Alias(aliasedOp, alias));
+    } else if (col instanceof ConstantOperation) {
+      this._select.push(new Alias(col, 'Constant'));
     } else if (col instanceof CountAllOperation) {
       const ta = this._tableAliasForTable(col.table, col.table);
       this._from.add(ta);
