@@ -45,6 +45,8 @@ import {
   SelectOperation,
   BinaryOperation,
   CaseOperation,
+  ArithmeticOperation,
+  ArithmeticOperator,
   containsAggregate,
   containsAggregateOrWindow,
 } from '../model/relational';
@@ -180,6 +182,29 @@ function windowSpecToString(window: WindowSpecification): string {
   return 'OVER (' + parts.join(' ') + ')';
 }
 
+const ARITHMETIC_PRECEDENCE: Record<ArithmeticOperator, number> = {
+  [ArithmeticOperator.ADD]: 1,
+  [ArithmeticOperator.SUBTRACT]: 1,
+  [ArithmeticOperator.MULTIPLY]: 2,
+  [ArithmeticOperator.DIVIDE]: 2,
+};
+
+/**
+ * Whether `child` must be parenthesised as an operand of `parent`: it binds more loosely than the parent, or it
+ * is the right operand of a - or / and binds equally (a - (b - c) is not a - b - c).
+ */
+export function arithmeticNeedsParentheses(parent: ArithmeticOperation, child: RelationalOperationElement, onRight: boolean): boolean {
+  if (!(child instanceof ArithmeticOperation)) return false;
+  const here = ARITHMETIC_PRECEDENCE[parent.operator];
+  const there = ARITHMETIC_PRECEDENCE[child.operator];
+  return there < here || (there === here && onRight
+    && (parent.operator === ArithmeticOperator.SUBTRACT || parent.operator === ArithmeticOperator.DIVIDE));
+}
+
+function operandString(operation: RelationalOperationElement): string {
+  return operation instanceof ConstantOperation ? constantValueString(operation) : sqlOperationToString(operation);
+}
+
 /**
  * A condition or CASE already written as SQL, to be selected as a column. It is rendered while the query is being
  * built, where its columns can be resolved to table aliases, not when the text of the select is put together.
@@ -256,6 +281,13 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
   if (operation instanceof CountAllOperation) return 'COUNT(*)';
   if (operation instanceof ConstantOperation) return selectedConstantString(operation);
   if (operation instanceof RenderedSql) return operation.sql;
+  if (operation instanceof ArithmeticOperation) {
+    let left = operandString(operation.left);
+    let right = operandString(operation.right);
+    if (arithmeticNeedsParentheses(operation, operation.left, false)) left = '(' + left + ')';
+    if (arithmeticNeedsParentheses(operation, operation.right, true)) right = '(' + right + ')';
+    return left + ' ' + operation.operator + ' ' + right;
+  }
   if (operation instanceof Alias) {
     return sqlOperationToString(operation.element) + ' AS "' + operation.name + '"';
   }
@@ -411,6 +443,9 @@ function walkRefs(
     walkRefs((op as UnaryOperation).element, visit, visitExists);
   } else if (op instanceof Alias) {
     walkRefs(op.element, visit, visitExists);
+  } else if (op instanceof ArithmeticOperation) {
+    walkRefs(op.left, visit, visitExists);
+    walkRefs(op.right, visit, visitExists);
   } else if (op instanceof CaseOperation) {
     walkRefs(op.condition, visit, visitExists);
     walkRefs(op.then, visit, visitExists);
@@ -702,6 +737,9 @@ class SQLQueryGenerator {
       );
     }
     if (op instanceof CaseOperation) return new RenderedSql(this._caseSql(op));
+    if (op instanceof ArithmeticOperation) {
+      return new ArithmeticOperation(this._rewriteOperation(op.left), op.operator, this._rewriteOperation(op.right), op.displayName);
+    }
     if (op instanceof WindowFunctionOperation) {
       const el = op.element ? this._rewriteOperation(op.element) : null;
       return new WindowFunctionOperation(el, op.func, op.displayName, op.secondArg, [...op.extraArgs],
@@ -815,6 +853,8 @@ class SQLQueryGenerator {
       this._select.push(new Alias(aliasedOp, alias));
     } else if (col instanceof CaseOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
+    } else if (col instanceof ArithmeticOperation) {
+      this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (isCondition(col)) {
       this._select.push(new Alias(new RenderedSql(this.buildFilter(col)), 'Expression'));
     } else if (col instanceof ConstantOperation) {
@@ -885,7 +925,7 @@ class SQLQueryGenerator {
       return sql;
     }
     if (op instanceof ConstantOperation) return constantValueString(op);
-    if (op instanceof ScalarFunctionOperation) {
+    if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation) {
       // an expression compared in a filter needs its columns' joins, then is written as in a select list
       const required = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
       this._collectRequiredJoins(op, required);
