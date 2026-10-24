@@ -148,8 +148,13 @@ function opToWhereClause(op: RelationalOperationElement | null | undefined): str
     return `{ ${logical}: [${left}, ${right}] }`;
   }
   if (op instanceof InOperation || op instanceof NotInOperation) {
-    const gqlOp = op instanceof InOperation ? '_in' : '_nin';
-    return nest(fieldName(op.element, 'a filter'), `{ ${gqlOp}: [${op.values.map(gqlValue).join(', ')}] }`);
+    const field = fieldName(op.element, 'a filter');
+    const values = op.values.map(gqlValue).join(', ');
+    if (op instanceof InOperation) return nest(field, `{ _in: [${values}] }`);
+    const notIn = nest(field, `{ _nin: [${values}] }`);
+    // a server's _nin skips nulls as SQL does, so a nullable field has to match its nulls explicitly
+    if ((op.element as ColumnWithJoin).column.nullable) return `{ _or: [${notIn}, ${nest(field, '{ _is_null: true }')}] }`;
+    return notIn;
   }
   if (op instanceof IsNullOperation) return nest(fieldName(op.element, 'a null check'), '{ _is_null: true }');
   if (op instanceof IsNotNullOperation) return nest(fieldName(op.element, 'a null check'), '{ _is_null: false }');
