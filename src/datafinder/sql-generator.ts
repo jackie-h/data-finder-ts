@@ -136,8 +136,13 @@ const SCALAR_SQL_NAMES: Record<ScalarFunction, string> = {
   [ScalarFunction.COALESCE]: 'COALESCE',
 };
 
+/** A string as a SQL literal: a quote inside it is doubled, so a value can never end the literal early. */
+function sqlStringLiteral(value: string): string {
+  return "'" + value.replaceAll("'", "''") + "'";
+}
+
 function constantValueString(op: ConstantOperation): string {
-  if (op instanceof StringConstantOperation) return "'" + op.value + "'";
+  if (op instanceof StringConstantOperation) return sqlStringLiteral(op.value);
   if (op instanceof DateConstantOperation) return sqlFormatDate(op.value);
   if (op instanceof DateTimeConstantOperation) return sqlFormatDatetime(op.value);
   if (op instanceof IntegerConstantOperation) return String(op.value);
@@ -172,7 +177,7 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
     }
     if (operation.secondArg !== undefined) parts.push(String(operation.secondArg));
     for (const arg of operation.extraArgs) {
-      parts.push(typeof arg === 'string' ? "'" + arg + "'" : String(arg));
+      parts.push(typeof arg === 'string' ? sqlStringLiteral(arg) : String(arg));
     }
     const sql = fn + '(' + parts.join(', ') + ')';
     return sql + (operation.window !== undefined ? ' ' + windowSpecToString(operation.window) : ' OVER ()');
@@ -190,7 +195,7 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
     const parts: string[] = [sqlOperationToString(operation.element)];
     if (operation.secondArg !== undefined) parts.push(String(operation.secondArg));
     for (const arg of operation.extraArgs) {
-      parts.push(typeof arg === 'string' ? "'" + arg + "'" : String(arg));
+      parts.push(typeof arg === 'string' ? sqlStringLiteral(arg) : String(arg));
     }
     return fn + '(' + parts.join(', ') + ')';
   }
