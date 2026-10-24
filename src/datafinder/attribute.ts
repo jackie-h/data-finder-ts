@@ -54,7 +54,7 @@ export abstract class Attribute {
     return new ColumnWithJoin(this._column, this._parent, this._embedded?.cwj());
   }
 
-  /** Count the number of non-null values. Use in a projection with `groupByOp` to aggregate per group. */
+  /** Count the number of non-null values. Use in a projection with `groupBy` to aggregate per group. */
   count(): AggregateOperation {
     return new AggregateOperation(
       this.cwj(),

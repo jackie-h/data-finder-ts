@@ -33,7 +33,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'group_by_category_count',
-    query: f => f.findAll(null, null, [f.category(), f.count()]).groupByOp(f.category()).orderBy(f.category().ascending()),
+    query: f => f.findAll(null, null, [f.category(), f.count()]).groupBy(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Count'], rows: [
         ['Finance', 2],
         ['Manufacturing', 1],

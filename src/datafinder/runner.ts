@@ -83,7 +83,7 @@ export class FinderResult {
     return this;
   }
 
-  groupByOp(...attrs: Attribute[]): this {
+  groupBy(...attrs: Attribute[]): this {
     this._groupBy = attrs;
     return this;
   }

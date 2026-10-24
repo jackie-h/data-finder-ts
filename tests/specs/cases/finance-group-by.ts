@@ -7,7 +7,7 @@ export const _AT = '2030-01-01 00:00:00';
 export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
     name: 'average_price_per_account',
-    query: f => f.findAll(null, _AT, [f.account().name(), f.price().average()]).groupByOp(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().average()]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Average Price'], rows: [
         ['Alpha Fund', 150.0],
         ['Beta Fund', 350.0],
@@ -16,7 +16,7 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'average_price_settled_only',
-    query: f => f.findAll(null, _AT, [f.account().name(), f.price().average()], f.isSettled().isTrue()).groupByOp(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().average()], f.isSettled().isTrue()).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Average Price'], rows: [
         ['Alpha Fund', 150.0],
         ['Beta Fund', 300.0],
@@ -25,7 +25,7 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'group_count_per_account',
-    query: f => f.findAll(null, _AT, [f.account().name(), f.count()]).groupByOp(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.count()]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Count'], rows: [
         ['Alpha Fund', 2],
         ['Beta Fund', 2],

@@ -52,7 +52,7 @@ describe('TradeFinder — group by with average', () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, _AT, [tf.account().name(), tf.price().average()])
-      .groupByOp(tf.account().name())
+      .groupBy(tf.account().name())
       .orderBy(tf.account().name().ascending())
       .toRows();
     const avgs = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
@@ -65,7 +65,7 @@ describe('TradeFinder — group by with average', () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, _AT, [tf.account().name(), tf.price().average()], tf.isSettled().isTrue())
-      .groupByOp(tf.account().name())
+      .groupBy(tf.account().name())
       .orderBy(tf.account().name().ascending())
       .toRows();
     const avgs = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
@@ -78,7 +78,7 @@ describe('TradeFinder — group by with average', () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, _AT, [tf.account().name(), tf.count()])
-      .groupByOp(tf.account().name())
+      .groupBy(tf.account().name())
       .orderBy(tf.account().name().ascending())
       .toRows();
     const counts = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
