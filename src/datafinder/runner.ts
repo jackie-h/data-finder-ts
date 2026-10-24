@@ -39,6 +39,7 @@ export interface QueryRunner {
     limit?: number,
     timeoutMs?: number,
     businessDateTo?: Date | null,
+    distinct?: boolean,
   ): Promise<Row[]>;
 }
 
@@ -62,6 +63,7 @@ export class FinderResult {
   private _orderBy: SortOperation[] = [];
   private _groupBy: Attribute[] = [];
   private _limit?: number;
+  private _distinct = false;
   private _timeoutMs: number = DEFAULT_TIMEOUT_MS;
 
   constructor(
@@ -93,6 +95,12 @@ export class FinderResult {
     return this;
   }
 
+  /** Return each distinct row once: `SELECT DISTINCT`. A sort on a distinct query has to use a selected column. */
+  distinct(): this {
+    this._distinct = true;
+    return this;
+  }
+
   /** Abort the query and throw QueryTimeoutError if it runs longer than `milliseconds` (default 60000). */
   timeout(milliseconds: number): this {
     this._timeoutMs = milliseconds;
@@ -110,6 +118,7 @@ export class FinderResult {
       this._groupBy,
       this._limit,
       this._businessDateTo,
+      this._distinct,
     );
   }
 
@@ -125,6 +134,7 @@ export class FinderResult {
       this._limit,
       this._timeoutMs,
       this._businessDateTo,
+      this._distinct,
     );
   }
 }

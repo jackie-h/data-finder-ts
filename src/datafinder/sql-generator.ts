@@ -425,6 +425,7 @@ function buildQueryOperation(
   groupBy: Attribute[] = [],
   limit?: number,
   businessDateTo: Date | null = null,
+  distinct: boolean = false,
 ): SelectOperation {
   let filter = op;
   const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) =>
@@ -467,7 +468,7 @@ function buildQueryOperation(
     if (combined !== undefined) joinFilters.set(node, combined);
   }
 
-  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters);
+  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct);
 }
 
 /**
@@ -489,6 +490,7 @@ class SQLQueryGenerator {
   private _orderByParts: string[] = [];
   private _where = '';
   private _limit?: number;
+  private _distinct = false;
   private _tableAliasIncr = 0;
   private _tableAliasesByTable = new Map<unknown, TableAlias>();
   private _addedJoinIds = new Set<JoinTreeNodeOperation>();
@@ -517,6 +519,7 @@ class SQLQueryGenerator {
       this.buildFilter(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
     );
     this._limit = select.limit;
+    this._distinct = select.distinct;
   }
 
   private _attrToColString(attr: Attribute): string {
@@ -803,7 +806,7 @@ class SQLQueryGenerator {
       (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
-    return 'SELECT ' + this._select.map(ca => sqlOperationToString(ca)).join(',') +
+    return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca)).join(',') +
       ' FROM ' + Array.from(this._from).map(ta => ta.table + ' AS ' + ta.alias).join(',') +
       joins.join('') +
       this._buildWhere() +
@@ -842,8 +845,9 @@ export function toSql(
   groupBy: Attribute[] = [],
   limit?: number,
   businessDateTo: Date | null = null,
+  distinct: boolean = false,
 ): string {
-  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo);
+  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct);
   return selectSqlToString(selectOp);
 }
 

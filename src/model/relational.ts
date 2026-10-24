@@ -469,5 +469,7 @@ export class SelectOperation {
      * Held here rather than on the shared JoinOperation, so queries that use the same node can't affect each other.
      */
     readonly joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map(),
+    /** Whether each distinct row is returned once (`SELECT DISTINCT`). */
+    readonly distinct: boolean = false,
   ) {}
 }
