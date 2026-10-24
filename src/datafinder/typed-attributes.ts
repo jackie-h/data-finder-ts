@@ -1,4 +1,4 @@
-import { Attribute } from './attribute';
+import { Attribute, AttributeValue } from './attribute';
 import {
   ComparisonOperation,
   ComparisonOperator,
@@ -8,6 +8,7 @@ import {
   IntegerConstantOperation,
   DateConstantOperation,
   DateTimeConstantOperation,
+  ConstantOperation,
   DateOnly,
   DATE_ONLY_PATTERN,
   BooleanConstantOperation,
@@ -32,6 +33,10 @@ export class StringAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
+
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new StringConstantOperation(String(value));
+  }
 
   /** Convert every character to uppercase. */
   toUpperCase(): ScalarFunctionOperation {
@@ -179,6 +184,10 @@ export class DoubleAttribute extends NumericAttribute {
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new FloatConstantOperation(Number(value));
+  }
+
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number): Operation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new FloatConstantOperation(value));
@@ -218,6 +227,10 @@ export class DecimalAttribute extends NumericAttribute {
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new DecimalConstantOperation(Number(value));
+  }
+
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number): Operation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new DecimalConstantOperation(value));
@@ -254,6 +267,10 @@ export class IntegerAttribute extends NumericAttribute {
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new IntegerConstantOperation(Number(value));
+  }
+
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number): Operation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new IntegerConstantOperation(value));
@@ -289,6 +306,10 @@ export class BooleanAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
+
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new BooleanConstantOperation(Boolean(value));
+  }
 
   /** Filter to rows where this attribute equals `value`. */
   eq(value: boolean): Operation {
@@ -330,6 +351,10 @@ export class DateAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
+
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new DateConstantOperation(parseDate(value as Date | string));
+  }
 
   /** Filter to rows where this date equals `value`. */
   eq(value: Date | string): Operation {
@@ -399,6 +424,10 @@ export class DateTimeAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
+
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return temporalConstant(value as Date | string);
+  }
 
   /** Filter to rows where this timestamp equals `value`. */
   eq(value: Date | string): Operation {
