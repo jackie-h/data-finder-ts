@@ -8,6 +8,8 @@ import {
   DateConstantOperation,
   DateTimeConstantOperation,
   IsNotNullOperation,
+  InOperation,
+  NotInOperation,
   IsNullOperation,
   LogicalOperation,
   LogicalOperator,
@@ -145,6 +147,10 @@ function opToWhereClause(op: RelationalOperationElement | null | undefined): str
     const logical = op.operator === LogicalOperator.AND ? '_and' : '_or';
     return `{ ${logical}: [${left}, ${right}] }`;
   }
+  if (op instanceof InOperation || op instanceof NotInOperation) {
+    const gqlOp = op instanceof InOperation ? '_in' : '_nin';
+    return nest(fieldName(op.element, 'a filter'), `{ ${gqlOp}: [${op.values.map(gqlValue).join(', ')}] }`);
+  }
   if (op instanceof IsNullOperation) return nest(fieldName(op.element, 'a null check'), '{ _is_null: true }');
   if (op instanceof IsNotNullOperation) return nest(fieldName(op.element, 'a null check'), '{ _is_null: false }');
   throw new GraphQLPushdownError(`Cannot push ${op.constructor.name} to the server`);
@@ -195,7 +201,8 @@ export function buildServerArgs(
 function opRawNames(op: RelationalOperationElement | null | undefined): Set<string> {
   if (op instanceof ComparisonOperation && op.left instanceof ColumnWithJoin) return new Set([op.left.column.name]);
   if (op instanceof LogicalOperation) return new Set([...opRawNames(op.left), ...opRawNames(op.right)]);
-  if ((op instanceof IsNullOperation || op instanceof IsNotNullOperation) && op.element instanceof ColumnWithJoin) {
+  if ((op instanceof IsNullOperation || op instanceof IsNotNullOperation ||
+       op instanceof InOperation || op instanceof NotInOperation) && op.element instanceof ColumnWithJoin) {
     return new Set([op.element.column.name]);
   }
   return new Set();

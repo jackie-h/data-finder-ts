@@ -120,6 +120,16 @@ export class IsNullOperation extends UnaryOperation {}
 
 export class IsNotNullOperation extends UnaryOperation {}
 
+/** The element is one of `values` (`element IN (...)`). */
+export class InOperation extends UnaryOperation {
+  constructor(element: RelationalOperationElement, readonly values: ConstantOperation[]) { super(element); }
+}
+
+/** The element is none of `values` (`element NOT IN (...)`). */
+export class NotInOperation extends UnaryOperation {
+  constructor(element: RelationalOperationElement, readonly values: ConstantOperation[]) { super(element); }
+}
+
 export class ComparisonOperation extends BinaryOperation {
   constructor(
     left: RelationalOperationElement,
