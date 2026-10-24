@@ -732,6 +732,49 @@ export class ArithmeticOperation extends BinaryOperation implements Aliasable, S
   comparisonOperand(): RelationalOperationElement { return this; }
 }
 
+/** Text joined end to end. A NULL in any part makes the whole NULL, as with SQL's `||`. */
+export class ConcatOperation extends Operation implements Aliasable, Sortable {
+  constructor(
+    readonly parts: RelationalOperationElement[],
+    readonly displayName?: string,
+  ) { super(); }
+
+  /** Join more text on the end: `f.first().concat(' ', f.last())`. A concatenation joins into one. */
+  concat(...more: ConcatPart[]): ConcatOperation { return concat(this, ...more); }
+
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+
+  comparisonOperand(): RelationalOperationElement { return this; }
+}
+
+/** What can be joined as text: a string, a text column, a function that gives text, or another concatenation. */
+export type ConcatPart = string | { functionInput(): RelationalOperationElement } | ConcatOperation;
+
+/**
+ * Join text: `concat(f.name(), ' (', f.category(), ')')`. A string is a constant; a concatenation among the
+ * parts is flattened into one.
+ */
+export function concat(...parts: ConcatPart[]): ConcatOperation {
+  const partsOf = (part: ConcatPart): RelationalOperationElement[] => {
+    if (part instanceof ConcatOperation) return part.parts;
+    if (typeof part === 'string') return [new StringConstantOperation(part)];
+    if (part instanceof RelationalOperationElement) return [part];
+    if (part !== null && typeof part === 'object' && typeof part.functionInput === 'function') return [part.functionInput()];
+    throw new TypeError(`Text is joined with text, not ${part === null ? 'null' : typeof part}`);
+  };
+  return new ConcatOperation(parts.flatMap(partsOf));
+}
+
+export interface ConcatOperation extends Comparable {}
+applyMixins(ConcatOperation, [Comparable]);
+
 export interface ArithmeticOperation extends Arithmetic, Comparable {}
 applyMixins(ArithmeticOperation, [Arithmetic, Comparable]);
 

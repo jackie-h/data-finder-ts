@@ -85,6 +85,10 @@ The result of a function has the functions of its type, so they chain: `cf.name(
 
 A numeric column, aggregate, number function or another calculation has `.plus()`, `.minus()`, `.times()` and `.dividedBy()`, with a number or another numeric expression on the other side: `tf.price().times(tf.quantity())`, `tf.price().plus(1.5)`. A number on the left is a constant: `constant(100).minus(tf.price())`. Parentheses are written only where the meaning needs them, so `tf.price().plus(1).times(2)` is `(t0.price + 1) * 2` and `a.minus(b.minus(1))` keeps its brackets. A result is named "Expression" unless `.alias()` names it, and can be compared (`tf.price().times(2).gte(8)`), sorted and aliased. A query that holds an aggregate in a calculation is grouped like any other aggregate. The GraphQL runner does not compute it on the client.
 
+### Joining text
+
+`.concat(...parts)` on a text column or a function that gives text joins text, where Python writes `+`: `cf.name().concat(' (', cf.category(), ')')`. A part is a string, a text column, a function that gives text, or another concatenation, and `concat(...)` starts one from anything: `concat('Company: ', cf.name())`. Concatenations join into one, so `a.concat('-').concat(b)` is `a || '-' || b`. A NULL in any part makes the whole result NULL, as with SQL's `||`. The result is named "Expression" unless `.alias()` names it, and can be compared, sorted and aliased. The GraphQL runner does not compute it on the client.
+
 ## Sorting
 
 Sort with `.orderBy()` and limit with `.limit()`. Several `orderBy` calls accumulate: the latest call takes priority and the earlier ones break its ties, so the two sorts below order by category and then by name. Sorting a column again replaces its earlier direction.

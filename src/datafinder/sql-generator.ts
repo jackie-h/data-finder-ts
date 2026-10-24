@@ -45,6 +45,7 @@ import {
   SelectOperation,
   BinaryOperation,
   CaseOperation,
+  ConcatOperation,
   ArithmeticOperation,
   ArithmeticOperator,
   containsAggregate,
@@ -281,6 +282,7 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
   if (operation instanceof CountAllOperation) return 'COUNT(*)';
   if (operation instanceof ConstantOperation) return selectedConstantString(operation);
   if (operation instanceof RenderedSql) return operation.sql;
+  if (operation instanceof ConcatOperation) return operation.parts.map(operandString).join(' || ');
   if (operation instanceof ArithmeticOperation) {
     let left = operandString(operation.left);
     let right = operandString(operation.right);
@@ -443,6 +445,8 @@ function walkRefs(
     walkRefs((op as UnaryOperation).element, visit, visitExists);
   } else if (op instanceof Alias) {
     walkRefs(op.element, visit, visitExists);
+  } else if (op instanceof ConcatOperation) {
+    for (const part of op.parts) walkRefs(part, visit, visitExists);
   } else if (op instanceof ArithmeticOperation) {
     walkRefs(op.left, visit, visitExists);
     walkRefs(op.right, visit, visitExists);
@@ -737,6 +741,7 @@ class SQLQueryGenerator {
       );
     }
     if (op instanceof CaseOperation) return new RenderedSql(this._caseSql(op));
+    if (op instanceof ConcatOperation) return new ConcatOperation(op.parts.map(part => this._rewriteOperation(part)), op.displayName);
     if (op instanceof ArithmeticOperation) {
       return new ArithmeticOperation(this._rewriteOperation(op.left), op.operator, this._rewriteOperation(op.right), op.displayName);
     }
@@ -853,6 +858,8 @@ class SQLQueryGenerator {
       this._select.push(new Alias(aliasedOp, alias));
     } else if (col instanceof CaseOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
+    } else if (col instanceof ConcatOperation) {
+      this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (col instanceof ArithmeticOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (isCondition(col)) {
@@ -925,7 +932,7 @@ class SQLQueryGenerator {
       return sql;
     }
     if (op instanceof ConstantOperation) return constantValueString(op);
-    if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation) {
+    if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation || op instanceof ConcatOperation) {
       // an expression compared in a filter needs its columns' joins, then is written as in a select list
       const required = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
       this._collectRequiredJoins(op, required);
