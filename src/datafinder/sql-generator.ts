@@ -199,6 +199,17 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
   if (operation instanceof AggregateOperation && operation.operator === AggregateOperator.COUNT_DISTINCT) {
     return 'COUNT(DISTINCT ' + sqlOperationToString(operation.element) + ')';
   }
+  if (operation instanceof AggregateOperation && operation.operator === AggregateOperator.STRING_AGG) {
+    let sql = 'STRING_AGG(' + sqlOperationToString(operation.element) + ', ' + sqlStringLiteral(operation.separator ?? '');
+    if (operation.orderBy.length > 0) {
+      sql += ' ORDER BY ' + operation.orderBy.map(s =>
+        sqlOperationToString(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
+      ).join(', ');
+    }
+    sql += ')';
+    if (operation.window !== undefined) sql += ' ' + windowSpecToString(operation.window);
+    return sql;
+  }
   if (operation instanceof AggregateOperation) {
     const fn = AGGREGATE_SQL_NAMES[operation.operator] ?? operation.operator;
     let sql = fn + '(' + sqlOperationToString(operation.element) + ')';
@@ -373,6 +384,7 @@ function walkRefs(
   } else if (op instanceof AggregateOperation) {
     walkRefs(op.element, visit, visitExists);
     if (op.window) walkWindowSpec(op.window, visit, visitExists);
+    for (const sort of op.orderBy) walkRefs(sort, visit, visitExists);
   } else if (op instanceof WindowFunctionOperation) {
     if (op.element) walkRefs(op.element, visit, visitExists);
     if (op.window) walkWindowSpec(op.window, visit, visitExists);
@@ -666,6 +678,7 @@ class SQLQueryGenerator {
       return new AggregateOperation(
         this._rewriteOperation(op.element), op.operator, op.displayName,
         op.window ? this._rewriteWindowSpec(op.window) : undefined,
+        op.separator, op.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column), s.direction)),
       );
     }
     if (op instanceof WindowFunctionOperation) {
@@ -744,6 +757,7 @@ class SQLQueryGenerator {
       const rewrittenAgg = new AggregateOperation(
         new TableAliasColumn(colNested.column, ta), col.operator, undefined,
         col.window ? this._rewriteWindowSpec(col.window) : undefined,
+        col.separator, col.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column), s.direction)),
       );
       this._select.push(new Alias(rewrittenAgg, alias));
     } else if (col instanceof ScalarFunctionOperation) {

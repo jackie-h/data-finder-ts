@@ -31,6 +31,7 @@ export enum AggregateOperator {
   MIN = 'MIN',
   MAX = 'MAX',
   AVERAGE = 'AVERAGE',
+  STRING_AGG = 'STRING_AGG',
   COUNT_DISTINCT = 'COUNT_DISTINCT',
 }
 
@@ -226,11 +227,15 @@ export class AggregateOperation extends UnaryOperation implements Aliasable, Sor
     readonly operator: AggregateOperator,
     readonly displayName?: string,
     readonly window?: WindowSpecification,
+    /** For STRING_AGG: what goes between the values. */
+    readonly separator?: string,
+    /** For STRING_AGG: the order the values are joined in. */
+    readonly orderBy: SortOperation[] = [],
   ) { super(element); }
 
   over(partitionBy?: RelationalOperationElement[], orderBy?: SortOperation[]): AggregateOperation {
     return new AggregateOperation(this.element, this.operator, this.displayName,
-      new WindowSpecification(partitionBy ?? [], orderBy ?? []));
+      new WindowSpecification(partitionBy ?? [], orderBy ?? []), this.separator, this.orderBy);
   }
 }
 

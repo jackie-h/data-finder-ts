@@ -16,6 +16,7 @@ import {
   DecimalConstantOperation,
   AggregateOperation,
   AggregateOperator,
+  SortOperation,
   ScalarFunction,
   ScalarFunctionOperation,
   DatePart,
@@ -38,6 +39,14 @@ export class StringAttribute extends Attribute {
 
   protected toConstant(value: AttributeValue): ConstantOperation {
     return new StringConstantOperation(String(value));
+  }
+
+  /**
+   * Join the values of a group into one text with `separator` between them. `orderBy` is the order they are
+   * joined in (`[f.name().ascending()]`); without it the order is not defined. Missing values are skipped.
+   */
+  join(separator: string = '', orderBy: SortOperation[] = []): AggregateOperation {
+    return new AggregateOperation(this.cwj(), AggregateOperator.STRING_AGG, 'Join ' + this.displayName(), undefined, separator, orderBy);
   }
 
   /** Convert every character to uppercase. */
