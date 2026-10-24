@@ -294,7 +294,16 @@ export class ScalarFunctionOperation extends UnaryOperation implements Aliasable
     readonly secondArg?: number,
     readonly extraArgs: (string | number | boolean)[] = [],
   ) { super(element); }
+
+  /** This expression as an operand of a comparison. */
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
+
+/** The functions that give a number, which arithmetic and `Numeric` functions apply to. */
+export const NUMERIC_FUNCTIONS: ReadonlySet<ScalarFunction> = new Set([
+  ScalarFunction.ABS, ScalarFunction.CEILING, ScalarFunction.FLOOR, ScalarFunction.MOD,
+  ScalarFunction.POWER, ScalarFunction.SQRT, ScalarFunction.ROUND, ScalarFunction.LENGTH,
+]);
 
 export class DateExtractOperation extends UnaryOperation implements Aliasable, Sortable {
   /** Name this column in the result. */
@@ -579,3 +588,63 @@ export function containsAggregate(op: unknown): boolean {
   if (op instanceof UnaryOperation || op instanceof Alias) return containsAggregate(op.element);
   return false;
 }
+
+/** A plain value as the constant it compares with. */
+export function valueOperand(value: unknown): ConstantOperation {
+  if (typeof value === 'boolean') return new BooleanConstantOperation(value);
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Number.isInteger(value) ? new IntegerConstantOperation(value) : new FloatConstantOperation(value);
+  }
+  if (typeof value === 'string') return new StringConstantOperation(value);
+  if (value instanceof DateOnly) return new DateConstantOperation(value); // before Date: DateOnly is a Date
+  if (value instanceof Date) return new DateTimeConstantOperation(value);
+  throw new TypeError(`A value to compare with is a boolean, a finite number, a string or a date, not ${value === null ? 'null' : typeof value}`);
+}
+
+/** The thing to compare or calculate with: an expression as it is, an attribute as its column, a value as a constant. */
+export function operandOf(other: unknown): RelationalOperationElement {
+  if (other instanceof RelationalOperationElement) return other;
+  if (typeof (other as { cwj?: unknown } | null)?.cwj === 'function') return (other as { cwj(): ColumnWithJoin }).cwj();
+  return valueOperand(other);
+}
+
+/**
+ * Comparisons for an expression, as for a column: `f.name().toUpperCase().eq('ACME')`, `f.name().length().gt(10)`.
+ * The other side is a value or another expression. Each gives a filter. Mixed into the expressions that have it.
+ */
+export abstract class Comparable {
+  abstract comparisonOperand(): RelationalOperationElement;
+
+  private _compared(operator: ComparisonOperator, other: unknown): ComparisonOperation {
+    return new ComparisonOperation(this.comparisonOperand(), operator, operandOf(other));
+  }
+
+  /** Filter to rows where this expression equals `other`. */
+  eq(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.EQUAL, other); }
+  /** Filter to rows where this expression does not equal `other`. */
+  ne(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.NOT_EQUAL, other); }
+  /** Filter to rows where this expression is less than `other`. */
+  lt(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.LESS_THAN, other); }
+  /** Filter to rows where this expression is at most `other`. */
+  lte(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, other); }
+  /** Filter to rows where this expression is greater than `other`. */
+  gt(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.GREATER_THAN, other); }
+  /** Filter to rows where this expression is at least `other`. */
+  gte(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, other); }
+}
+
+/**
+ * Mix the methods of the base classes into `derived`, the TypeScript handbook's way to inherit from more than
+ * one class: the type side comes from an `interface Derived extends Base {}` beside the class.
+ */
+export function applyMixins(derived: { prototype: object }, bases: { prototype: object }[]): void {
+  for (const base of bases) {
+    for (const name of Object.getOwnPropertyNames(base.prototype)) {
+      if (name === 'constructor') continue;
+      Object.defineProperty(derived.prototype, name, Object.getOwnPropertyDescriptor(base.prototype, name)!);
+    }
+  }
+}
+
+export interface ScalarFunctionOperation extends Comparable {}
+applyMixins(ScalarFunctionOperation, [Comparable]);

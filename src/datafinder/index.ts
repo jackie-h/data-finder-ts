@@ -1,6 +1,7 @@
 export { Attribute } from './attribute';
 export { registerRelatedFinderClass, getRelatedFinderClass } from './finder-registry';
 export * from './typed-attributes';
+export { StringFunctionOperation, NumericFunctionOperation } from './scalar-functions';
 export { constant } from './expressions';
 export { when } from './conditional';
 export { toSql, selectSqlToString } from './sql-generator';
