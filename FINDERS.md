@@ -68,11 +68,14 @@ Custom `QueryRunner`s receive the timeout as the last argument to `select`.
 | `DateAttribute` `DateTimeAttribute` | `.eq(v)` `.gt(v)` `.lt(v)` `.gte(v)` `.lte(v)` |
 | `BooleanAttribute` | `.eq(v)` |
 
-Combine with `.andOp()`:
+Combine with `.andOp()` and `.orOp()`. A chain reads left to right, each call taking everything before it as its left side, so the first line below is `(name is Acme or name is Beta) and id > 100` and the second is `(name is Acme and id > 100) or name is Beta`:
 
 ```ts
-af.name().eq('Acme').andOp(af.id().gt(100))
+af.name().eq('Acme').orOp(af.name().eq('Beta')).andOp(af.id().gt(100))
+af.name().eq('Acme').andOp(af.id().gt(100)).orOp(af.name().eq('Beta'))
 ```
+
+To group differently, build the part that should bind first and combine it on the other side, e.g. `a.orOp(b.andOp(c))`.
 
 ## Joins
 
