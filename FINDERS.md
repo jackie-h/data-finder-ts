@@ -79,12 +79,12 @@ To group differently, build the part that should bind first and combine it on th
 
 ## Sorting
 
-Sort with `.orderByOp()` and limit with `.limit()`. Several `orderByOp` calls accumulate: the latest call takes priority and the earlier ones break its ties, so the two sorts below order by category and then by name. Sorting a column again replaces its earlier direction.
+Sort with `.orderBy()` and limit with `.limit()`. Several `orderBy` calls accumulate: the latest call takes priority and the earlier ones break its ties, so the two sorts below order by category and then by name. Sorting a column again replaces its earlier direction.
 
 ```ts
 cf.findAll(null, null, [cf.name(), cf.category()])
-  .orderByOp(cf.name().ascending())
-  .orderByOp(cf.category().ascending())
+  .orderBy(cf.name().ascending())
+  .orderBy(cf.category().ascending())
 ```
 
 ## Joins

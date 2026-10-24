@@ -5,7 +5,7 @@ import type { EmployeeFinder } from '../../generated_examples/orgchart/EmployeeF
 export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'all_employees',
-    query: f => f.findAll(null, null, [f.id(), f.name()]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.name()]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Name'], rows: [
         [1, 'Alice'],
         [2, 'Bob'],
@@ -29,7 +29,7 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'filter_by_manager_alice',
-    query: f => f.findAll(null, null, [f.name()], f.manager().name().eq('Alice')).orderByOp(f.name().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.manager().name().eq('Alice')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Bob'],
         ['Carol'],

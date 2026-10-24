@@ -63,12 +63,12 @@ export abstract class Attribute {
     );
   }
 
-  /** Sort this attribute in ascending order. Pass to `orderByOp` or a window function's `orderBy`. */
+  /** Sort this attribute in ascending order. Pass to `orderBy` or a window function's `orderBy`. */
   ascending(): SortOperation {
     return new SortOperation(this.cwj(), SortDirection.ASC);
   }
 
-  /** Sort this attribute in descending order. Pass to `orderByOp` or a window function's `orderBy`. */
+  /** Sort this attribute in descending order. Pass to `orderBy` or a window function's `orderBy`. */
   descending(): SortOperation {
     return new SortOperation(this.cwj(), SortDirection.DESC);
   }

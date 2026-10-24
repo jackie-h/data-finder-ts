@@ -1,4 +1,4 @@
-/** Chained orderByOp calls accumulate: the latest call's sorts are primary and earlier ones break their ties. */
+/** Chained orderBy calls accumulate: the latest call's sorts are primary and earlier ones break their ties. */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb } from './duckdb-runner';
@@ -13,24 +13,24 @@ const orderOf = (r: unknown) => (r as { _orderBy: { column: { column: { name: st
   ._orderBy.map(s => [s.column.column.name, s.direction]);
 const [a, b, c] = ['a', 'b', 'c'].map(n => new StringAttribute(n.toUpperCase(), n, 'VARCHAR', 't'));
 
-describe('orderByOp accumulates', () => {
+describe('orderBy accumulates', () => {
   it('makes the later call primary', () => {
-    expect(orderOf(result().orderByOp(a.ascending()).orderByOp(b.descending())))
+    expect(orderOf(result().orderBy(a.ascending()).orderBy(b.descending())))
       .toEqual([['b', SortDirection.DESC], ['a', SortDirection.ASC]]);
   });
 
   it('keeps the order within one call', () => {
-    expect(orderOf(result().orderByOp(a.ascending(), b.descending())))
+    expect(orderOf(result().orderBy(a.ascending(), b.descending())))
       .toEqual([['a', SortDirection.ASC], ['b', SortDirection.DESC]]);
   });
 
   it('runs three calls newest first', () => {
-    expect(orderOf(result().orderByOp(a.ascending()).orderByOp(b.ascending()).orderByOp(c.ascending())).map(([n]) => n))
+    expect(orderOf(result().orderBy(a.ascending()).orderBy(b.ascending()).orderBy(c.ascending())).map(([n]) => n))
       .toEqual(['c', 'b', 'a']);
   });
 
   it('replaces the earlier direction when a column is sorted again', () => {
-    expect(orderOf(result().orderByOp(a.ascending(), b.ascending()).orderByOp(a.descending())))
+    expect(orderOf(result().orderBy(a.ascending(), b.ascending()).orderBy(a.descending())))
       .toEqual([['a', SortDirection.DESC], ['b', SortDirection.ASC]]);
   });
 
@@ -38,7 +38,7 @@ describe('orderByOp accumulates', () => {
     const join = new JoinOperation('Other', new Table('other', []), new Column('fk', 'INT', 't'), new Column('id', 'INT', 'other'));
     const joined = new StringAttribute('Other Name', 'name', 'VARCHAR', 'other', new JoinTreeNodeOperation(join));
     const own = new StringAttribute('Name', 'name', 'VARCHAR', 't');
-    expect(orderOf(result().orderByOp(own.ascending()).orderByOp(joined.ascending()))).toHaveLength(2);
+    expect(orderOf(result().orderBy(own.ascending()).orderBy(joined.ascending()))).toHaveLength(2);
   });
 
   it('means no ordering when never called', () => {
@@ -61,9 +61,9 @@ describe('against DuckDB', () => {
   it('sorts by category, then name', async () => {
     const f = new CompanyFinder();
     const chained = await f.findAll(null, null, [f.name(), f.category()])
-      .orderByOp(f.name().ascending()).orderByOp(f.category().ascending()).toRows();
+      .orderBy(f.name().ascending()).orderBy(f.category().ascending()).toRows();
     const single = await f.findAll(null, null, [f.name(), f.category()])
-      .orderByOp(f.category().ascending(), f.name().ascending()).toRows();
+      .orderBy(f.category().ascending(), f.name().ascending()).toRows();
     expect(chained).toEqual(single);
   });
 });
