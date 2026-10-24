@@ -26,9 +26,9 @@ def create_instrument_class() -> Class:
 
 
 def create_trade_class(account: Class, instrument: Class) -> Class:
-    p1 = Property('Symbol', 'symbol', String, [create_description('The symbol of the instrument traded')])
-    p2 = Property('Price', 'price', Float, [create_description('The current price of the trade')])
-    p3 = Property('Account', 'account', account, [create_description('The trading account')])
+    p1 = Property('Symbol', 'symbol', String, tagged_values=[create_description('The symbol of the instrument traded')])
+    p2 = Property('Price', 'price', Float, tagged_values=[create_description('The current price of the trade')])
+    p3 = Property('Account', 'account', account, tagged_values=[create_description('The trading account')])
     p4 = Property('Valid From', 'validFrom', DateTime)
     p5 = Property('Valid To', 'validTo', DateTime)
     p6 = Property('Instrument', 'instrument', instrument)

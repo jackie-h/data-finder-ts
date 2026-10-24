@@ -392,6 +392,11 @@ export class JoinTreeNodeOperation {
   constructor(
     readonly join: JoinOperation,
     readonly parent?: JoinTreeNodeOperation,
+    /**
+     * True when the property this step follows is to-many, so a value read through it repeats the row. As in
+     * Pure, that is the multiplicity of the property, not something the join itself says.
+     */
+    readonly many: boolean = false,
   ) {}
 }
 
@@ -476,4 +481,20 @@ export class SelectOperation {
     /** How many rows to skip before the first one returned. */
     readonly offset?: number,
   ) {}
+}
+
+/** Whether `op` holds an aggregate, a window function or a count. */
+export function containsAggregateOrWindow(op: unknown): boolean {
+  if (op instanceof AggregateOperation || op instanceof WindowFunctionOperation || op instanceof CountAllOperation) return true;
+  if (op instanceof BinaryOperation) return containsAggregateOrWindow(op.left) || containsAggregateOrWindow(op.right);
+  if (op instanceof UnaryOperation || op instanceof Alias) return containsAggregateOrWindow(op.element);
+  return false;
+}
+
+/** Whether `op` collapses rows: an aggregate or a count. Window functions keep every row. */
+export function containsAggregate(op: unknown): boolean {
+  if (op instanceof AggregateOperation || op instanceof CountAllOperation) return true;
+  if (op instanceof BinaryOperation) return containsAggregate(op.left) || containsAggregate(op.right);
+  if (op instanceof UnaryOperation || op instanceof Alias) return containsAggregate(op.element);
+  return false;
 }

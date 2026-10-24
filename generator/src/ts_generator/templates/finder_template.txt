@@ -89,9 +89,9 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
     new Column('{{rcm.milestone_mapping._date.target.name}}', '{{rcm.milestone_mapping._date.target.type}}'),
   );
 {% endif %}
-  private static readonly _table = new MilestonedTable('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', [], {{rcm.clazz.name}}RelatedFinder._milestoningColumns);
+  private static readonly _table = new MilestonedTable('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', [{% for rpm in rcm.property_mappings %}{% if is_primitive(rpm.property) and rpm.target.primary_key %}new Column('{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', true), {% endif %}{% endfor %}], {{rcm.clazz.name}}RelatedFinder._milestoningColumns);
 {% else %}
-  private static readonly _table = new Table('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', []);
+  private static readonly _table = new Table('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', [{% for rpm in rcm.property_mappings %}{% if is_primitive(rpm.property) and rpm.target.primary_key %}new Column('{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', true), {% endif %}{% endfor %}]);
 {% endif %}
 
   /** Property id -> [column, type, table] for the filters accepted by related-finder accessors. */
@@ -117,19 +117,19 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   private _{{reverse_name}}?: {{source_rcm.clazz.name}}RelatedFinder;
 {% endfor %}
 
-  constructor(relationName: string, source: Column, target: Column, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{rcm.clazz.name}}Filter) {
+  constructor(relationName: string, source: Column, target: Column, many: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{rcm.clazz.name}}Filter) {
     super();
     const join = new JoinOperation(relationName, {{rcm.clazz.name}}RelatedFinder._table, source, target);
     if (filter) {
       join.filterKwargs = filter as Record<string, unknown>;
       join.filterColumnMap = {{rcm.clazz.name}}RelatedFinder._filterColumns;
     }
-    this._node = new JoinTreeNodeOperation(join, parentJoin);
+    this._node = new JoinTreeNodeOperation(join, parentJoin, many);
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
     this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(displayPrefix(relationName, parentJoin) + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node, embedded?.['{{rpm.property.id}}']{% if rpm.target.nullable is defined and not rpm.target.nullable %}, false{% endif %});
 {% elif rpm.property.type.name != rcm.clazz.name %}
-    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node, {% if flatten_embedded(rpm.target) %}embeddedFor_{{to_ts_name(rpm.property)}}(embedded, this._node, '{{rpm.property.name}}'){% else %}embeddedUnder(embedded, '{{rpm.property.id}}.'){% endif %});
+    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), {{ 'true' if rpm.property.multiplicity is not none and rpm.property.multiplicity.is_many() else 'false' }}, this._node, {% if flatten_embedded(rpm.target) %}embeddedFor_{{to_ts_name(rpm.property)}}(embedded, this._node, '{{rpm.property.name}}'){% else %}embeddedUnder(embedded, '{{rpm.property.id}}.'){% endif %});
 {% endif %}
 {% endfor %}
   }
@@ -144,9 +144,9 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% elif rpm.property.type.name == rcm.clazz.name %}
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinder {
-    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node, undefined, filter);
+    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), {{ 'true' if rpm.property.multiplicity is not none and rpm.property.multiplicity.is_many() else 'false' }}, this._node, undefined, filter);
     if (!this._{{to_ts_name(rpm.property)}}) {
-      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node);
+      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), {{ 'true' if rpm.property.multiplicity is not none and rpm.property.multiplicity.is_many() else 'false' }}, this._node);
     }
     return this._{{to_ts_name(rpm.property)}}!;
   }
@@ -154,7 +154,7 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% else %}
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinder {
-    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node, undefined, filter);
+    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), {{ 'true' if rpm.property.multiplicity is not none and rpm.property.multiplicity.is_many() else 'false' }}, this._node, undefined, filter);
     return this._{{to_ts_name(rpm.property)}};
   }
 
@@ -162,11 +162,11 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
   {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter): {{source_rcm.clazz.name}}RelatedFinder {
-    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter) => {{source_rcm.clazz.name}}RelatedFinder;
+    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter) => {{source_rcm.clazz.name}}RelatedFinder;
     if (!_Cls) throw new Error('{{source_rcm.clazz.name}}RelatedFinder not registered. Import {{source_rcm.clazz.name}}Finder before calling {{reverse_name}}().');
-    if (filter) return new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), this._node, undefined, filter);
+    if (filter) return new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), {{ 'true' if assoc.source_multiplicity.is_many() else 'false' }}, this._node, undefined, filter);
     if (!this._{{reverse_name}}) {
-      this._{{reverse_name}} = new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), this._node);
+      this._{{reverse_name}} = new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), {{ 'true' if assoc.source_multiplicity.is_many() else 'false' }}, this._node);
     }
     return this._{{reverse_name}}!;
   }
@@ -216,16 +216,16 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
     new Column('{{rcm.milestone_mapping._date.target.name}}', '{{rcm.milestone_mapping._date.target.type}}'),
   );
 {% endif %}
-  private static readonly _table = new MilestonedTable('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', [], {{rcm.clazz.name}}Finder._milestoningColumns);
+  private static readonly _table = new MilestonedTable('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', [{% for rpm in rcm.property_mappings %}{% if is_primitive(rpm.property) and rpm.target.primary_key %}new Column('{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', true), {% endif %}{% endfor %}], {{rcm.clazz.name}}Finder._milestoningColumns);
 {% else %}
-  private static readonly _table = new Table('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', []);
+  private static readonly _table = new Table('{{table_qualified_name(rcm.property_mappings[0].target.table)}}', [{% for rpm in rcm.property_mappings %}{% if is_primitive(rpm.property) and rpm.target.primary_key %}new Column('{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', true), {% endif %}{% endfor %}]);
 {% endif %}
 
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
   private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute('{{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}'{% if rpm.target.nullable is defined and not rpm.target.nullable %}, undefined, undefined, false{% endif %});
 {% elif rpm.property.type.name != rcm.clazz.name %}
-  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'){% if flatten_embedded(rpm.target) %}, undefined, embeddedFor_{{to_ts_name(rpm.property)}}(undefined, undefined, '{{rpm.property.name}}'){% endif %});
+  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), {{ 'true' if rpm.property.multiplicity is not none and rpm.property.multiplicity.is_many() else 'false' }}{% if flatten_embedded(rpm.target) %}, undefined, embeddedFor_{{to_ts_name(rpm.property)}}(undefined, undefined, '{{rpm.property.name}}'){% endif %});
 {% endif %}
 {% endfor %}
 {% for rpm in rcm.property_mappings %}
@@ -247,9 +247,9 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% elif rpm.property.type.name == rcm.clazz.name %}
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinder {
-    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), undefined, undefined, filter);
+    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), {{ 'true' if rpm.property.multiplicity is not none and rpm.property.multiplicity.is_many() else 'false' }}, undefined, undefined, filter);
     if (!this._{{to_ts_name(rpm.property)}}) {
-      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'));
+      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), {{ 'true' if rpm.property.multiplicity is not none and rpm.property.multiplicity.is_many() else 'false' }});
     }
     return this._{{to_ts_name(rpm.property)}}!;
   }
@@ -257,7 +257,7 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% else %}
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinder {
-    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), undefined, undefined, filter);
+    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), {{ 'true' if rpm.property.multiplicity is not none and rpm.property.multiplicity.is_many() else 'false' }}, undefined, undefined, filter);
     return {{rcm.clazz.name}}Finder._{{to_ts_name(rpm.property)}};
   }
 
@@ -265,11 +265,11 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
   {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter): {{source_rcm.clazz.name}}RelatedFinder {
-    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter) => {{source_rcm.clazz.name}}RelatedFinder;
+    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter) => {{source_rcm.clazz.name}}RelatedFinder;
     if (!_Cls) throw new Error('{{source_rcm.clazz.name}}RelatedFinder not registered. Import {{source_rcm.clazz.name}}Finder before calling {{reverse_name}}().');
-    if (filter) return new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), undefined, undefined, filter);
+    if (filter) return new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), {{ 'true' if assoc.source_multiplicity.is_many() else 'false' }}, undefined, undefined, filter);
     if (!this._{{reverse_name}}) {
-      this._{{reverse_name}} = new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'));
+      this._{{reverse_name}} = new _Cls('{{source_rcm.clazz.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), {{ 'true' if assoc.source_multiplicity.is_many() else 'false' }});
     }
     return this._{{reverse_name}}!;
   }
