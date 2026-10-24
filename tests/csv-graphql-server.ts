@@ -175,7 +175,13 @@ function comparable(raw: any, target: any): [any, any] {
 }
 
 function likeToRegex(pattern: string): RegExp {
-  const body = [...pattern].map(ch => ch === '%' ? '.*' : ch === '_' ? '.' : ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('');
+  const literal = (ch: string) => ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let body = '';
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === '\\' && i + 1 < pattern.length) body += literal(pattern[++i]); // a backslash makes the next character literal
+    else body += ch === '%' ? '.*' : ch === '_' ? '.' : literal(ch);
+  }
   return new RegExp(`^${body}$`, 's');
 }
 

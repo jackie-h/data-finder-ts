@@ -18,6 +18,8 @@ import {
   RelationalOperationElement,
   SortDirection,
   SortOperation,
+  LIKE_ESCAPE,
+  StringConstantOperation,
 } from '../model/relational';
 import {
   parseFieldPath,
@@ -103,6 +105,21 @@ const CMP_OPS: Partial<Record<ComparisonOperator, string>> = {
   [ComparisonOperator.NOT_LIKE]: '_nlike',
 };
 
+/** A LIKE pattern in the escape convention of the model (`!`) in the server's (backslash). */
+export function likeForServer(pattern: string): string {
+  let out = '';
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === LIKE_ESCAPE && i + 1 < pattern.length) {
+      out += (pattern[i + 1] === LIKE_ESCAPE ? '' : '\\') + pattern[i + 1];
+      i++;
+    } else {
+      out += c === '\\' ? '\\\\' : c;
+    }
+  }
+  return out;
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
@@ -140,7 +157,11 @@ function opToWhereClause(op: RelationalOperationElement | null | undefined): str
     if (!(op.right instanceof ConstantOperation)) {
       throw new GraphQLPushdownError('Cannot push a filter comparing two fields to the server');
     }
-    return nest(field, `{ ${gqlOp}: ${gqlValue(op.right)} }`);
+    const isLike = op.operator === ComparisonOperator.LIKE || op.operator === ComparisonOperator.NOT_LIKE;
+    const value = isLike && op.right instanceof StringConstantOperation
+      ? new StringConstantOperation(likeForServer(op.right.value))
+      : op.right;
+    return nest(field, `{ ${gqlOp}: ${gqlValue(value)} }`);
   }
   if (op instanceof LogicalOperation) {
     const left = opToWhereClause(op.left);
