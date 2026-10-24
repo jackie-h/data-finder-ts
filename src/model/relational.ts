@@ -84,6 +84,14 @@ export interface Aliasable {
   alias(name: string): Alias;
 }
 
+/** Something the result can be ordered by: `f.id().count().ascending()`. */
+export interface Sortable {
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation;
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation;
+}
+
 export abstract class Operation extends RelationalOperationElement {
   and(other: RelationalOperationElement): Operation {
     return new LogicalOperation(this, LogicalOperator.AND, other);
@@ -106,9 +114,15 @@ export class NoOperation extends Operation {
   }
 }
 
-export abstract class ConstantOperation extends RelationalOperationElement implements Aliasable {
+export abstract class ConstantOperation extends RelationalOperationElement implements Aliasable, Sortable {
   /** Name this column in the result. */
   alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 }
 
 export class IntegerConstantOperation extends ConstantOperation {
@@ -197,9 +211,15 @@ export class WindowSpecification {
   ) {}
 }
 
-export class AggregateOperation extends UnaryOperation implements Aliasable {
+export class AggregateOperation extends UnaryOperation implements Aliasable, Sortable {
   /** Name this column in the result. */
   alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 
   constructor(
     element: RelationalOperationElement,
@@ -227,9 +247,15 @@ export enum WindowFunction {
   PERCENT_RANK = 'PERCENT_RANK',
 }
 
-export class WindowFunctionOperation extends UnaryOperation implements Aliasable {
+export class WindowFunctionOperation extends UnaryOperation implements Aliasable, Sortable {
   /** Name this column in the result. */
   alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 
   constructor(
     element: RelationalOperationElement | null,
@@ -246,9 +272,15 @@ export class WindowFunctionOperation extends UnaryOperation implements Aliasable
   }
 }
 
-export class ScalarFunctionOperation extends UnaryOperation implements Aliasable {
+export class ScalarFunctionOperation extends UnaryOperation implements Aliasable, Sortable {
   /** Name this column in the result. */
   alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 
   constructor(
     element: RelationalOperationElement,
@@ -259,9 +291,15 @@ export class ScalarFunctionOperation extends UnaryOperation implements Aliasable
   ) { super(element); }
 }
 
-export class DateExtractOperation extends UnaryOperation implements Aliasable {
+export class DateExtractOperation extends UnaryOperation implements Aliasable, Sortable {
   /** Name this column in the result. */
   alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 
   constructor(
     element: RelationalOperationElement,
@@ -270,9 +308,15 @@ export class DateExtractOperation extends UnaryOperation implements Aliasable {
   ) { super(element); }
 }
 
-export class DateArithmeticOperation extends UnaryOperation implements Aliasable {
+export class DateArithmeticOperation extends UnaryOperation implements Aliasable, Sortable {
   /** Name this column in the result. */
   alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 
   constructor(
     element: RelationalOperationElement,
@@ -283,9 +327,15 @@ export class DateArithmeticOperation extends UnaryOperation implements Aliasable
   ) { super(element); }
 }
 
-export class DateDiffOperation extends UnaryOperation implements Aliasable {
+export class DateDiffOperation extends UnaryOperation implements Aliasable, Sortable {
   /** Name this column in the result. */
   alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 
   constructor(
     element: RelationalOperationElement,
@@ -414,14 +464,21 @@ export class ColumnWithJoin extends RelationalOperationElement {
 
 export class SortOperation {
   constructor(
-    readonly column: ColumnWithJoin,
+    /** What the rows are ordered by: a column, or an expression such as an aggregate. */
+    readonly column: RelationalOperationElement,
     readonly direction: SortDirection,
   ) {}
 }
 
-export class CountAllOperation extends RelationalOperationElement implements Aliasable {
+export class CountAllOperation extends RelationalOperationElement implements Aliasable, Sortable {
   /** Name this column in the result. */
   alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 
   constructor(readonly table: string) { super(); }
 }
@@ -431,10 +488,16 @@ export class CountAllOperation extends RelationalOperationElement implements Ali
  * column of the result have `alias()` (an `Attribute`, an aggregate, a function, a constant, ...), so a
  * filter cannot be aliased; aliasing an alias replaces its name.
  */
-export class Alias extends RelationalOperationElement implements Aliasable {
+export class Alias extends RelationalOperationElement implements Aliasable, Sortable {
   constructor(readonly element: RelationalOperationElement, readonly name: string) { super(); }
 
   alias(name: string): Alias { return new Alias(this.element, name); }
+
+  /** Sorts by the column the alias names. */
+  ascending(): SortOperation { return new SortOperation(this.element, SortDirection.ASC); }
+
+  /** Sorts by the column the alias names. */
+  descending(): SortOperation { return new SortOperation(this.element, SortDirection.DESC); }
 }
 
 /** Returned by `RelatedFinder.exists()`. A backend translates it to a join-presence check. */
