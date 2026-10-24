@@ -148,7 +148,7 @@ af.findAll(null, null, [af.count()]).toSql()
 
 ## Replacing a missing value
 
-`.orElse(default, ...)` (`COALESCE` in SQL) selects the value, or the first default that is not NULL when it is. It works on any attribute, including one reached through an association (for example a manager that may not exist). Defaults are strings, numbers or booleans.
+`.orElse(default)` (`COALESCE` in SQL) selects the value, or `default` when it is NULL. It works on any attribute, including one reached through an association (for example a manager that may not exist). The default is a string, number or boolean.
 
 ```ts
 ef.findAll(null, null, [ef.name(), ef.manager().name().orElse('nobody')])
