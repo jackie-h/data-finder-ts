@@ -51,6 +51,13 @@ export function getRunner(): QueryRunner {
   return _runner;
 }
 
+/** What a sort orders by: the column and the joins to reach it. */
+function sortTarget(sort: SortOperation): string {
+  const joins: string[] = [];
+  for (let node = sort.column.parent; node !== undefined; node = node.parent) joins.push(node.join.name);
+  return JSON.stringify([sort.column.column.owner, sort.column.column.name, joins]);
+}
+
 export class FinderResult {
   private _orderBy: SortOperation[] = [];
   private _groupBy: Attribute[] = [];
@@ -66,8 +73,13 @@ export class FinderResult {
     private readonly _businessDateTo: Date | null = null,
   ) {}
 
+  /**
+   * Order the rows. Calls accumulate: the sorts of the latest call take priority and earlier ones order the
+   * rows it leaves tied, as in a chain of `sortBy` calls. Sorting a column again replaces its earlier direction.
+   */
   orderByOp(...sorts: SortOperation[]): this {
-    this._orderBy = sorts;
+    const resorted = new Set(sorts.map(sortTarget));
+    this._orderBy = [...sorts, ...this._orderBy.filter(s => !resorted.has(sortTarget(s)))];
     return this;
   }
 

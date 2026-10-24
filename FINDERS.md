@@ -77,6 +77,16 @@ af.name().eq('Acme').andOp(af.id().gt(100)).orOp(af.name().eq('Beta'))
 
 To group differently, build the part that should bind first and combine it on the other side, e.g. `a.orOp(b.andOp(c))`.
 
+## Sorting
+
+Sort with `.orderByOp()` and limit with `.limit()`. Several `orderByOp` calls accumulate: the latest call takes priority and the earlier ones break its ties, so the two sorts below order by category and then by name. Sorting a column again replaces its earlier direction.
+
+```ts
+cf.findAll(null, null, [cf.name(), cf.category()])
+  .orderByOp(cf.name().ascending())
+  .orderByOp(cf.category().ascending())
+```
+
 ## Joins
 
 Call a related finder method to include a JOIN and access its columns:
