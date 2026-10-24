@@ -58,6 +58,7 @@ METHOD_NAMES = {
     'group_by': 'groupBy',
     'upper': 'toUpperCase',
     'lower': 'toLowerCase',
+    'coalesce': 'orElse',
     'is_none': 'isNull',
     'is_not_none': 'isNotNull',
     'strip': 'trim',

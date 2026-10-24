@@ -72,12 +72,12 @@ export abstract class Attribute implements Aliasable {
     return new Alias(this, name);
   }
 
-  /** The value, or the first default that is not NULL when it is NULL: `name().coalesce('N/A')`. */
-  coalesce(...defaults: (string | number | boolean)[]): ScalarFunctionOperation {
-    if (defaults.length === 0) throw new Error('coalesce needs at least one default');
+  /** The value, or the first default that is not NULL when it is NULL: `name().orElse('N/A')`. */
+  orElse(...defaults: (string | number | boolean)[]): ScalarFunctionOperation {
+    if (defaults.length === 0) throw new Error('orElse needs at least one default');
     for (const d of defaults) {
       if (!['string', 'number', 'boolean'].includes(typeof d)) {
-        throw new TypeError(`A coalesce default is a string, number or boolean, not ${d === null ? 'null' : typeof d}`);
+        throw new TypeError(`An orElse default is a string, number or boolean, not ${d === null ? 'null' : typeof d}`);
       }
     }
     return new ScalarFunctionOperation(this.cwj(), ScalarFunction.COALESCE, 'Coalesce ' + this._displayName, undefined, defaults);

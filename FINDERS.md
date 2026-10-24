@@ -142,13 +142,13 @@ af.findAll(null, null, [af.count()]).toSql()
 
 ## Replacing a missing value
 
-`.coalesce(default, ...)` selects the value, or the first default that is not NULL when it is. It works on any attribute, including one reached through an association (for example a manager that may not exist). Defaults are strings, numbers or booleans.
+`.orElse(default, ...)` selects (`COALESCE` in SQL) the value, or the first default that is not NULL when it is. It works on any attribute, including one reached through an association (for example a manager that may not exist). Defaults are strings, numbers or booleans.
 
 ```ts
-ef.findAll(null, null, [ef.name(), ef.manager().name().coalesce('nobody')])
+ef.findAll(null, null, [ef.name(), ef.manager().name().orElse('nobody')])
 ```
 
-The GraphQL runner does not compute functions on the client, so it reports `GraphQLClientComputationError` for a `coalesce` column, as for the other functions.
+The GraphQL runner does not compute functions on the client, so it reports `GraphQLClientComputationError` for an `orElse` column, as for the other functions.
 
 ## Reverse associations
 
