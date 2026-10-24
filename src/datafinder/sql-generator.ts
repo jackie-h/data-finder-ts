@@ -558,7 +558,7 @@ class SQLQueryGenerator {
     }
     this._groupByParts = this._groupByPartsFor(select);
     this._orderByParts = select.orderBy.map(s =>
-      this.buildFilter(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
+      this._sortExpression(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
     );
     this._limit = select.limit;
     this._distinct = select.distinct;
@@ -586,6 +586,12 @@ class SQLQueryGenerator {
       .filter(({ column }) => !containsAggregateOrWindow(column) && !(unaliased(column) instanceof ConstantOperation))
       .map(({ shown }) => sqlOperationToString(shown.element));
     return [...new Set([...keys, ...grouped])];
+  }
+
+  /** What a sort orders by: a column, or an expression such as an aggregate. */
+  private _sortExpression(expression: RelationalOperationElement): string {
+    if (expression instanceof ColumnWithJoin || expression instanceof Attribute) return this.buildFilter(expression);
+    return sqlOperationToString(this._rewriteOperation(expression));
   }
 
   private _columnToString(column: Column): string {

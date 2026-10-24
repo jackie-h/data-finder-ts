@@ -6,6 +6,7 @@ import {
   SortOperation,
   NoOperation,
   RelationalOperationElement,
+  ColumnWithJoin,
   DateOnly,
   DATE_ONLY_PATTERN,
 } from '../model/relational';
@@ -53,11 +54,22 @@ export function getRunner(): QueryRunner {
   return _runner;
 }
 
-/** What a sort orders by: the column and the joins to reach it. */
+const expressionIds = new WeakMap<object, number>();
+let nextExpressionId = 1;
+
+/**
+ * What a sort orders by: a column and the joins to reach it. Any other expression, such as an aggregate, is its
+ * own target, so sorting by an expression again adds a sort.
+ */
 function sortTarget(sort: SortOperation): string {
+  const column = sort.column;
+  if (!(column instanceof ColumnWithJoin)) {
+    if (!expressionIds.has(column)) expressionIds.set(column, nextExpressionId++);
+    return JSON.stringify(['expression', expressionIds.get(column)]);
+  }
   const joins: string[] = [];
-  for (let node = sort.column.parent; node !== undefined; node = node.parent) joins.push(node.join.name);
-  return JSON.stringify([sort.column.column.owner, sort.column.column.name, joins]);
+  for (let node = column.parent; node !== undefined; node = node.parent) joins.push(node.join.name);
+  return JSON.stringify([column.column.owner, column.column.name, joins]);
 }
 
 export class FinderResult {
