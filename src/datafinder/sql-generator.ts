@@ -47,6 +47,7 @@ import {
   MilestonedTable,
   BiTemporalColumns,
   BusinessDateAndProcessingTemporalColumns,
+  MilestoningColumns,
   ProcessingTemporalColumns,
   SingleBusinessDateColumn,
 } from '../model/milestoning';
@@ -232,6 +233,66 @@ function openEndClause(
   return gtOp;
 }
 
+/** The operations ANDed together left to right, ignoring the missing ones; null if there are none. */
+function andAll(ops: (Operation | null)[]): Operation | null {
+  const present = ops.filter((op): op is Operation => op !== null);
+  if (present.length === 0) return null;
+  return present.slice(1).reduce<Operation>((left, right) => new LogicalOperation(left, LogicalOperator.AND, right), present[0]);
+}
+
+/** The table's processing range contains the processing date. */
+function processingPredicate(
+  mc: MilestoningColumns,
+  processingDatetime: Date | null,
+  joinNode?: JoinTreeNodeOperation,
+): Operation | null {
+  if (!(mc instanceof ProcessingTemporalColumns || mc instanceof BusinessDateAndProcessingTemporalColumns || mc instanceof BiTemporalColumns)
+    || processingDatetime === null) return null;
+  const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
+  const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
+  return new LogicalOperation(startAt.lte(processingDatetime), LogicalOperator.AND, openEndClause(endAt, processingDatetime, mc.infiniteDatetime));
+}
+
+/** The table's business range contains the business date, or its business date column equals it. */
+function businessPredicate(
+  mc: MilestoningColumns,
+  businessDate: Date | null,
+  joinNode?: JoinTreeNodeOperation,
+): Operation | null {
+  if (businessDate === null) return null;
+  if (mc instanceof BiTemporalColumns) {
+    const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
+    const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
+    return new LogicalOperation(dateFrom.lte(businessDate), LogicalOperator.AND, openEndClause(dateTo, businessDate, mc.infiniteDatetime));
+  }
+  if (mc instanceof BusinessDateAndProcessingTemporalColumns || mc instanceof SingleBusinessDateColumn) {
+    const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
+    return businessAtt.eq(businessDate);
+  }
+  return null;
+}
+
+/** The table's business range overlaps the business date range, or its business date column is within it. */
+function businessRangePredicate(
+  mc: MilestoningColumns,
+  businessDateFrom: Date | null,
+  businessDateTo: Date | null,
+  joinNode?: JoinTreeNodeOperation,
+): Operation | null {
+  if (businessDateFrom === null || businessDateTo === null) return null;
+  if (mc instanceof BiTemporalColumns) {
+    const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
+    const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
+    return new LogicalOperation(dateFrom.lte(businessDateTo), LogicalOperator.AND, openEndClause(dateTo, businessDateFrom, mc.infiniteDatetime));
+  }
+  if (mc instanceof BusinessDateAndProcessingTemporalColumns || mc instanceof SingleBusinessDateColumn) {
+    const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
+    return new LogicalOperation(businessAtt.gte(businessDateFrom), LogicalOperator.AND, businessAtt.lte(businessDateTo));
+  }
+  return null;
+}
+
+/** The milestoning filter for a point in time: the processing range, then the business range, ANDed together. */
 function buildMilestoningFilterOperation(
   businessDate: Date | null,
   processingDatetime: Date | null,
@@ -239,41 +300,7 @@ function buildMilestoningFilterOperation(
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
   const mc = table.milestoningColumns;
-  const ops: Operation[] = [];
-
-  if (mc instanceof BiTemporalColumns) {
-    if (businessDate !== null) {
-      const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
-      const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
-      ops.push(new LogicalOperation(dateFrom.lte(businessDate), LogicalOperator.AND, openEndClause(dateTo, businessDate, mc.infiniteDatetime)));
-    }
-    if (processingDatetime !== null) {
-      const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
-      const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
-      ops.push(new LogicalOperation(startAt.lte(processingDatetime), LogicalOperator.AND, openEndClause(endAt, processingDatetime, mc.infiniteDatetime)));
-    }
-  } else if (mc instanceof BusinessDateAndProcessingTemporalColumns) {
-    if (businessDate !== null) {
-      const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
-      ops.push(businessAtt.eq(businessDate));
-    }
-    if (processingDatetime !== null) {
-      const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
-      const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
-      ops.push(new LogicalOperation(startAt.lte(processingDatetime), LogicalOperator.AND, openEndClause(endAt, processingDatetime, mc.infiniteDatetime)));
-    }
-  } else if (mc instanceof ProcessingTemporalColumns && processingDatetime !== null) {
-    const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
-    const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
-    ops.push(new LogicalOperation(startAt.lte(processingDatetime), LogicalOperator.AND, openEndClause(endAt, processingDatetime, mc.infiniteDatetime)));
-  } else if (mc instanceof SingleBusinessDateColumn && businessDate !== null) {
-    const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
-    ops.push(businessAtt.eq(businessDate));
-  }
-
-  if (ops.length === 0) return null;
-  if (ops.length === 1) return ops[0];
-  return new LogicalOperation(ops[0], LogicalOperator.AND, ops[1]);
+  return andAll([processingPredicate(mc, processingDatetime, joinNode), businessPredicate(mc, businessDate, joinNode)]);
 }
 
 /**
@@ -293,38 +320,10 @@ function buildMilestoningFilterOperationForDateRange(
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
   const mc = table.milestoningColumns;
-  const ops: Operation[] = [];
-  const hasRange = businessDateFrom !== null && businessDateTo !== null;
-
-  const processingOp = (m: BiTemporalColumns | BusinessDateAndProcessingTemporalColumns | ProcessingTemporalColumns): Operation => {
-    const startAt = new DateTimeAttribute('start_at', m.startAtColumn.name, m.startAtColumn.type, m.startAtColumn.table!.qualifiedName, joinNode);
-    const endAt = new DateTimeAttribute('end_at', m.endAtColumn.name, m.endAtColumn.type, m.endAtColumn.table!.qualifiedName, joinNode);
-    return new LogicalOperation(startAt.lte(processingDatetime!), LogicalOperator.AND, openEndClause(endAt, processingDatetime!, m.infiniteDatetime));
-  };
-
-  if (mc instanceof BiTemporalColumns) {
-    if (hasRange) {
-      const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
-      const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
-      ops.push(new LogicalOperation(dateFrom.lte(businessDateTo!), LogicalOperator.AND, openEndClause(dateTo, businessDateFrom!, mc.infiniteDatetime)));
-    }
-    if (processingDatetime !== null) ops.push(processingOp(mc));
-  } else if (mc instanceof BusinessDateAndProcessingTemporalColumns) {
-    if (hasRange) {
-      const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
-      ops.push(new LogicalOperation(businessAtt.gte(businessDateFrom!), LogicalOperator.AND, businessAtt.lte(businessDateTo!)));
-    }
-    if (processingDatetime !== null) ops.push(processingOp(mc));
-  } else if (mc instanceof ProcessingTemporalColumns) {
-    if (processingDatetime !== null) ops.push(processingOp(mc));
-  } else if (mc instanceof SingleBusinessDateColumn && hasRange) {
-    const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
-    ops.push(new LogicalOperation(businessAtt.gte(businessDateFrom!), LogicalOperator.AND, businessAtt.lte(businessDateTo!)));
-  }
-
-  if (ops.length === 0) return null;
-  if (ops.length === 1) return ops[0];
-  return new LogicalOperation(ops[0], LogicalOperator.AND, ops[1]);
+  return andAll([
+    processingPredicate(mc, processingDatetime, joinNode),
+    businessRangePredicate(mc, businessDateFrom, businessDateTo, joinNode),
+  ]);
 }
 
 type RefVisitor = (ref: Attribute | ColumnWithJoin) => void;
@@ -466,6 +465,17 @@ function buildQueryOperation(
   }
 
   return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters);
+}
+
+/**
+ * Whether `child` must be parenthesised where it is an operand of `parent`.
+ *
+ * A logical operation nested in one with a different operator is parenthesised: OR inside AND would
+ * otherwise change meaning, and AND inside OR is easier to read. The same operator needs none, since
+ * AND and OR are associative, so a AND (b AND c) is a AND b AND c.
+ */
+export function needsParentheses(parent: LogicalOperation, child: RelationalOperationElement): boolean {
+  return child instanceof LogicalOperation && child.operator !== parent.operator;
 }
 
 class SQLQueryGenerator {
@@ -727,8 +737,8 @@ class SQLQueryGenerator {
     if (op instanceof LogicalOperation) {
       let left = this.buildFilter(op.left);
       let right = this.buildFilter(op.right);
-      if (op.left instanceof LogicalOperation) left = '(' + left + ')';
-      if (op.right instanceof LogicalOperation) right = '(' + right + ')';
+      if (needsParentheses(op, op.left)) left = '(' + left + ')';
+      if (needsParentheses(op, op.right)) right = '(' + right + ')';
       return left + LOGICAL_OPERATOR_STR[op.operator] + right;
     }
     if (op instanceof ComparisonOperation) {
@@ -765,9 +775,9 @@ class SQLQueryGenerator {
   buildQueryString(): string {
     const joins = this._join.map(j =>
       ' LEFT OUTER JOIN ' + j.target.tableAlias.table + ' AS ' + j.target.tableAlias.alias +
-      ' ON ' + j.source.tableAlias.alias + '.' + j.source.column.name +
+      ' ON (' + j.source.tableAlias.alias + '.' + j.source.column.name +
       ' = ' + j.target.tableAlias.alias + '.' + j.target.column.name +
-      (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : ''),
+      (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
     return 'SELECT ' + this._select.map(ca => sqlOperationToString(ca)).join(',') +
