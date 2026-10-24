@@ -559,21 +559,21 @@ describe('DateTimeAttribute extract and arithmetic (SQL)', () => {
 // ORDER BY
 // ---------------------------------------------------------------------------
 describe('ORDER BY', () => {
-  it('orderByOp(asc) produces ORDER BY ... ASC in SQL', async () => {
+  it('orderBy(asc) produces ORDER BY ... ASC in SQL', async () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.symbol(), tf.price()])
-      .orderByOp(tf.price().ascending())
+      .orderBy(tf.price().ascending())
       .toSql();
     expect(sql).toContain('ORDER BY');
     expect(sql).toContain('ASC');
   });
 
-  it('orderByOp(desc) produces ORDER BY ... DESC in SQL', async () => {
+  it('orderBy(desc) produces ORDER BY ... DESC in SQL', async () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.symbol(), tf.price()])
-      .orderByOp(tf.price().descending())
+      .orderBy(tf.price().descending())
       .toSql();
     expect(sql).toContain('DESC');
   });
@@ -582,7 +582,7 @@ describe('ORDER BY', () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.symbol(), tf.price()])
-      .orderByOp(tf.price().ascending())
+      .orderBy(tf.price().ascending())
       .toRows();
     expect(rows.length).toBe(3);
     const prices = rows.map(r => r[1] as number);
@@ -595,7 +595,7 @@ describe('ORDER BY', () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.symbol(), tf.price()])
-      .orderByOp(tf.price().descending())
+      .orderBy(tf.price().descending())
       .toRows();
     expect(rows[0][0]).toBe('IBM');
     expect(rows[0][1] as number).toBeCloseTo(3000.5, 1);
@@ -624,7 +624,7 @@ describe('LIMIT', () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.symbol(), tf.price()])
-      .orderByOp(tf.price().descending())
+      .orderBy(tf.price().descending())
       .limit(2)
       .toRows();
     expect(rows.length).toBe(2);

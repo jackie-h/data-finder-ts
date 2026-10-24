@@ -39,7 +39,7 @@ const names = (rows: unknown[][]) => rows.map(r => r[0]);
 describe('RelatedFinder.exists / notExists', () => {
   it('manager().exists() keeps employees that have a manager', async () => {
     const rows = await ef.findAll(null, null, [ef.firstName()], ef.manager().exists())
-      .orderByOp(ef.firstName().ascending()).toRows();
+      .orderBy(ef.firstName().ascending()).toRows();
     expect(names(rows)).toEqual(['Bob', 'Carol', 'Dave']);
   });
 
@@ -59,7 +59,7 @@ describe('RelatedFinder.exists / notExists', () => {
   it('combines with other filters via andOp', async () => {
     const rows = await ef.findAll(null, null, [ef.firstName()],
       ef.manager().exists().andOp(ef.department().eq('Engineering')),
-    ).orderByOp(ef.firstName().ascending()).toRows();
+    ).orderBy(ef.firstName().ascending()).toRows();
     expect(names(rows)).toEqual(['Bob', 'Carol']);
   });
 });

@@ -46,7 +46,7 @@ export const TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'both_trades_active_in_2021',
-    query: f => f.findAll(null, '2021-06-01 12:00:00', [f.symbol()]).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, '2021-06-01 12:00:00', [f.symbol()]).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['GOOG'],
@@ -89,7 +89,7 @@ export const TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'valid_to_ge',
-    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().gte(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.validTo().gte(new Date(Date.UTC(2022, 0, 1, 0, 0, 0)))).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['GOOG'],
@@ -352,7 +352,7 @@ export const TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
 export const TRADE_MULTI_HOP_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
     name: 'account_name_in_2021',
-    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().name()]).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().name()]).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol', 'Account Name'], rows: [
         ['AAPL', 'Acme Ltd'],
         ['GOOG', 'Acme Ltd'],
@@ -367,7 +367,7 @@ export const TRADE_MULTI_HOP_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'ancestor_join_follows_the_query_time',
-    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().branch().city()]).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().branch().city()]).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol', 'Account Branch City'], rows: [
         ['AAPL', 'London'],
         ['GOOG', 'London'],
@@ -399,7 +399,7 @@ export const TRADE_EXISTS_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'exists_returns_each_trade_once_in_2021',
-    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.account().exists()).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.account().exists()).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['GOOG'],
@@ -421,7 +421,7 @@ export const TRADE_EXISTS_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'exists_once_the_account_is_live',
-    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists()).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists()).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['MSFT'],
@@ -477,7 +477,7 @@ export const TRADE_IS_NONE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'is_not_none_once_the_account_is_live',
-    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNotNull()).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNotNull()).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['MSFT'],
@@ -530,7 +530,7 @@ export const CONTRACTUAL_POSITION_FINDER_SPECS: SpecCase<ContractualPositionFind
   },
   {
     name: 'range_jan15_jan16',
-    query: f => f.findForDateRange('2023-01-15', '2023-01-16', _AT, [f.quantity()]).orderByOp(f.quantity().ascending()),
+    query: f => f.findForDateRange('2023-01-15', '2023-01-16', _AT, [f.quantity()]).orderBy(f.quantity().ascending()),
     expected: { columns: ['Quantity'], rows: [
         [100.0],
         [200.0],

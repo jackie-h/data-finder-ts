@@ -135,7 +135,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'trade_date_gt',
-    query: f => f.findAll(null, null, [f.id()], f.tradeDate().gt(_D2)).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()], f.tradeDate().gt(_D2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [3],
       ] },
@@ -149,7 +149,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'trade_date_ge',
-    query: f => f.findAll(null, null, [f.id()], f.tradeDate().gte(_D2)).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()], f.tradeDate().gte(_D2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -157,7 +157,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'trade_date_le',
-    query: f => f.findAll(null, null, [f.id()], f.tradeDate().lte(_D2)).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()], f.tradeDate().lte(_D2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
@@ -172,7 +172,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'npv_gt',
-    query: f => f.findAll(null, null, [f.id()], f.npv().gt(500.0)).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()], f.npv().gt(500.0)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -187,7 +187,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'npv_ge',
-    query: f => f.findAll(null, null, [f.id()], f.npv().gte(800.0)).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()], f.npv().gte(800.0)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -195,7 +195,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'npv_le',
-    query: f => f.findAll(null, null, [f.id()], f.npv().lte(800.0)).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()], f.npv().lte(800.0)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
@@ -238,7 +238,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'id_gt',
-    query: f => f.findAll(null, null, [f.id()], f.id().gt(1)).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()], f.id().gt(1)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -254,7 +254,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'id_ge',
-    query: f => f.findAll(null, null, [f.id()], f.id().gte(2)).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()], f.id().gte(2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -262,7 +262,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'id_le',
-    query: f => f.findAll(null, null, [f.id()], f.id().lte(2)).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()], f.id().lte(2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],

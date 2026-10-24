@@ -86,7 +86,7 @@ describe('embedded mapping — projection', () => {
 describe('embedded mapping — filter, group by, order by', () => {
   it('filter on an embedded property elides the join', async () => {
     await check(
-      tf.findAll(null, BOTH_AT, [tf.symbol()], tf.account().name().eq('Acme Corp')).orderByOp(tf.symbol().ascending()),
+      tf.findAll(null, BOTH_AT, [tf.symbol()], tf.account().name().eq('Acme Corp')).orderBy(tf.symbol().ascending()),
       [['AAPL'], ['GOOG']], false,
     );
   });
@@ -94,7 +94,7 @@ describe('embedded mapping — filter, group by, order by', () => {
   it('filter on an embedded property with a non-embedded projection keeps the join', async () => {
     await check(
       tf.findAll(null, BOTH_AT, [tf.symbol(), tf.account().id()], tf.account().name().eq('Acme Corp'))
-        .orderByOp(tf.symbol().ascending()),
+        .orderBy(tf.symbol().ascending()),
       [['AAPL', 1], ['GOOG', 1]], true,
     );
   });
@@ -116,7 +116,7 @@ describe('embedded mapping — filter, group by, order by', () => {
 
   it('order by an embedded property elides the join', async () => {
     await check(
-      tf.findAll(null, BOTH_AT, [tf.symbol()]).orderByOp(tf.account().name().ascending(), tf.symbol().descending()),
+      tf.findAll(null, BOTH_AT, [tf.symbol()]).orderBy(tf.account().name().ascending(), tf.symbol().descending()),
       [['GOOG'], ['AAPL']], false,
     );
   });
@@ -128,7 +128,7 @@ describe('embedded mapping — window functions', () => {
       tf.findAll(null, BOTH_AT, [
         tf.symbol(), tf.price(),
         tf.price().rank({ method: 'min', partitionBy: [tf.account().name()], orderBy: [tf.price().ascending()] }),
-      ]).orderByOp(tf.price().ascending()),
+      ]).orderBy(tf.price().ascending()),
       [['AAPL', 84.11, 1n], ['GOOG', 200, 2n]], false,
     );
   });
@@ -138,7 +138,7 @@ describe('embedded mapping — window functions', () => {
       tf.findAll(null, BOTH_AT, [
         tf.symbol(), tf.account().id(),
         tf.price().rank({ method: 'min', partitionBy: [tf.account().name()], orderBy: [tf.price().ascending()] }),
-      ]).orderByOp(tf.price().ascending()),
+      ]).orderBy(tf.price().ascending()),
       [['AAPL', 1, 1n], ['GOOG', 1, 2n]], true,
     );
   });
@@ -148,7 +148,7 @@ describe('embedded mapping — window functions', () => {
       tf.findAll(null, BOTH_AT, [
         tf.symbol(), tf.price(),
         tf.price().rank({ method: 'min', partitionBy: [tf.account().branch().city()], orderBy: [tf.price().ascending()] }),
-      ]).orderByOp(tf.price().ascending()),
+      ]).orderBy(tf.price().ascending()),
       [['AAPL', 84.11, 1n], ['GOOG', 200, 2n]], false,
     );
   });

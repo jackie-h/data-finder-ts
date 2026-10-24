@@ -103,7 +103,7 @@ describe('EmployeeFinder (orgchart, self-referential)', () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
     const ef = new EmployeeFinder();
     const rows = await ef.findAll(null, null, [ef.name()], ef.manager().name().eq('Alice'))
-      .orderByOp(ef.name().ascending()).toRows();
+      .orderBy(ef.name().ascending()).toRows();
     expect(rows.map(r => r[0])).toEqual(['Bob', 'Carol']);
   });
 });

@@ -101,9 +101,9 @@ describe('DuckDB', () => {
 
   it('works through a finder', async () => {
     const f = new CompanyFinder();
-    const rows = await f.findAll(null, null, [f.name()], f.name().isIn(['Acme Corp', 'Gamma LLC'])).orderByOp(f.name().ascending()).toRows();
+    const rows = await f.findAll(null, null, [f.name()], f.name().isIn(['Acme Corp', 'Gamma LLC'])).orderBy(f.name().ascending()).toRows();
     expect(rows).toEqual([['Acme Corp'], ['Gamma LLC']]);
-    const rest = await f.findAll(null, null, [f.name()], f.name().isNotIn(['Acme Corp', 'Acme Industries', 'Gamma LLC'])).orderByOp(f.name().ascending()).toRows();
+    const rest = await f.findAll(null, null, [f.name()], f.name().isNotIn(['Acme Corp', 'Acme Industries', 'Gamma LLC'])).orderBy(f.name().ascending()).toRows();
     expect(rest).toEqual([['Beta Corp'], ['Delta Ltd']]);
   });
 });
@@ -142,13 +142,13 @@ describe('GraphQL', () => {
 
   it('pushes isIn as _in', async () => {
     const f = new GraphQLCompanyFinder(endpoint);
-    const rows = await f.findAll(null, null, [f.name()], f.name().isIn(['Acme Corp', 'Gamma LLC'])).orderByOp(f.name().ascending()).toRows();
+    const rows = await f.findAll(null, null, [f.name()], f.name().isIn(['Acme Corp', 'Gamma LLC'])).orderBy(f.name().ascending()).toRows();
     expect(rows).toEqual([['Acme Corp'], ['Gamma LLC']]);
   });
 
   it('pushes isNotIn as _nin', async () => {
     const f = new GraphQLCompanyFinder(endpoint);
-    const rows = await f.findAll(null, null, [f.name()], f.name().isNotIn(['Acme Corp', 'Acme Industries', 'Gamma LLC'])).orderByOp(f.name().ascending()).toRows();
+    const rows = await f.findAll(null, null, [f.name()], f.name().isNotIn(['Acme Corp', 'Acme Industries', 'Gamma LLC'])).orderBy(f.name().ascending()).toRows();
     expect(rows).toEqual([['Beta Corp'], ['Delta Ltd']]);
   });
 });

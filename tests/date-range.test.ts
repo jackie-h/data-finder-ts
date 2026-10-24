@@ -34,7 +34,7 @@ describe('findForDateRange (business date + processing)', () => {
   it('returns every position in the range', async () => {
     const rows = await cpf
       .findForDateRange('2023-01-15', '2023-01-16', AT, [cpf.quantity()])
-      .orderByOp(cpf.quantity().ascending())
+      .orderBy(cpf.quantity().ascending())
       .toRows();
     expect(rows).toEqual([[100], [200]]);
   });

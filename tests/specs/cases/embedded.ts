@@ -36,7 +36,7 @@ export const EMBEDDED_TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'filter_by_embedded_account_name_elides_join',
-    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.account().name().eq('Acme Corp')).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.account().name().eq('Acme Corp')).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['GOOG'],
@@ -44,7 +44,7 @@ export const EMBEDDED_TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'filter_mixed_with_account_id_display_forces_real_join',
-    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().id()], f.account().name().eq('Acme Corp')).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().id()], f.account().name().eq('Acme Corp')).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol', 'Account Id'], rows: [
         ['AAPL', 1],
         ['GOOG', 1],
@@ -66,7 +66,7 @@ export const EMBEDDED_TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'partition_by_embedded_account_name_elides_join',
-    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.price(), f.price().rank({ method: 'min', partitionBy: [f.account().name()], orderBy: [f.price().ascending()] })]).orderByOp(f.price().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.price(), f.price().rank({ method: 'min', partitionBy: [f.account().name()], orderBy: [f.price().ascending()] })]).orderBy(f.price().ascending()),
     expected: { columns: ['Symbol', 'Price', 'Rank'], rows: [
         ['AAPL', 84.11, 1],
         ['GOOG', 200.0, 2],
@@ -74,7 +74,7 @@ export const EMBEDDED_TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'partition_by_mixed_with_account_id_forces_real_join',
-    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().id(), f.price().rank({ method: 'min', partitionBy: [f.account().name()], orderBy: [f.price().ascending()] })]).orderByOp(f.price().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().id(), f.price().rank({ method: 'min', partitionBy: [f.account().name()], orderBy: [f.price().ascending()] })]).orderBy(f.price().ascending()),
     expected: { columns: ['Symbol', 'Account Id', 'Rank'], rows: [
         ['AAPL', 1, 1],
         ['GOOG', 1, 2],
@@ -82,7 +82,7 @@ export const EMBEDDED_TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'partition_by_two_hop_embedded_branch_city_elides_both_joins',
-    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.price(), f.price().rank({ method: 'min', partitionBy: [f.account().branch().city()], orderBy: [f.price().ascending()] })]).orderByOp(f.price().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.price(), f.price().rank({ method: 'min', partitionBy: [f.account().branch().city()], orderBy: [f.price().ascending()] })]).orderBy(f.price().ascending()),
     expected: { columns: ['Symbol', 'Price', 'Rank'], rows: [
         ['AAPL', 84.11, 1],
         ['GOOG', 200.0, 2],

@@ -77,7 +77,7 @@ export class FinderResult {
    * Order the rows. Calls accumulate: the sorts of the latest call take priority and earlier ones order the
    * rows it leaves tied, as in a chain of `sortBy` calls. Sorting a column again replaces its earlier direction.
    */
-  orderByOp(...sorts: SortOperation[]): this {
+  orderBy(...sorts: SortOperation[]): this {
     const resorted = new Set(sorts.map(sortTarget));
     this._orderBy = [...sorts, ...this._orderBy.filter(s => !resorted.has(sortTarget(s)))];
     return this;
