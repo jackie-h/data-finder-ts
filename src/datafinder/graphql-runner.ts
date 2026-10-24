@@ -446,6 +446,7 @@ export class GraphQLConnect implements QueryRunner {
     timeoutMs: number = DEFAULT_TIMEOUT_MS,
     businessDateTo: Date | null = null,
     distinct: boolean = false,
+    offset?: number,
   ): Promise<Row[]> {
     // an alias only names the column in the result: read the column, then name it
     const columns = selected.map(c => c instanceof Alias ? c.element : c);
@@ -465,8 +466,8 @@ export class GraphQLConnect implements QueryRunner {
     const expands = checkExpansion(op, columns, limit);
     // the server can only order the parents, so rows expanded by a to-many relation are sorted afterwards
     const sortAfter = expands && (orderBy ?? []).some(so => isMany(so.column));
-    // with distinct the limit is applied here, after the duplicates are gone, not on the server before
-    const serverArgs = buildServerArgs(op, sortAfter ? undefined : orderBy, distinct ? undefined : limit, query.endpoint.filterConvention);
+    // with distinct or an offset the limit is applied here, after the duplicates and skipped rows are gone, not on the server before
+    const serverArgs = buildServerArgs(op, sortAfter ? undefined : orderBy, distinct || offset ? undefined : limit, query.endpoint.filterConvention);
 
     let rows: Record<string, unknown>[];
     if (isDateRange) {
@@ -483,15 +484,19 @@ export class GraphQLConnect implements QueryRunner {
     // a nested field is absent from every row when its parent object is null in all of them
     const fields = columns.map(c => plain(rawName(c)));
     this.lastColumns = selected.map(c => c instanceof Alias ? c.name : (c as Attribute).displayName());
-    const projected = flat.map(row => fields.map(f => row[f] ?? null));
-    if (!distinct) return projected;
-    const seen = new Set<string>();
-    const unique = projected.filter(row => {
-      const key = JSON.stringify(row);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    return limit !== undefined ? unique.slice(0, limit) : unique;
+    let projected = flat.map(row => fields.map(f => row[f] ?? null));
+    if (distinct) {
+      const seen = new Set<string>();
+      projected = projected.filter(row => {
+        const key = JSON.stringify(row);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+    if (!distinct && !offset) return projected;
+    // skip `offset` rows, then keep `limit` of the rest
+    const start = offset ?? 0;
+    return limit !== undefined ? projected.slice(start, start + limit) : projected.slice(start);
   }
 }
