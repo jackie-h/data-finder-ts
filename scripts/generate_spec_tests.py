@@ -54,7 +54,7 @@ METHOD_NAMES = {
     'and_op': 'and',
     'and_': 'and',
     'or_': 'or',
-    'order_by': 'orderByOp',
+    'order_by': 'orderBy',
     'group_by': 'groupByOp',
     'upper': 'toUpperCase',
     'lower': 'toLowerCase',

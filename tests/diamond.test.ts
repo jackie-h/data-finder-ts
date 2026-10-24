@@ -34,7 +34,7 @@ afterAll(() => {
 describe('RecordFinder — diamond inheritance', () => {
   it('returns all records with id and name', async () => {
     const rows = await rf.findAll(null, null, [rf.id(), rf.recordName()])
-      .orderByOp(rf.id().ascending()).toRows();
+      .orderBy(rf.id().ascending()).toRows();
     expect(rows).toEqual([[1, 'Alpha'], [2, 'Beta'], [3, 'Gamma']]);
   });
 

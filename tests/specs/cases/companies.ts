@@ -33,7 +33,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'group_by_category_count',
-    query: f => f.findAll(null, null, [f.category(), f.count()]).groupByOp(f.category()).orderByOp(f.category().ascending()),
+    query: f => f.findAll(null, null, [f.category(), f.count()]).groupByOp(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Count'], rows: [
         ['Finance', 2],
         ['Manufacturing', 1],
@@ -42,7 +42,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_name_asc',
-    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()),
+    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -53,7 +53,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_id_desc',
-    query: f => f.findAll(null, null, [f.id()]).orderByOp(f.id().descending()),
+    query: f => f.findAll(null, null, [f.id()]).orderBy(f.id().descending()),
     expected: { columns: ['Id'], rows: [
         [5],
         [4],
@@ -64,7 +64,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_category_asc_name_desc',
-    query: f => f.findAll(null, null, [f.name(), f.category()]).orderByOp(f.category().ascending(), f.name().descending()),
+    query: f => f.findAll(null, null, [f.name(), f.category()]).orderBy(f.category().ascending(), f.name().descending()),
     expected: { columns: ['Name', 'Category'], rows: [
         ['Gamma LLC', 'Finance'],
         ['Delta Ltd', 'Finance'],
@@ -75,7 +75,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_filter_technology_asc',
-    query: f => f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderByOp(f.name().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
@@ -83,7 +83,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'limit_two_by_name',
-    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()).limit(2),
+    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).limit(2),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -112,7 +112,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_contains_corp',
-    query: f => f.findAll(null, null, [f.name()], f.name().contains('Corp')).orderByOp(f.name().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.name().contains('Corp')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
@@ -120,7 +120,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_contains_acme',
-    query: f => f.findAll(null, null, [f.name()], f.name().contains('Acme')).orderByOp(f.name().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.name().contains('Acme')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -128,7 +128,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_starts_with_acme',
-    query: f => f.findAll(null, null, [f.name()], f.name().startsWith('Acme')).orderByOp(f.name().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.name().startsWith('Acme')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -136,7 +136,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_ends_with_corp',
-    query: f => f.findAll(null, null, [f.name()], f.name().endsWith('Corp')).orderByOp(f.name().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.name().endsWith('Corp')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
@@ -151,7 +151,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_category_starts_with_fin',
-    query: f => f.findAll(null, null, [f.name()], f.category().startsWith('Fin')).orderByOp(f.name().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.category().startsWith('Fin')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Delta Ltd'],
         ['Gamma LLC'],
@@ -166,7 +166,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'rank_min_by_id',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'min', orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'min', orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Rank'], rows: [
         [1, 1],
         [2, 2],
@@ -177,7 +177,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'rank_dense_with_partition_by_category',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'dense', partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'dense', partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Dense Rank'], rows: [
         [1, 1],
         [2, 1],
@@ -188,7 +188,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'shift_lag_second_row',
-    query: f => f.findAll(null, null, [f.id(), f.id().shift(1, { orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().shift(1, { orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Lag Id'], rows: [
         [1, null],
         [2, 1],
@@ -199,7 +199,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'shift_lead_last_row',
-    query: f => f.findAll(null, null, [f.id(), f.id().shift(-1, { orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().shift(-1, { orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Lead Id'], rows: [
         [1, 2],
         [2, 3],
@@ -210,7 +210,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'qcut_two_buckets',
-    query: f => f.findAll(null, null, [f.id(), f.id().qcut(2, { orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().qcut(2, { orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Quantile'], rows: [
         [1, 1],
         [2, 1],
@@ -221,7 +221,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'first_id_per_category',
-    query: f => f.findAll(null, null, [f.id(), f.category(), f.id().first({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.category(), f.id().first({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Category', 'First Id'], rows: [
         [1, 'Technology', 1],
         [2, 'Manufacturing', 2],
@@ -232,7 +232,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'last_id_per_category',
-    query: f => f.findAll(null, null, [f.id(), f.category(), f.id().last({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.category(), f.id().last({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Category', 'Last Id'], rows: [
         [1, 'Technology', 1],
         [2, 'Manufacturing', 2],
@@ -243,7 +243,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'rank_method_first',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'first', orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'first', orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Row Number'], rows: [
         [1, 1],
         [2, 2],
@@ -254,7 +254,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'rank_pct',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ pct: true, orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ pct: true, orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Percent Rank'], rows: [
         [1.0, 0.0],
         [2.0, 0.25],
@@ -265,7 +265,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'rank_pct_method_max',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ pct: true, method: 'max', orderBy: [f.id().ascending()] })]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().rank({ pct: true, method: 'max', orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Cume Dist'], rows: [
         [1.0, 0.2],
         [2.0, 0.4],
@@ -311,7 +311,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_id_asc',
-    query: f => f.findAll(null, null, [f.id()]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id()]).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
@@ -322,7 +322,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_name_desc',
-    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().descending()),
+    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().descending()),
     expected: { columns: ['Name'], rows: [
         ['Gamma LLC'],
         ['Delta Ltd'],
@@ -333,7 +333,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_category_asc_name_asc',
-    query: f => f.findAll(null, null, [f.name(), f.category()]).orderByOp(f.category().ascending(), f.name().ascending()),
+    query: f => f.findAll(null, null, [f.name(), f.category()]).orderBy(f.category().ascending(), f.name().ascending()),
     expected: { columns: ['Name', 'Category'], rows: [
         ['Delta Ltd', 'Finance'],
         ['Gamma LLC', 'Finance'],
@@ -344,14 +344,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'limit_one',
-    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()).limit(1),
+    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },
   },
   {
     name: 'limit_three',
-    query: f => f.findAll(null, null, [f.name()]).orderByOp(f.name().ascending()).limit(3),
+    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).limit(3),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -360,7 +360,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'limit_with_filter',
-    query: f => f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderByOp(f.name().ascending()).limit(1),
+    query: f => f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },

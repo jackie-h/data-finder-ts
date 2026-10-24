@@ -53,7 +53,7 @@ describe('TradeFinder — group by with average', () => {
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, _AT, [tf.account().name(), tf.price().average()])
       .groupByOp(tf.account().name())
-      .orderByOp(tf.account().name().ascending())
+      .orderBy(tf.account().name().ascending())
       .toRows();
     const avgs = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
     expect(avgs['Alpha Fund']).toBeCloseTo(150.0);
@@ -66,7 +66,7 @@ describe('TradeFinder — group by with average', () => {
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, _AT, [tf.account().name(), tf.price().average()], tf.isSettled().isTrue())
       .groupByOp(tf.account().name())
-      .orderByOp(tf.account().name().ascending())
+      .orderBy(tf.account().name().ascending())
       .toRows();
     const avgs = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
     expect(avgs['Alpha Fund']).toBeCloseTo(150.0);
@@ -79,7 +79,7 @@ describe('TradeFinder — group by with average', () => {
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, _AT, [tf.account().name(), tf.count()])
       .groupByOp(tf.account().name())
-      .orderByOp(tf.account().name().ascending())
+      .orderBy(tf.account().name().ascending())
       .toRows();
     const counts = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
     expect(counts['Alpha Fund']).toBe(2);

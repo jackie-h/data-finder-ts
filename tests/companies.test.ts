@@ -124,27 +124,27 @@ describe('CompanyFinder — string operations', () => {
 describe('CompanyFinder — sort', () => {
   it('sorts by name ascending', async () => {
     const rows = await cf.findAll(null, null, [cf.name()])
-      .orderByOp(cf.name().ascending()).toRows();
+      .orderBy(cf.name().ascending()).toRows();
     const names = rows.map(r => r[0] as string);
     expect(names).toEqual([...names].sort());
   });
 
   it('sorts by name descending', async () => {
     const rows = await cf.findAll(null, null, [cf.name()])
-      .orderByOp(cf.name().descending()).toRows();
+      .orderBy(cf.name().descending()).toRows();
     const names = rows.map(r => r[0] as string);
     expect(names).toEqual([...names].sort().reverse());
   });
 
   it('sorts by id descending, first row is highest', async () => {
     const rows = await cf.findAll(null, null, [cf.id()])
-      .orderByOp(cf.id().descending()).toRows();
+      .orderBy(cf.id().descending()).toRows();
     expect(Number(rows[0][0])).toBe(5);
   });
 
   it('multi-column sort: category asc then name asc', async () => {
     const rows = await cf.findAll(null, null, [cf.name(), cf.category()])
-      .orderByOp(cf.category().ascending(), cf.name().ascending()).toRows();
+      .orderBy(cf.category().ascending(), cf.name().ascending()).toRows();
     expect(rows[0][1]).toBe('Finance');
     const financeRows = rows.filter(r => r[1] === 'Finance');
     expect(financeRows[0][0]).toBe('Delta Ltd');
@@ -153,7 +153,7 @@ describe('CompanyFinder — sort', () => {
 
   it('multi-column sort: category asc then name desc', async () => {
     const rows = await cf.findAll(null, null, [cf.name(), cf.category()])
-      .orderByOp(cf.category().ascending(), cf.name().descending()).toRows();
+      .orderBy(cf.category().ascending(), cf.name().descending()).toRows();
     const financeRows = rows.filter(r => r[1] === 'Finance');
     expect(financeRows[0][0]).toBe('Gamma LLC');
     expect(financeRows[1][0]).toBe('Delta Ltd');
@@ -161,7 +161,7 @@ describe('CompanyFinder — sort', () => {
 
   it('sorts filtered results', async () => {
     const rows = await cf.findAll(null, null, [cf.name()], cf.category().eq('Technology'))
-      .orderByOp(cf.name().ascending()).toRows();
+      .orderBy(cf.name().ascending()).toRows();
     expect(rows.length).toBe(2);
     expect(rows[0][0]).toBe('Acme Corp');
     expect(rows[1][0]).toBe('Beta Corp');
@@ -204,7 +204,7 @@ describe('CompanyFinder — group by', () => {
 
   it('group by with order by', async () => {
     const rows = await cf.findAll(null, null, [cf.category(), cf.count()])
-      .groupByOp(cf.category()).orderByOp(cf.category().ascending()).toRows();
+      .groupByOp(cf.category()).orderBy(cf.category().ascending()).toRows();
     const categories = rows.map(r => r[0] as string);
     expect(categories).toEqual([...categories].sort());
   });

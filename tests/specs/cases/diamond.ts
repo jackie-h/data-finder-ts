@@ -5,7 +5,7 @@ import type { RecordFinder } from '../../generated_examples/diamond/RecordFinder
 export const DIAMOND_FINDER_SPECS: SpecCase<RecordFinder>[] = [
   {
     name: 'all_records',
-    query: f => f.findAll(null, null, [f.id(), f.recordName()]).orderByOp(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.recordName()]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Record Name'], rows: [
         [1, 'Alpha'],
         [2, 'Beta'],

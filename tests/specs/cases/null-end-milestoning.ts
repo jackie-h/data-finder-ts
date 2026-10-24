@@ -8,7 +8,7 @@ export const _AT_2021 = new Date(Date.UTC(2021, 5, 1, 12, 0, 0));
 export const NULL_END_PRICE_FINDER_SPECS: SpecCase<PriceFinder>[] = [
   {
     name: 'null_end_rows_active_at_2024',
-    query: f => f.findAll(null, _AT_2024, [f.symbol()]).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _AT_2024, [f.symbol()]).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['MSFT'],
@@ -21,7 +21,7 @@ export const NULL_END_PRICE_FINDER_SPECS: SpecCase<PriceFinder>[] = [
   },
   {
     name: 'all_three_active_before_expiry',
-    query: f => f.findAll(null, _AT_2021, [f.symbol()]).orderByOp(f.symbol().ascending()),
+    query: f => f.findAll(null, _AT_2021, [f.symbol()]).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['GOOG'],
