@@ -126,11 +126,18 @@ export abstract class ConstantOperation extends RelationalOperationElement imple
   descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 }
 
-export class IntegerConstantOperation extends ConstantOperation {
+/** A constant that is a number, so it can be an operand of arithmetic: `constant(100).minus(f.price())`. */
+export abstract class NumericConstantOperation extends ConstantOperation {
+  abstract readonly value: number;
+
+  arithmeticOperand(): RelationalOperationElement { return this; }
+}
+
+export class IntegerConstantOperation extends NumericConstantOperation {
   constructor(readonly value: number) { super(); }
 }
 
-export class FloatConstantOperation extends ConstantOperation {
+export class FloatConstantOperation extends NumericConstantOperation {
   constructor(readonly value: number) { super(); }
 }
 
@@ -156,7 +163,7 @@ export class DateTimeConstantOperation extends ConstantOperation {
   constructor(readonly value: Date) { super(); }
 }
 
-export class DecimalConstantOperation extends ConstantOperation {
+export class DecimalConstantOperation extends NumericConstantOperation {
   constructor(readonly value: number) { super(); }
 }
 
@@ -233,6 +240,8 @@ export class AggregateOperation extends UnaryOperation implements Aliasable, Sor
     readonly orderBy: SortOperation[] = [],
   ) { super(element); }
 
+  arithmeticOperand(): RelationalOperationElement { return this; }
+
   over(partitionBy?: RelationalOperationElement[], orderBy?: SortOperation[]): AggregateOperation {
     return new AggregateOperation(this.element, this.operator, this.displayName,
       new WindowSpecification(partitionBy ?? [], orderBy ?? []), this.separator, this.orderBy);
@@ -297,6 +306,15 @@ export class ScalarFunctionOperation extends UnaryOperation implements Aliasable
 
   /** This expression as an operand of a comparison. */
   comparisonOperand(): RelationalOperationElement { return this; }
+
+  arithmeticOperand(): RelationalOperationElement { return this; }
+
+  /** Only a function that gives a number can be used in arithmetic. */
+  assertNumeric(): void {
+    if (!NUMERIC_FUNCTIONS.has(this.func)) {
+      throw new TypeError(`${this.func} does not give a number, so it cannot be used in arithmetic`);
+    }
+  }
 }
 
 /** The functions that give a number, which arithmetic and `Numeric` functions apply to. */
@@ -640,11 +658,88 @@ export abstract class Comparable {
 export function applyMixins(derived: { prototype: object }, bases: { prototype: object }[]): void {
   for (const base of bases) {
     for (const name of Object.getOwnPropertyNames(base.prototype)) {
-      if (name === 'constructor') continue;
+      if (name === 'constructor' || Object.prototype.hasOwnProperty.call(derived.prototype, name)) continue;
       Object.defineProperty(derived.prototype, name, Object.getOwnPropertyDescriptor(base.prototype, name)!);
     }
   }
 }
 
-export interface ScalarFunctionOperation extends Comparable {}
-applyMixins(ScalarFunctionOperation, [Comparable]);
+export enum ArithmeticOperator {
+  ADD = '+',
+  SUBTRACT = '-',
+  MULTIPLY = '*',
+  DIVIDE = '/',
+}
+
+/** A number or a numeric expression: what arithmetic takes on the other side. */
+export type ArithmeticOperand = number | { arithmeticOperand(): RelationalOperationElement };
+
+/**
+ * `plus`, `minus`, `times` and `dividedBy` for an expression that holds a number: `f.price().times(f.quantity())`,
+ * `f.price().plus(1.5)`, `constant(100).minus(f.price())`. The other operand is a number or another numeric
+ * expression. Mixed into the expressions that have it.
+ */
+export abstract class Arithmetic {
+  abstract arithmeticOperand(): RelationalOperationElement;
+
+  /** Raises if this expression is not a number. */
+  assertNumeric(): void {}
+
+  private _arithmetic(operator: ArithmeticOperator, other: ArithmeticOperand): ArithmeticOperation {
+    this.assertNumeric();
+    let operand: RelationalOperationElement;
+    if (typeof other === 'number') {
+      if (!Number.isFinite(other)) throw new TypeError('Arithmetic is between numbers and numeric columns, not a non-finite number');
+      operand = valueOperand(other);
+    } else if (other !== null && typeof other === 'object' && typeof other.arithmeticOperand === 'function') {
+      (other as unknown as Arithmetic).assertNumeric?.();
+      operand = other.arithmeticOperand();
+    } else {
+      throw new TypeError(`Arithmetic is between numbers and numeric columns, not ${other === null ? 'null' : typeof other}`);
+    }
+    return new ArithmeticOperation(this.arithmeticOperand(), operator, operand);
+  }
+
+  /** `this + other`. */
+  plus(other: ArithmeticOperand): ArithmeticOperation { return this._arithmetic(ArithmeticOperator.ADD, other); }
+  /** `this - other`. */
+  minus(other: ArithmeticOperand): ArithmeticOperation { return this._arithmetic(ArithmeticOperator.SUBTRACT, other); }
+  /** `this * other`. */
+  times(other: ArithmeticOperand): ArithmeticOperation { return this._arithmetic(ArithmeticOperator.MULTIPLY, other); }
+  /** `this / other`. */
+  dividedBy(other: ArithmeticOperand): ArithmeticOperation { return this._arithmetic(ArithmeticOperator.DIVIDE, other); }
+}
+
+/** `left operator right` on numbers, e.g. `price * quantity`. */
+export class ArithmeticOperation extends BinaryOperation implements Aliasable, Sortable {
+  constructor(
+    left: RelationalOperationElement,
+    readonly operator: ArithmeticOperator,
+    right: RelationalOperationElement,
+    readonly displayName?: string,
+  ) { super(left, right); }
+
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+
+  arithmeticOperand(): RelationalOperationElement { return this; }
+  comparisonOperand(): RelationalOperationElement { return this; }
+}
+
+export interface ArithmeticOperation extends Arithmetic, Comparable {}
+applyMixins(ArithmeticOperation, [Arithmetic, Comparable]);
+
+export interface ScalarFunctionOperation extends Comparable, Arithmetic {}
+applyMixins(ScalarFunctionOperation, [Comparable, Arithmetic]);
+
+export interface AggregateOperation extends Arithmetic {}
+applyMixins(AggregateOperation, [Arithmetic]);
+
+export interface NumericConstantOperation extends Arithmetic {}
+applyMixins(NumericConstantOperation, [Arithmetic]);

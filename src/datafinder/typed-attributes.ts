@@ -13,6 +13,7 @@ import {
   DateOnly,
   escapeLike,
   applyMixins,
+  Arithmetic,
   DATE_ONLY_PATTERN,
   BooleanConstantOperation,
   DecimalConstantOperation,
@@ -109,8 +110,8 @@ export abstract class NumericAttribute extends Attribute {
   }
 }
 
-export interface NumericAttribute extends NumericFunctions {}
-applyMixins(NumericAttribute, [NumericFunctions]);
+export interface NumericAttribute extends NumericFunctions, Arithmetic {}
+applyMixins(NumericAttribute, [NumericFunctions, Arithmetic]);
 
 export class DoubleAttribute extends NumericAttribute {
   constructor(

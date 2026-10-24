@@ -65,6 +65,11 @@ export abstract class Attribute implements Aliasable {
     return this._displayName;
   }
 
+  /** @internal This attribute as an operand of arithmetic: its column. */
+  arithmeticOperand(): RelationalOperationElement {
+    return this.cwj();
+  }
+
   cwj(): ColumnWithJoin {
     return new ColumnWithJoin(this._column, this._parent, this._embedded?.cwj());
   }

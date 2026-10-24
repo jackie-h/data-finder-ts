@@ -81,6 +81,10 @@ To group differently, build the part that should bind first and combine it on th
 
 The result of a function has the functions of its type, so they chain: `cf.name().toUpperCase().length()` is labelled "Length Upper Name", and `price().sqrt().floor()` works the same way. An expression can be compared like a column, with a value or with another expression: `cf.name().toUpperCase().eq('ACME CORP')`, `cf.name().length().gt(cf.category().length())`. The GraphQL runner does not compute either on the client.
 
+### Arithmetic
+
+A numeric column, aggregate, number function or another calculation has `.plus()`, `.minus()`, `.times()` and `.dividedBy()`, with a number or another numeric expression on the other side: `tf.price().times(tf.quantity())`, `tf.price().plus(1.5)`. A number on the left is a constant: `constant(100).minus(tf.price())`. Parentheses are written only where the meaning needs them, so `tf.price().plus(1).times(2)` is `(t0.price + 1) * 2` and `a.minus(b.minus(1))` keeps its brackets. A result is named "Expression" unless `.alias()` names it, and can be compared (`tf.price().times(2).gte(8)`), sorted and aliased. A query that holds an aggregate in a calculation is grouped like any other aggregate. The GraphQL runner does not compute it on the client.
+
 ## Sorting
 
 Sort with `.orderBy()` and limit with `.limit()`. Several `orderBy` calls accumulate: the latest call takes priority and the earlier ones break its ties, so the two sorts below order by category and then by name. Sorting a column again replaces its earlier direction.
