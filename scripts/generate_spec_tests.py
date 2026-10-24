@@ -58,7 +58,7 @@ METHOD_NAMES = {
     'group_by': 'groupBy',
     'upper': 'toUpperCase',
     'lower': 'toLowerCase',
-    'coalesce': 'orElse',
+    'fill_null': 'orElse',
     'is_none': 'isNull',
     'is_not_none': 'isNotNull',
     'strip': 'trim',
@@ -67,11 +67,13 @@ METHOD_NAMES = {
 }
 
 # Result column labels that follow the TypeScript method name where it deliberately differs from Python's
-# (strip/lstrip/rstrip are trim/trimStart/trimEnd in TypeScript, see the idiomatic-naming refactor).
+# (strip/lstrip/rstrip are trim/trimStart/trimEnd in TypeScript, see the idiomatic-naming refactor; fill_null is orElse).
 COLUMN_LABELS = {
     'strip': {'Strip Name': 'Trim Name'},
     'lstrip': {'Lstrip Name': 'Trim Start Name'},
     'rstrip': {'Rstrip Name': 'Trim End Name'},
+    'fill_null_replaces_a_missing_manager': {'Fill Null Manager Name': 'Or Else Manager Name'},
+    'fill_null_leaves_a_value_that_is_there': {'Fill Null Name': 'Or Else Name'},
 }
 
 # Specs that exercise Python features the TypeScript port doesn't have (SQL views: View / to_view).
