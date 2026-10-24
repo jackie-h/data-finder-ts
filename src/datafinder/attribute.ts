@@ -12,6 +12,7 @@ import {
   ConstantOperation,
   JoinTreeNodeOperation,
   Alias,
+  Aliasable,
   WindowFunction,
   WindowFunctionOperation,
   WindowSpecification,
@@ -20,7 +21,7 @@ import {
 /** A value an attribute can be compared with in `isIn` / `isNotIn`. */
 export type AttributeValue = string | number | boolean | Date;
 
-export abstract class Attribute {
+export abstract class Attribute implements Aliasable {
   private readonly _displayName: string;
   private readonly _column: Column;
   private readonly _owner: string;

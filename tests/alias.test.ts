@@ -11,7 +11,7 @@ import { clearRunner, registerRunner } from '../src/datafinder/runner';
 import { toSql } from '../src/datafinder/sql-generator';
 import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { GraphQLEndpoint, GraphQLFilterConvention } from '../src/model/graphql_mapping';
-import { Alias, Column, CountAllOperation, NoOperation, RelationalOperationElement, Table } from '../src/model/relational';
+import { Alias, Aliasable, Column, CountAllOperation, NoOperation, RelationalOperationElement, Table } from '../src/model/relational';
 import { csvTable, startGraphQLServer } from './csv-graphql-server';
 import type { Attribute } from '../src/datafinder/attribute';
 
@@ -54,6 +54,11 @@ describe('alias in SQL', () => {
     const alias = id.alias('Key');
     expect(alias).toBeInstanceOf(Alias);
     expect(alias.name).toBe('Key');
+  });
+
+  it('everything a column can be implements Aliasable', () => {
+    const columns: Aliasable[] = [id, id.sum(), name.toUpperCase(), new CountAllOperation('t'), id.alias('A')];
+    expect(columns.map(c => c.alias('X')).every(a => a instanceof Alias)).toBe(true);
   });
 
   it('only a column can be aliased', () => {
