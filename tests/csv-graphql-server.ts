@@ -184,6 +184,10 @@ function evalLeaf(opName: string, raw: any, target: any): boolean {
   if (raw === null || raw === undefined) return false; // comparing null is never true, as in SQL
   if (opName === '_like') return likeToRegex(String(target)).test(String(raw));
   if (opName === '_nlike') return !likeToRegex(String(target)).test(String(raw));
+  if (opName === '_in' || opName === '_nin') {
+    const member = (target as unknown[]).some(t => { const [a, b] = comparable(raw, t); return a === b; });
+    return opName === '_in' ? member : !member;
+  }
   const [a, b] = comparable(raw, target);
   switch (opName) {
     case '_eq': return a === b;

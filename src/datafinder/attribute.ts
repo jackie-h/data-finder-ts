@@ -7,11 +7,17 @@ import {
   SortDirection,
   IsNullOperation,
   IsNotNullOperation,
+  InOperation,
+  NotInOperation,
+  ConstantOperation,
   JoinTreeNodeOperation,
   WindowFunction,
   WindowFunctionOperation,
   WindowSpecification,
 } from '../model/relational';
+
+/** A value an attribute can be compared with in `isIn` / `isNotIn`. */
+export type AttributeValue = string | number | boolean | Date;
 
 export abstract class Attribute {
   private readonly _displayName: string;
@@ -74,6 +80,27 @@ export abstract class Attribute {
   /** Filter to rows where this attribute has a value. */
   isNotNull(): IsNotNullOperation {
     return new IsNotNullOperation(this.cwj());
+  }
+
+  /** Wrap a value as a constant of this attribute's type. Overridden by the typed attributes. */
+  protected toConstant(_value: AttributeValue): ConstantOperation {
+    throw new TypeError(`${this.constructor.name} does not support isIn / isNotIn`);
+  }
+
+  private _constants(values: readonly AttributeValue[]): ConstantOperation[] {
+    const constants = values.map(v => this.toConstant(v));
+    if (constants.length === 0) throw new Error('isIn / isNotIn need at least one value');
+    return constants;
+  }
+
+  /** Filter to rows where this attribute equals any of `values`. */
+  isIn(values: readonly AttributeValue[]): InOperation {
+    return new InOperation(this.cwj(), this._constants(values));
+  }
+
+  /** Filter to rows where this attribute equals none of `values`. Rows with no value are excluded, as in SQL. */
+  isNotIn(values: readonly AttributeValue[]): NotInOperation {
+    return new NotInOperation(this.cwj(), this._constants(values));
   }
 
   private _windowSpec(

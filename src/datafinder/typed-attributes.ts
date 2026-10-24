@@ -1,4 +1,4 @@
-import { Attribute } from './attribute';
+import { Attribute, AttributeValue } from './attribute';
 import {
   ComparisonOperation,
   ComparisonOperator,
@@ -8,6 +8,9 @@ import {
   IntegerConstantOperation,
   DateConstantOperation,
   DateTimeConstantOperation,
+  ConstantOperation,
+  DateOnly,
+  DATE_ONLY_PATTERN,
   BooleanConstantOperation,
   DecimalConstantOperation,
   AggregateOperation,
@@ -30,6 +33,10 @@ export class StringAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
+
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new StringConstantOperation(String(value));
+  }
 
   /** Convert every character to uppercase. */
   toUpperCase(): ScalarFunctionOperation {
@@ -177,6 +184,10 @@ export class DoubleAttribute extends NumericAttribute {
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new FloatConstantOperation(Number(value));
+  }
+
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number): Operation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new FloatConstantOperation(value));
@@ -216,6 +227,10 @@ export class DecimalAttribute extends NumericAttribute {
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new DecimalConstantOperation(Number(value));
+  }
+
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number): Operation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new DecimalConstantOperation(value));
@@ -251,6 +266,10 @@ export class IntegerAttribute extends NumericAttribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
+
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new IntegerConstantOperation(Number(value));
+  }
 
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number): Operation {
@@ -288,6 +307,10 @@ export class BooleanAttribute extends Attribute {
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new BooleanConstantOperation(Boolean(value));
+  }
+
   /** Filter to rows where this attribute equals `value`. */
   eq(value: boolean): Operation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new BooleanConstantOperation(value));
@@ -309,6 +332,16 @@ function parseDate(value: Date | string): Date {
   return d;
 }
 
+/**
+ * A timestamp comparison value: a `DateOnly` (or a `YYYY-MM-DD` string) is a date literal,
+ * any other `Date` or string a timestamp literal.
+ */
+function temporalConstant(value: Date | string): DateConstantOperation | DateTimeConstantOperation {
+  if (typeof value === 'string' && DATE_ONLY_PATTERN.test(value)) return new DateConstantOperation(new DateOnly(value));
+  const date = parseDate(value);
+  return date instanceof DateOnly ? new DateConstantOperation(date) : new DateTimeConstantOperation(date);
+}
+
 export class DateAttribute extends Attribute {
   constructor(
     displayName: string,
@@ -318,6 +351,10 @@ export class DateAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
+
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new DateConstantOperation(parseDate(value as Date | string));
+  }
 
   /** Filter to rows where this date equals `value`. */
   eq(value: Date | string): Operation {
@@ -388,29 +425,33 @@ export class DateTimeAttribute extends Attribute {
     embedded?: Attribute,
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded); }
 
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return temporalConstant(value as Date | string);
+  }
+
   /** Filter to rows where this timestamp equals `value`. */
   eq(value: Date | string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new DateTimeConstantOperation(parseDate(value)));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, temporalConstant(value));
   }
   /** Filter to rows where this timestamp does not equal `value`. */
   ne(value: Date | string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new DateTimeConstantOperation(parseDate(value)));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, temporalConstant(value));
   }
   /** Filter to rows where this timestamp is after `value`. */
   gt(value: Date | string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, new DateTimeConstantOperation(parseDate(value)));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, temporalConstant(value));
   }
   /** Filter to rows where this timestamp is before `value`. */
   lt(value: Date | string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, new DateTimeConstantOperation(parseDate(value)));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, temporalConstant(value));
   }
   /** Filter to rows where this timestamp is on or after `value`. */
   gte(value: Date | string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, new DateTimeConstantOperation(parseDate(value)));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, temporalConstant(value));
   }
   /** Filter to rows where this timestamp is on or before `value`. */
   lte(value: Date | string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, new DateTimeConstantOperation(parseDate(value)));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, temporalConstant(value));
   }
 
   /** Extract the four-digit calendar year. */

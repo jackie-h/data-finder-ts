@@ -17,6 +17,8 @@ import {
   ComparisonOperator,
   IsNullOperation,
   IsNotNullOperation,
+  InOperation,
+  NotInOperation,
   AggregateOperation,
   AggregateOperator,
   ScalarFunctionOperation,
@@ -351,7 +353,8 @@ function walkRefs(
     if (op.window) walkWindowSpec(op.window, visit, visitExists);
   } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation ||
              op instanceof DateArithmeticOperation || op instanceof DateDiffOperation ||
-             op instanceof IsNullOperation || op instanceof IsNotNullOperation) {
+             op instanceof IsNullOperation || op instanceof IsNotNullOperation ||
+             op instanceof InOperation || op instanceof NotInOperation) {
     walkRefs((op as UnaryOperation).element, visit, visitExists);
   } else if (op instanceof SortOperation) {
     walkRefs(op.column, visit, visitExists);
@@ -724,6 +727,10 @@ class SQLQueryGenerator {
     if (op instanceof NotExistsOperation) {
       const col = op.node.join.right;
       return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NULL';
+    }
+    if (op instanceof InOperation || op instanceof NotInOperation) {
+      const keyword = op instanceof InOperation ? ' IN ' : ' NOT IN ';
+      return this.buildFilter(op.element) + keyword + '(' + op.values.map(constantValueString).join(', ') + ')';
     }
     if (op instanceof IsNotNullOperation) return this.buildFilter(op.element) + ' IS NOT NULL';
     if (op instanceof IsNullOperation) return this.buildFilter(op.element) + ' IS NULL';
