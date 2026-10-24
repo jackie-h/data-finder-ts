@@ -39,6 +39,7 @@ import {
   CountAllOperation,
   UnaryOperation,
   Alias,
+  LIKE_ESCAPE,
   ExistsOperation,
   NotExistsOperation,
   SelectOperation,
@@ -750,7 +751,12 @@ class SQLQueryGenerator {
       return left + LOGICAL_OPERATOR_STR[op.operator] + right;
     }
     if (op instanceof ComparisonOperation) {
-      return this.buildFilter(op.left) + COMPARISON_OPERATOR_STR[op.operator] + this.buildFilter(op.right);
+      let sql = this.buildFilter(op.left) + COMPARISON_OPERATOR_STR[op.operator] + this.buildFilter(op.right);
+      if ((op.operator === ComparisonOperator.LIKE || op.operator === ComparisonOperator.NOT_LIKE)
+        && op.right instanceof StringConstantOperation && op.right.value.includes(LIKE_ESCAPE)) {
+        sql += " ESCAPE '" + LIKE_ESCAPE + "'"; // the pattern has a literal %, _ or escape character in it
+      }
+      return sql;
     }
     if (op instanceof ConstantOperation) return constantValueString(op);
     if (op instanceof ColumnWithJoin) {

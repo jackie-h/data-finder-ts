@@ -9,6 +9,17 @@ export enum ComparisonOperator {
   NOT_LIKE = 'NOT_LIKE',
 }
 
+/** The character that makes the next one literal in a LIKE pattern built from a value (`contains`, `startsWith`, ...). */
+export const LIKE_ESCAPE = '!';
+
+/**
+ * `value` as part of a LIKE pattern that matches it literally: `%`, `_` and the escape character itself
+ * would otherwise be wildcards.
+ */
+export function escapeLike(value: string): string {
+  return value.replaceAll(LIKE_ESCAPE, LIKE_ESCAPE + LIKE_ESCAPE).replaceAll('%', LIKE_ESCAPE + '%').replaceAll('_', LIKE_ESCAPE + '_');
+}
+
 export enum LogicalOperator {
   AND = 'AND',
   OR = 'OR',

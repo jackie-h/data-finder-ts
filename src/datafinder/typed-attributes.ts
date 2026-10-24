@@ -10,6 +10,7 @@ import {
   DateTimeConstantOperation,
   ConstantOperation,
   DateOnly,
+  escapeLike,
   DATE_ONLY_PATTERN,
   BooleanConstantOperation,
   DecimalConstantOperation,
@@ -103,19 +104,19 @@ export class StringAttribute extends Attribute {
   }
   /** Filter to rows where this attribute contains `value` as a substring. */
   contains(value: string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`%${value}%`));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`%${escapeLike(value)}%`));
   }
   /** Filter to rows where this attribute begins with `prefix`. */
   startsWith(prefix: string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`${prefix}%`));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`${escapeLike(prefix)}%`));
   }
   /** Filter to rows where this attribute ends with `suffix`. */
   endsWith(suffix: string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`%${suffix}`));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`%${escapeLike(suffix)}`));
   }
   /** Filter to rows where this attribute does not contain `value` as a substring. */
   notContains(value: string): Operation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_LIKE, new StringConstantOperation(`%${value}%`));
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_LIKE, new StringConstantOperation(`%${escapeLike(value)}%`));
   }
 }
 
