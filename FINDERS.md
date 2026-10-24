@@ -144,6 +144,8 @@ af.findAll(null, null, [af.count()]).toSql()
 // → SELECT COUNT(*) FROM ref_data.account_master
 ```
 
+`.countDistinct()` counts the different non-NULL values (`COUNT(DISTINCT column)`); use it with `.groupBy()` to count per group. The GraphQL runner does not compute aggregates on the client.
+
 ## Replacing a missing value
 
 `.orElse(default)` (`COALESCE` in SQL) selects the value, or `default` when it is NULL. It works on any attribute, including one reached through an association (for example a manager that may not exist). The default is a string, number or boolean.

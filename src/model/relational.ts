@@ -31,6 +31,7 @@ export enum AggregateOperator {
   MIN = 'MIN',
   MAX = 'MAX',
   AVERAGE = 'AVERAGE',
+  COUNT_DISTINCT = 'COUNT_DISTINCT',
 }
 
 export enum ScalarFunction {
