@@ -53,6 +53,7 @@ export enum ScalarFunction {
   REPEAT = 'REPEAT',
   REPLACE = 'REPLACE',
   SUBSTRING = 'SUBSTRING',
+  COALESCE = 'COALESCE',
 }
 
 export enum DatePart {
@@ -253,7 +254,7 @@ export class ScalarFunctionOperation extends UnaryOperation implements Aliasable
     readonly func: ScalarFunction,
     readonly displayName?: string,
     readonly secondArg?: number,
-    readonly extraArgs: (string | number)[] = [],
+    readonly extraArgs: (string | number | boolean)[] = [],
   ) { super(element); }
 }
 
