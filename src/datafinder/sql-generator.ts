@@ -152,6 +152,17 @@ function constantValueString(op: ConstantOperation): string {
   throw new Error('Unknown constant operation');
 }
 
+/**
+ * A constant in the select list. A bare quoted literal would come back as text, so dates are typed, and a
+ * bare 1.5 would come back as a DECIMAL, so a float is cast to DOUBLE.
+ */
+function selectedConstantString(op: ConstantOperation): string {
+  if (op instanceof FloatConstantOperation) return 'CAST(' + constantValueString(op) + ' AS DOUBLE)';
+  if (op instanceof DateTimeConstantOperation) return 'TIMESTAMP ' + constantValueString(op);
+  if (op instanceof DateConstantOperation) return 'DATE ' + constantValueString(op);
+  return constantValueString(op);
+}
+
 function windowSpecToString(window: WindowSpecification): string {
   const parts: string[] = [];
   if (window.partitionBy.length > 0) {
@@ -214,6 +225,7 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
     return "DATE_DIFF('" + operation.unit.toLowerCase() + "', " + sqlOperationToString(operation.element) + ', ' + otherSql + ')';
   }
   if (operation instanceof CountAllOperation) return 'COUNT(*)';
+  if (operation instanceof ConstantOperation) return selectedConstantString(operation);
   if (operation instanceof Alias) {
     return sqlOperationToString(operation.element) + ' AS "' + operation.name + '"';
   }
@@ -717,6 +729,8 @@ class SQLQueryGenerator {
         aliasedOp = new DateDiffOperation(new TableAliasColumn(colNested.column, ta), (col as DateDiffOperation).other, (col as DateDiffOperation).unit);
       }
       this._select.push(new Alias(aliasedOp, alias));
+    } else if (col instanceof ConstantOperation) {
+      this._select.push(new Alias(col, 'Constant'));
     } else if (col instanceof CountAllOperation) {
       const ta = this._tableAliasForTable(col.table, col.table);
       this._from.add(ta);

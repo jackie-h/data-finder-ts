@@ -134,6 +134,14 @@ function gqlLiteral(value: unknown): string {
   return typeof value === 'string' ? JSON.stringify(value) : String(value);
 }
 
+/** The value of a constant column, as the server would return it: a date is its ISO text. */
+function constantValue(constant: ConstantOperation): unknown {
+  const value = (constant as unknown as { value: unknown }).value;
+  if (constant instanceof DateConstantOperation) return formatDate(constant.value);
+  if (value instanceof Date) return value.toISOString();
+  return value;
+}
+
 /** Serialize a constant to an inline GraphQL argument literal. */
 function gqlValue(constant: ConstantOperation): string {
   if (constant instanceof DateConstantOperation) return `"${formatDate(constant.value)}"`;
@@ -450,9 +458,14 @@ export class GraphQLConnect implements QueryRunner {
   ): Promise<Row[]> {
     // an alias only names the column in the result: read the column, then name it
     const columns = selected.map(c => c instanceof Alias ? c.element : c);
+    // a constant is not read from the server: only the other columns are selected
+    const fieldColumns = columns.filter(c => !(c instanceof ConstantOperation));
+    if (columns.length > 0 && fieldColumns.length === 0) {
+      throw new GraphQLUnsupportedError('A query of only constants selects no field from the server');
+    }
     const query = table as GraphQLQuery;
     // validates that every column is a plain field before anything is sent
-    const fieldsStr = buildFieldsStr(columns, query.endpoint.filterConvention);
+    const fieldsStr = buildFieldsStr(fieldColumns, query.endpoint.filterConvention);
     if (groupBy && groupBy.length > 0) {
       throw new GraphQLClientComputationError('The GraphQL runner does not support group by: aggregation is not computed on the client');
     }
@@ -463,7 +476,7 @@ export class GraphQLConnect implements QueryRunner {
         'A sort or limit cannot be pushed to the server for a date range: each date is a separate query');
     }
 
-    const expands = checkExpansion(op, columns, limit);
+    const expands = checkExpansion(op, fieldColumns, limit);
     // the server can only order the parents, so rows expanded by a to-many relation are sorted afterwards
     const sortAfter = expands && (orderBy ?? []).some(so => isMany(so.column));
     // with distinct or an offset the limit is applied here, after the duplicates and skipped rows are gone, not on the server before
@@ -482,9 +495,9 @@ export class GraphQLConnect implements QueryRunner {
     let flat = rows.flatMap(row => flattenRows(row));
     if (sortAfter) flat = sortExpanded(flat, orderBy ?? []);
     // a nested field is absent from every row when its parent object is null in all of them
-    const fields = columns.map(c => plain(rawName(c)));
-    this.lastColumns = selected.map(c => c instanceof Alias ? c.name : (c as Attribute).displayName());
-    let projected = flat.map(row => fields.map(f => row[f] ?? null));
+    const fields = columns.map(c => c instanceof ConstantOperation ? null : plain(rawName(c)));
+    this.lastColumns = selected.map(c => c instanceof Alias ? c.name : c instanceof ConstantOperation ? 'Constant' : (c as Attribute).displayName());
+    let projected = flat.map(row => columns.map((c, i) => c instanceof ConstantOperation ? constantValue(c) : row[fields[i]!] ?? null));
     if (distinct) {
       const seen = new Set<string>();
       projected = projected.filter(row => {
