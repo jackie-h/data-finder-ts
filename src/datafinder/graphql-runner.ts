@@ -8,6 +8,7 @@ import {
   DateConstantOperation,
   DateTimeConstantOperation,
   IsNotNullOperation,
+  Alias,
   InOperation,
   NotInOperation,
   IsNullOperation,
@@ -415,7 +416,7 @@ export class GraphQLConnect implements QueryRunner {
   async select(
     businessDate: Date | null,
     processingDatetime: Date | null,
-    columns: (Attribute | RelationalOperationElement)[],
+    selected: (Attribute | RelationalOperationElement)[],
     table: QueryTarget,
     op: RelationalOperationElement,
     orderBy?: SortOperation[],
@@ -424,6 +425,8 @@ export class GraphQLConnect implements QueryRunner {
     timeoutMs: number = DEFAULT_TIMEOUT_MS,
     businessDateTo: Date | null = null,
   ): Promise<Row[]> {
+    // an alias only names the column in the result: read the column, then name it
+    const columns = selected.map(c => c instanceof Alias ? c.element : c);
     const query = table as GraphQLQuery;
     // validates that every column is a plain field before anything is sent
     const fieldsStr = buildFieldsStr(columns, query.endpoint.filterConvention);
@@ -456,7 +459,7 @@ export class GraphQLConnect implements QueryRunner {
     if (sortAfter) flat = sortExpanded(flat, orderBy ?? []);
     // a nested field is absent from every row when its parent object is null in all of them
     const fields = columns.map(c => plain(rawName(c)));
-    this.lastColumns = columns.map(c => (c as Attribute).displayName());
+    this.lastColumns = selected.map(c => c instanceof Alias ? c.name : (c as Attribute).displayName());
     return flat.map(row => fields.map(f => row[f] ?? null));
   }
 }

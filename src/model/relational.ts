@@ -85,7 +85,10 @@ export class NoOperation extends Operation {
   }
 }
 
-export abstract class ConstantOperation extends RelationalOperationElement {}
+export abstract class ConstantOperation extends RelationalOperationElement {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+}
 
 export class IntegerConstantOperation extends ConstantOperation {
   constructor(readonly value: number) { super(); }
@@ -174,6 +177,9 @@ export class WindowSpecification {
 }
 
 export class AggregateOperation extends UnaryOperation {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly operator: AggregateOperator,
@@ -201,6 +207,9 @@ export enum WindowFunction {
 }
 
 export class WindowFunctionOperation extends UnaryOperation {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement | null,
     readonly func: WindowFunction,
@@ -217,6 +226,9 @@ export class WindowFunctionOperation extends UnaryOperation {
 }
 
 export class ScalarFunctionOperation extends UnaryOperation {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly func: ScalarFunction,
@@ -227,6 +239,9 @@ export class ScalarFunctionOperation extends UnaryOperation {
 }
 
 export class DateExtractOperation extends UnaryOperation {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly part: DatePart,
@@ -235,6 +250,9 @@ export class DateExtractOperation extends UnaryOperation {
 }
 
 export class DateArithmeticOperation extends UnaryOperation {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly n: number,
@@ -245,6 +263,9 @@ export class DateArithmeticOperation extends UnaryOperation {
 }
 
 export class DateDiffOperation extends UnaryOperation {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly other: Date,
@@ -373,11 +394,21 @@ export class SortOperation {
 }
 
 export class CountAllOperation extends RelationalOperationElement {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(readonly table: string) { super(); }
 }
 
+/**
+ * A column of the result under another name, wrapping the column it names. Only things that can be a
+ * column of the result have `alias()` (an `Attribute`, an aggregate, a function, a constant, ...), so a
+ * filter cannot be aliased; aliasing an alias replaces its name.
+ */
 export class Alias extends RelationalOperationElement {
   constructor(readonly element: RelationalOperationElement, readonly name: string) { super(); }
+
+  alias(name: string): Alias { return new Alias(this.element, name); }
 }
 
 /** Returned by `RelatedFinder.exists()`. A backend translates it to a join-presence check. */

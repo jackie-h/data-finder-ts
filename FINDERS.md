@@ -87,6 +87,16 @@ cf.findAll(null, null, [cf.name(), cf.category()])
   .orderBy(cf.category().ascending())
 ```
 
+## Naming columns
+
+A column is named in the result after its property. Give it another name with `.alias()`, on an attribute, an aggregate or a function of a column:
+
+```ts
+cf.findAll(null, null, [cf.name().alias('Company'), cf.id().count().alias('N')])
+```
+
+Only a column of the result can be aliased, so a filter has no `.alias()`. Aliasing an alias replaces its name.
+
 ## Joins
 
 Call a related finder method to include a JOIN and access its columns:
