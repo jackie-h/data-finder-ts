@@ -6,6 +6,8 @@ import {
   SortOperation,
   NoOperation,
   RelationalOperationElement,
+  DateOnly,
+  DATE_ONLY_PATTERN,
 } from '../model/relational';
 
 export type Row = unknown[];
@@ -115,13 +117,19 @@ export class FinderResult {
   }
 }
 
+/** A processing date input keeps the precision it was given: a date stays a date, a timestamp a timestamp. */
+function convertProcessingDate(value: Date | string | null): Date | null {
+  if (typeof value === 'string' && DATE_ONLY_PATTERN.test(value)) return new DateOnly(value + 'T00:00:00Z');
+  return convertDate(value);
+}
+
 function convertDate(value: Date | string | null): Date | null {
   if (value === null) return null;
   if (value instanceof Date) return value;
   // Zone-less strings (YYYY-MM-DD, or YYYY-MM-DD HH:MM[:SS]) are read as UTC, matching how
   // dates are formatted into SQL, so the value doesn't shift with the machine's timezone.
   let normalized = value;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) normalized = value + 'T00:00:00Z';
+  if (DATE_ONLY_PATTERN.test(value)) normalized = value + 'T00:00:00Z';
   else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)) normalized = value.replace(' ', 'T') + 'Z';
   const d = new Date(normalized);
   if (isNaN(d.getTime())) throw new Error(`Cannot parse date: ${value}`);
@@ -137,7 +145,7 @@ export function convertInputsAndSelect(
 ): FinderResult {
   return new FinderResult(
     convertDate(businessDate),
-    convertDate(processingDatetime),
+    convertProcessingDate(processingDatetime),
     columns,
     table,
     op,
@@ -157,7 +165,7 @@ export function convertInputsAndSelectForDateRange(
   if (processingDatetime == null) throw new Error('processingValidAt is required for findForDateRange');
   return new FinderResult(
     convertDate(businessDateFrom),
-    convertDate(processingDatetime),
+    convertProcessingDate(processingDatetime),
     columns,
     table,
     op,

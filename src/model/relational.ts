@@ -89,6 +89,16 @@ export class StringConstantOperation extends ConstantOperation {
   constructor(readonly value: string) { super(); }
 }
 
+/** Matches a zone-less calendar date such as `2024-06-01`. */
+export const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A calendar date, held as UTC midnight. JavaScript has no date-only type, so this marks a `Date`
+ * that was given as a date rather than a timestamp, and is rendered as a date literal (`'2024-06-01'`)
+ * instead of a timestamp literal (`'2024-06-01 00:00:00'`).
+ */
+export class DateOnly extends Date {}
+
 export class DateConstantOperation extends ConstantOperation {
   constructor(readonly value: Date) { super(); }
 }
@@ -235,13 +245,19 @@ export class DateDiffOperation extends UnaryOperation {
 
 export class Column extends RelationalOperationElement {
   table?: Table;
+  /** Whether the column may hold NULL. As in Legend, a primary key is never null. */
+  readonly nullable: boolean;
 
   constructor(
     readonly name: string,
     readonly type: string,
     readonly owner?: string,
     readonly primaryKey: boolean = false,
-  ) { super(); }
+    nullable: boolean = true,
+  ) {
+    super();
+    this.nullable = nullable && !primaryKey;
+  }
 }
 
 export class ForeignKey {

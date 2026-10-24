@@ -12,9 +12,9 @@ import { CompanyFinder as GraphQLCompanyFinder } from './generated_graphql/compa
 import { GraphQLConnect } from '../src/datafinder/graphql-runner';
 import { clearRunner, registerRunner } from '../src/datafinder/runner';
 import { GraphQLEndpoint, GraphQLFilterConvention } from '../src/model/graphql_mapping';
-import { Column, InOperation, NotInOperation, Operation, Table } from '../src/model/relational';
+import { Column, DateOnly, InOperation, NotInOperation, Operation, Table } from '../src/model/relational';
 import { toSql } from '../src/datafinder/sql-generator';
-import { BooleanAttribute, DateAttribute, DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
+import { BooleanAttribute, DateAttribute, DateTimeAttribute, DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { csvTable, startGraphQLServer } from './csv-graphql-server';
 
 const table = new Table('people', [new Column('id', 'INTEGER', 'people'), new Column('first_name', 'VARCHAR', 'people')]);
@@ -31,6 +31,12 @@ describe('SQL rendering', () => {
     expect(where(new BooleanAttribute('Active', 'active', 'BOOLEAN', 'people').isIn([true]))).toBe('t0.active IN (TRUE)');
     expect(where(new DateAttribute('Born', 'born', 'DATE', 'people').isIn(['2020-01-15', new Date('2021-02-03')])))
       .toBe("t0.born IN ('2020-01-15', '2021-02-03')");
+  });
+
+  it('renders a DateOnly or date string as a date literal for a timestamp', () => {
+    const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', 'people');
+    expect(where(at.isIn([new DateOnly('2020-01-15'), new Date('2021-02-03T10:30:00Z')])))
+      .toBe("t0.at IN ('2020-01-15', '2021-02-03 10:30:00')");
   });
 
   it('is an InOperation / NotInOperation', () => {

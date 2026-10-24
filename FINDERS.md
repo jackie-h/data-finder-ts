@@ -19,7 +19,7 @@ const af = new AccountFinder();
 
 const result = af.findAll(
   businessDate,           // Date | string | null  (null = not milestoned)
-  processingDate,         // Date | string | null  (null = not milestoned)
+  processingDate,         // Date | string | null  (null = not milestoned); a 'YYYY-MM-DD' string or a DateOnly is a date literal, a Date or 'YYYY-MM-DD HH:MM:SS' a timestamp
   [af.id(), af.name()],  // columns to SELECT
   af.id().eq(42),         // optional WHERE filter
 );
