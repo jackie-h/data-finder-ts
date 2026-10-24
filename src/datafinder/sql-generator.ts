@@ -43,6 +43,9 @@ import {
   ExistsOperation,
   NotExistsOperation,
   SelectOperation,
+  BinaryOperation,
+  containsAggregate,
+  containsAggregateOrWindow,
 } from '../model/relational';
 import {
   MilestonedTable,
@@ -492,6 +495,17 @@ export function needsParentheses(parent: LogicalOperation, child: RelationalOper
   return child instanceof LogicalOperation && child.operator !== parent.operator;
 }
 
+/** Whether a value is read through a to-many association, so it repeats the row it is read for. */
+function reachesToMany(op: RelationalOperationElement): boolean {
+  if (op instanceof ColumnWithJoin) {
+    for (let node = op.parent; node !== undefined; node = node.parent) if (node.many) return true;
+    return false;
+  }
+  if (op instanceof UnaryOperation || op instanceof Alias) return reachesToMany(op.element);
+  if (op instanceof BinaryOperation) return reachesToMany(op.left) || reachesToMany(op.right);
+  return false;
+}
+
 class SQLQueryGenerator {
   private _select: Alias[] = [];
   private _from: Set<TableAlias> = new Set();
@@ -525,13 +539,39 @@ class SQLQueryGenerator {
     for (const node of groupByJoins.values()) {
       this._addJoin(node);
     }
-    this._groupByParts = select.groupBy.map(a => this._attrToColString(a as Attribute));
+    this._groupByParts = this._groupByPartsFor(select);
     this._orderByParts = select.orderBy.map(s =>
       this.buildFilter(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
     );
     this._limit = select.limit;
     this._distinct = select.distinct;
     this._offset = select.offset;
+  }
+
+  /**
+   * The GROUP BY of a query: the grouping it was given, else the grouping its columns imply.
+   *
+   * Columns that are not aggregated are what the aggregates are computed for, so a query that selects both is
+   * grouped by those columns (as a DataFrame's `groupby(columns).agg(...)` does). An aggregate read through a
+   * to-many association is computed for each row of the root table, as Legend does, so the root's primary key
+   * is grouped by too. A query that selects only aggregates over the root's own columns is not grouped: the
+   * aggregate covers every row.
+   */
+  private _groupByPartsFor(select: SelectOperation): string[] {
+    if (select.groupBy.length > 0) return select.groupBy.map(a => this._attrToColString(a as Attribute));
+    const aggregates = select.display.filter(containsAggregate);
+    if (aggregates.length === 0) return [];
+    const perRoot = select.table !== undefined && aggregates.some(reachesToMany);
+    const keys = perRoot ? select.table!.columns.filter(c => c.primaryKey).map(c => this._columnToString(c)) : [];
+    const grouped = select.display
+      .map((column, i) => ({ column, shown: this._select[i] }))
+      .filter(({ column }) => !containsAggregateOrWindow(column))
+      .map(({ shown }) => sqlOperationToString(shown.element));
+    return [...new Set([...keys, ...grouped])];
+  }
+
+  private _columnToString(column: Column): string {
+    return this._tableAliasForTable(column.owner!, column.owner!).alias + '.' + column.name;
   }
 
   private _attrToColString(attr: Attribute): string {
