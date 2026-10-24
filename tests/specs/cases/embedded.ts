@@ -52,14 +52,14 @@ export const EMBEDDED_TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'group_by_embedded_account_name_elides_join',
-    query: f => f.findAll(null, _BOTH_AT, [f.account().name(), f.count()]).groupByOp(f.account().name()),
+    query: f => f.findAll(null, _BOTH_AT, [f.account().name(), f.count()]).groupBy(f.account().name()),
     expected: { columns: ['Account Name', 'Count'], rows: [
         ['Acme Corp', 2],
       ], unexpectedSql: 'JOIN', skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'group_by_mixed_with_account_id_forces_real_join',
-    query: f => f.findAll(null, _BOTH_AT, [f.account().name(), f.account().id(), f.count()]).groupByOp(f.account().name(), f.account().id()),
+    query: f => f.findAll(null, _BOTH_AT, [f.account().name(), f.account().id(), f.count()]).groupBy(f.account().name(), f.account().id()),
     expected: { columns: ['Account Name', 'Account Id', 'Count'], rows: [
         ['Acme Corp', 1, 2],
       ], sql: 'JOIN', skipGraphql: 'The GraphQL finder has no count() yet' },

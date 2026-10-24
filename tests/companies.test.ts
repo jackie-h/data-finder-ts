@@ -171,7 +171,7 @@ describe('CompanyFinder — sort', () => {
 describe('CompanyFinder — group by', () => {
   it('count per category', async () => {
     const rows = await cf.findAll(null, null, [cf.category(), cf.count()])
-      .groupByOp(cf.category()).toRows();
+      .groupBy(cf.category()).toRows();
     const counts = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
     expect(counts['Technology']).toBe(2);
     expect(counts['Finance']).toBe(2);
@@ -180,13 +180,13 @@ describe('CompanyFinder — group by', () => {
 
   it('group by returns one row per group', async () => {
     const rows = await cf.findAll(null, null, [cf.category(), cf.count()])
-      .groupByOp(cf.category()).toRows();
+      .groupBy(cf.category()).toRows();
     expect(rows.length).toBe(3);
   });
 
   it('group by with filter', async () => {
     const rows = await cf.findAll(null, null, [cf.category(), cf.count()], cf.category().ne('Manufacturing'))
-      .groupByOp(cf.category()).toRows();
+      .groupBy(cf.category()).toRows();
     expect(rows.length).toBe(2);
     const counts = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
     expect(counts['Technology']).toBe(2);
@@ -195,7 +195,7 @@ describe('CompanyFinder — group by', () => {
 
   it('attribute count per category', async () => {
     const rows = await cf.findAll(null, null, [cf.category(), cf.name().count()])
-      .groupByOp(cf.category()).toRows();
+      .groupBy(cf.category()).toRows();
     const counts = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
     expect(counts['Technology']).toBe(2);
     expect(counts['Finance']).toBe(2);
@@ -204,7 +204,7 @@ describe('CompanyFinder — group by', () => {
 
   it('group by with order by', async () => {
     const rows = await cf.findAll(null, null, [cf.category(), cf.count()])
-      .groupByOp(cf.category()).orderBy(cf.category().ascending()).toRows();
+      .groupBy(cf.category()).orderBy(cf.category().ascending()).toRows();
     const categories = rows.map(r => r[0] as string);
     expect(categories).toEqual([...categories].sort());
   });

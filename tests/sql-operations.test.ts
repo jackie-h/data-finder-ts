@@ -379,11 +379,11 @@ describe('NumericAttribute aggregate functions (execution)', () => {
     expect(Number(rows[0][0])).toBe(3);
   });
 
-  it('groupByOp + sum() returns per-symbol totals', async () => {
+  it('groupBy + sum() returns per-symbol totals', async () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const rows = await tf.findAll(null, null, [tf.symbol(), tf.price().sum()])
-      .groupByOp(tf.symbol())
+      .groupBy(tf.symbol())
       .toRows();
     expect(rows.length).toBe(3);
     const bySymbol = Object.fromEntries(rows.map(r => [r[0] as string, r[1] as number]));

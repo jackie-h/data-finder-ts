@@ -101,7 +101,7 @@ describe('embedded mapping — filter, group by, order by', () => {
 
   it('group by an embedded property elides the join', async () => {
     await check(
-      tf.findAll(null, BOTH_AT, [tf.account().name(), tf.count()]).groupByOp(tf.account().name()),
+      tf.findAll(null, BOTH_AT, [tf.account().name(), tf.count()]).groupBy(tf.account().name()),
       [['Acme Corp', 2n]], false,
     );
   });
@@ -109,7 +109,7 @@ describe('embedded mapping — filter, group by, order by', () => {
   it('group by mixed embedded and non-embedded keeps the join', async () => {
     await check(
       tf.findAll(null, BOTH_AT, [tf.account().name(), tf.account().id(), tf.count()])
-        .groupByOp(tf.account().name(), tf.account().id()),
+        .groupBy(tf.account().name(), tf.account().id()),
       [['Acme Corp', 1, 2n]], true,
     );
   });
