@@ -2,6 +2,7 @@ export { Attribute } from './attribute';
 export { registerRelatedFinderClass, getRelatedFinderClass } from './finder-registry';
 export * from './typed-attributes';
 export { constant } from './expressions';
+export { when } from './conditional';
 export { toSql, selectSqlToString } from './sql-generator';
 export { titleCase } from './naming';
 export { EmbeddedAttributes, embeddedUnder } from './embedded';
