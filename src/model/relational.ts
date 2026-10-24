@@ -471,5 +471,7 @@ export class SelectOperation {
     readonly joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map(),
     /** Whether each distinct row is returned once (`SELECT DISTINCT`). */
     readonly distinct: boolean = false,
+    /** How many rows to skip before the first one returned. */
+    readonly offset?: number,
   ) {}
 }

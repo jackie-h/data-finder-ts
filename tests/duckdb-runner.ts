@@ -22,8 +22,9 @@ export class DuckDbRunner implements QueryRunner {
     timeoutMs: number = DEFAULT_TIMEOUT_MS,
     businessDateTo: Date | null = null,
     distinct: boolean = false,
+    offset?: number,
   ): Promise<unknown[][]> {
-    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit, businessDateTo, distinct);
+    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset);
     console.log('[SQL]', sql);
     const timer = setTimeout(() => this.conn.interrupt(), timeoutMs);
     let result;

@@ -89,6 +89,8 @@ cf.findAll(null, null, [cf.name(), cf.category()])
 
 `.distinct()` returns each row once (`SELECT DISTINCT`): `cf.findAll(null, null, [cf.category()]).distinct()`. A sort on a distinct query has to use a selected column. The GraphQL runner removes the duplicates on the client, so it applies a limit after that rather than on the server.
 
+`.offset(n)` skips the first `n` rows and `.slice(start, stop)` keeps rows `start` up to `stop`, counting from 0. Sort first: without an order, which rows come first is not defined. The GraphQL runner applies the offset on the client, after the sort, and the limit after that rather than on the server.
+
 ## Naming columns
 
 A column is named in the result after its property. Give it another name with `.alias()`, on an attribute, an aggregate or a function of a column:

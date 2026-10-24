@@ -426,6 +426,7 @@ function buildQueryOperation(
   limit?: number,
   businessDateTo: Date | null = null,
   distinct: boolean = false,
+  offset?: number,
 ): SelectOperation {
   let filter = op;
   const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) =>
@@ -468,7 +469,7 @@ function buildQueryOperation(
     if (combined !== undefined) joinFilters.set(node, combined);
   }
 
-  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct);
+  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset);
 }
 
 /**
@@ -491,6 +492,7 @@ class SQLQueryGenerator {
   private _where = '';
   private _limit?: number;
   private _distinct = false;
+  private _offset?: number;
   private _tableAliasIncr = 0;
   private _tableAliasesByTable = new Map<unknown, TableAlias>();
   private _addedJoinIds = new Set<JoinTreeNodeOperation>();
@@ -520,6 +522,7 @@ class SQLQueryGenerator {
     );
     this._limit = select.limit;
     this._distinct = select.distinct;
+    this._offset = select.offset;
   }
 
   private _attrToColString(attr: Attribute): string {
@@ -812,7 +815,8 @@ class SQLQueryGenerator {
       this._buildWhere() +
       this._buildGroupBy() +
       this._buildOrderBy() +
-      this._buildLimit();
+      this._buildLimit() +
+      this._buildOffset();
   }
 
   private _buildWhere(): string {
@@ -824,6 +828,10 @@ class SQLQueryGenerator {
   private _buildOrderBy(): string {
     return this._orderByParts.length > 0 ? ' ORDER BY ' + this._orderByParts.join(', ') : '';
   }
+  private _buildOffset(): string {
+    return this._offset !== undefined ? ' OFFSET ' + this._offset : '';
+  }
+
   private _buildLimit(): string {
     return this._limit !== undefined ? ' LIMIT ' + this._limit : '';
   }
@@ -846,8 +854,9 @@ export function toSql(
   limit?: number,
   businessDateTo: Date | null = null,
   distinct: boolean = false,
+  offset?: number,
 ): string {
-  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct);
+  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset);
   return selectSqlToString(selectOp);
 }
 

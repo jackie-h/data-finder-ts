@@ -40,6 +40,7 @@ export interface QueryRunner {
     timeoutMs?: number,
     businessDateTo?: Date | null,
     distinct?: boolean,
+    offset?: number,
   ): Promise<Row[]>;
 }
 
@@ -64,6 +65,7 @@ export class FinderResult {
   private _groupBy: Attribute[] = [];
   private _limit?: number;
   private _distinct = false;
+  private _offset?: number;
   private _timeoutMs: number = DEFAULT_TIMEOUT_MS;
 
   constructor(
@@ -95,6 +97,21 @@ export class FinderResult {
     return this;
   }
 
+  /** Skip the first `n` rows. Sort the rows first: without an order, which rows are first is not defined. */
+  offset(n: number): this {
+    if (!Number.isInteger(n) || n < 0) throw new Error('offset cannot be negative');
+    this._offset = n;
+    return this;
+  }
+
+  /** Rows `start` up to but not including `stop`, counting from 0: `offset(start).limit(stop - start)`. */
+  slice(start: number, stop: number): this {
+    if (!Number.isInteger(start) || !Number.isInteger(stop) || start < 0 || stop < start) {
+      throw new Error('slice needs 0 <= start <= stop');
+    }
+    return this.offset(start).limit(stop - start);
+  }
+
   /** Return each distinct row once: `SELECT DISTINCT`. A sort on a distinct query has to use a selected column. */
   distinct(): this {
     this._distinct = true;
@@ -119,6 +136,7 @@ export class FinderResult {
       this._limit,
       this._businessDateTo,
       this._distinct,
+      this._offset,
     );
   }
 
@@ -135,6 +153,7 @@ export class FinderResult {
       this._timeoutMs,
       this._businessDateTo,
       this._distinct,
+      this._offset,
     );
   }
 }
