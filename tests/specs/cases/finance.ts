@@ -441,7 +441,7 @@ export const TRADE_EXISTS_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'exists_combined_with_a_filter',
-    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists().andOp(f.symbol().eq('AAPL'))),
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists().and(f.symbol().eq('AAPL'))),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
       ], skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
@@ -499,7 +499,7 @@ export const TRADE_IS_NONE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'is_none_combined_with_a_filter',
-    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull().andOp(f.symbol().eq('MSFT'))),
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().isNull().and(f.symbol().eq('MSFT'))),
     expected: { columns: ['Symbol'], rows: [
         ['MSFT'],
       ], skipGraphql: 'A condition on a nested field never matches a missing nested object on a server, so is_none cannot mean \'no live account\'' },

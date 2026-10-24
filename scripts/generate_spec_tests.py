@@ -51,6 +51,9 @@ SEEDS = {
 METHOD_NAMES = {
     'find_all': 'findAll',
     'find_for_date_range': 'findForDateRange',
+    'and_op': 'and',
+    'and_': 'and',
+    'or_': 'or',
     'order_by': 'orderBy',
     'group_by': 'groupByOp',
     'upper': 'toUpperCase',

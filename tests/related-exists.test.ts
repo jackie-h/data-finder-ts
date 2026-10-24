@@ -56,9 +56,9 @@ describe('RelatedFinder.exists / notExists', () => {
     expect(names(withProjects)).toEqual(['Bob']);
   });
 
-  it('combines with other filters via andOp', async () => {
+  it('combines with other filters via and', async () => {
     const rows = await ef.findAll(null, null, [ef.firstName()],
-      ef.manager().exists().andOp(ef.department().eq('Engineering')),
+      ef.manager().exists().and(ef.department().eq('Engineering')),
     ).orderBy(ef.firstName().ascending()).toRows();
     expect(names(rows)).toEqual(['Bob', 'Carol']);
   });

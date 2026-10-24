@@ -110,7 +110,7 @@ describe('TradeFinder', () => {
     expect(rows[0][1]).toBeCloseTo(3000.5, 1);
   });
 
-  it('combines filters with andOp', async () => {
+  it('combines filters with and', async () => {
     const { TradeFinder } = await import('../example/generated/TradeFinder');
     const tf = new TradeFinder();
     const now = new Date();
@@ -118,7 +118,7 @@ describe('TradeFinder', () => {
     const rows = await tf.findAll(
       null, now,
       [tf.symbol(), tf.price()],
-      tf.symbol().eq('AAPL').andOp(tf.price().eq(84.11)),
+      tf.symbol().eq('AAPL').and(tf.price().eq(84.11)),
     ).toRows();
 
     expect(rows.length).toBe(1);
