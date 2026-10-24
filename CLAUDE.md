@@ -35,7 +35,7 @@ Finder output (`example/generated/`, `tests/generated_examples/`, `tests/generat
 ### TypeScript library (`src/`)
 
 **`src/model/`** — core data model, no dependencies on datafinder:
-- `relational.ts` — operation tree (`ComparisonOperation`, `LogicalOperation`, `AggregateOperation`, `ColumnWithJoin`, `JoinOperation`, `JoinTreeNodeOperation`, …), `Column`, `Table`, `Schema`. Uses `instanceof` checks throughout (mirrors Python's `isinstance`). `Operation.andOp()` replaces Python's `__and__`.
+- `relational.ts` — operation tree (`ComparisonOperation`, `LogicalOperation`, `AggregateOperation`, `ColumnWithJoin`, `JoinOperation`, `JoinTreeNodeOperation`, …), `Column`, `Table`, `Schema`. Uses `instanceof` checks throughout (mirrors Python's `isinstance`). `Operation.and()` replaces Python's `__and__`.
 - `milestoning.ts` — temporal types: `ProcessingTemporalColumns`, `SingleBusinessDateColumn`, `BusinessDateAndProcessingTemporalColumns`, `BiTemporalColumns`, `MilestonedTable`.
 
 **`src/datafinder/`** — query building and execution:
