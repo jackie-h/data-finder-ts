@@ -9,7 +9,7 @@ import { registerDuckDb } from './duckdb-runner';
 import { seeds } from './spec-seeds';
 import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
 import { CompanyFinder as GraphQLCompanyFinder } from './generated_graphql/companies/CompanyFinder';
-import { GraphQLConnect } from '../src/datafinder/graphql-runner';
+import { GraphQLConnect, buildServerArgs } from '../src/datafinder/graphql-runner';
 import { clearRunner, registerRunner } from '../src/datafinder/runner';
 import { GraphQLEndpoint, GraphQLFilterConvention } from '../src/model/graphql_mapping';
 import { Column, DateOnly, InOperation, NotInOperation, Operation, Table } from '../src/model/relational';
@@ -25,7 +25,7 @@ const where = (op: Operation) => toSql(null, null, [id], table, op).split(' WHER
 describe('SQL rendering', () => {
   it('renders strings, numbers, dates and booleans as literals', () => {
     expect(where(name.isIn(['John', 'Peter']))).toBe("t0.first_name IN ('John', 'Peter')");
-    expect(where(name.isNotIn(['John', 'Peter']))).toBe("t0.first_name NOT IN ('John', 'Peter')");
+    expect(where(name.isNotIn(['John', 'Peter']))).toBe("(t0.first_name NOT IN ('John', 'Peter') OR t0.first_name IS NULL)");
     expect(where(id.isIn([2, 3]))).toBe('t0.id IN (2, 3)');
     expect(where(new DoubleAttribute('Price', 'price', 'DOUBLE', 'people').isIn([1.5, 2]))).toBe('t0.price IN (1.5, 2)');
     expect(where(new BooleanAttribute('Active', 'active', 'BOOLEAN', 'people').isIn([true]))).toBe('t0.active IN (TRUE)');
@@ -46,7 +46,12 @@ describe('SQL rendering', () => {
 
   it('combines with other filters', () => {
     expect(where(name.isIn(['John', 'Peter']).andOp(id.isNotIn([1]))))
-      .toBe("t0.first_name IN ('John', 'Peter') AND t0.id NOT IN (1)");
+      .toBe("t0.first_name IN ('John', 'Peter') AND (t0.id NOT IN (1) OR t0.id IS NULL)");
+  });
+
+  it('isNotIn on a not-null column has no NULL check', () => {
+    const notNull = new StringAttribute('First Name', 'first_name', 'VARCHAR', 'people', undefined, undefined, false);
+    expect(where(notNull.isNotIn(['John', 'Peter']))).toBe("t0.first_name NOT IN ('John', 'Peter')");
   });
 
   it('rejects an empty list', () => {
@@ -80,8 +85,13 @@ describe('DuckDB', () => {
     expect(await ids(toSql(null, null, [id], table, name.isIn(['John', 'Peter'])))).toEqual([1, 2]);
   });
 
-  it('isNotIn excludes the listed values and NULL', async () => {
-    expect(await ids(toSql(null, null, [id], table, name.isNotIn(['John', 'Peter'])))).toEqual([3]);
+  it('isNotIn on a nullable column includes NULL', async () => {
+    expect(await ids(toSql(null, null, [id], table, name.isNotIn(['John', 'Peter'])))).toEqual([3, 4]);
+  });
+
+  it('isNotIn on a not-null column excludes NULL, as SQL does', async () => {
+    const notNull = new StringAttribute('First Name', 'first_name', 'VARCHAR', 'people', undefined, undefined, false);
+    expect(await ids(toSql(null, null, [id], table, notNull.isNotIn(['John', 'Peter'])))).toEqual([3]);
   });
 
   it('isIn works on integers', async () => {
@@ -95,6 +105,20 @@ describe('DuckDB', () => {
     expect(rows).toEqual([['Acme Corp'], ['Gamma LLC']]);
     const rest = await f.findAll(null, null, [f.name()], f.name().isNotIn(['Acme Corp', 'Acme Industries', 'Gamma LLC'])).orderByOp(f.name().ascending()).toRows();
     expect(rest).toEqual([['Beta Corp'], ['Delta Ltd']]);
+  });
+});
+
+describe('GraphQL where clause', () => {
+  const convention = new GraphQLFilterConvention('where', 'order_by', 'limit');
+  const args = (op: Operation) => buildServerArgs(op, undefined, undefined, convention)[0];
+
+  it('matches the nulls of a nullable field for isNotIn', () => {
+    expect(args(name.isNotIn(['John']))).toBe('where: { _or: [{ first_name: { _nin: ["John"] } }, { first_name: { _is_null: true } }] }');
+  });
+
+  it('does not for a not-null field', () => {
+    const notNull = new StringAttribute('First Name', 'first_name', 'VARCHAR', 'people', undefined, undefined, false);
+    expect(args(notNull.isNotIn(['John']))).toBe('where: { first_name: { _nin: ["John"] } }');
   });
 });
 
