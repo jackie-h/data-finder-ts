@@ -728,9 +728,17 @@ class SQLQueryGenerator {
       const col = op.node.join.right;
       return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NULL';
     }
-    if (op instanceof InOperation || op instanceof NotInOperation) {
-      const keyword = op instanceof InOperation ? ' IN ' : ' NOT IN ';
-      return this.buildFilter(op.element) + keyword + '(' + op.values.map(constantValueString).join(', ') + ')';
+    if (op instanceof InOperation) {
+      return this.buildFilter(op.element) + ' IN (' + op.values.map(constantValueString).join(', ') + ')';
+    }
+    if (op instanceof NotInOperation) {
+      const column = this.buildFilter(op.element);
+      const sql = column + ' NOT IN (' + op.values.map(constantValueString).join(', ') + ')';
+      // NULL NOT IN (...) is not true in SQL, so a nullable column has to match its NULLs explicitly
+      if (op.element instanceof ColumnWithJoin && this._resolve(op.element).column.nullable) {
+        return '(' + sql + ' OR ' + column + ' IS NULL)';
+      }
+      return sql;
     }
     if (op instanceof IsNotNullOperation) return this.buildFilter(op.element) + ' IS NOT NULL';
     if (op instanceof IsNullOperation) return this.buildFilter(op.element) + ' IS NULL';

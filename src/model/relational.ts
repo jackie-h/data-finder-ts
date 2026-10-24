@@ -67,11 +67,21 @@ export abstract class Operation extends RelationalOperationElement {
   andOp(other: RelationalOperationElement): Operation {
     return new LogicalOperation(this, LogicalOperator.AND, other);
   }
+
+  /** Combine with `other` using OR. A chain reads left to right: `a.orOp(b).andOp(c)` is `(a OR b) AND c`. */
+  orOp(other: RelationalOperationElement): Operation {
+    return new LogicalOperation(this, LogicalOperator.OR, other);
+  }
 }
 
 export class NoOperation extends Operation {
   andOp(other: RelationalOperationElement): Operation {
     return other as Operation;
+  }
+
+  /** No filter matches every row, so OR-ing anything with it still matches every row. */
+  orOp(_other: RelationalOperationElement): Operation {
+    return this;
   }
 }
 
@@ -377,6 +387,10 @@ export class ExistsOperation extends RelationalOperationElement {
   andOp(other: RelationalOperationElement): LogicalOperation {
     return new LogicalOperation(this, LogicalOperator.AND, other);
   }
+
+  orOp(other: RelationalOperationElement): LogicalOperation {
+    return new LogicalOperation(this, LogicalOperator.OR, other);
+  }
 }
 
 /** Returned by `RelatedFinder.notExists()`. A backend translates it to a join-absence check. */
@@ -385,6 +399,10 @@ export class NotExistsOperation extends RelationalOperationElement {
 
   andOp(other: RelationalOperationElement): LogicalOperation {
     return new LogicalOperation(this, LogicalOperator.AND, other);
+  }
+
+  orOp(other: RelationalOperationElement): LogicalOperation {
+    return new LogicalOperation(this, LogicalOperator.OR, other);
   }
 }
 

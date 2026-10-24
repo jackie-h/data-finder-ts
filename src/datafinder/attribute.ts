@@ -33,9 +33,10 @@ export abstract class Attribute {
     owner: string,
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
+    nullable: boolean = true,
   ) {
     this._displayName = displayName;
-    this._column = new Column(columnName, columnDbType, owner);
+    this._column = new Column(columnName, columnDbType, owner, false, nullable);
     this._owner = owner;
     this._parent = parent;
     this._embedded = embedded;

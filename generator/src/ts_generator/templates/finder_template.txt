@@ -47,7 +47,7 @@ import { registerRelatedFinderClass } from '@datafinder/finder-registry';
 function embeddedFor_{{to_ts_name(rpm.property)}}(incoming: EmbeddedAttributes | undefined, parent: JoinTreeNodeOperation | undefined, relationName: string): EmbeddedAttributes {
   const result: EmbeddedAttributes = {};
 {% for dotted, leaf_prop, col in flatten_embedded(rpm.target) %}
-  result['{{dotted}}'] = new {{leaf_prop.type.name}}Attribute(titleCase(relationName) + ' {{display_name(leaf_prop)}}', '{{col.name}}', '{{col.type}}', '{{table_qualified_name(col.table)}}', parent);
+  result['{{dotted}}'] = new {{leaf_prop.type.name}}Attribute(titleCase(relationName) + ' {{display_name(leaf_prop)}}', '{{col.name}}', '{{col.type}}', '{{table_qualified_name(col.table)}}', parent{% if col.nullable is defined and not col.nullable %}, undefined, false{% endif %});
 {% endfor %}
   const forwarded = embeddedUnder(incoming, '{{rpm.property.id}}.');
   if (forwarded) Object.assign(result, forwarded);
@@ -127,7 +127,7 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
     this._node = new JoinTreeNodeOperation(join, parentJoin);
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
-    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(displayPrefix(relationName, parentJoin) + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node, embedded?.['{{rpm.property.id}}']);
+    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(displayPrefix(relationName, parentJoin) + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node, embedded?.['{{rpm.property.id}}']{% if rpm.target.nullable is defined and not rpm.target.nullable %}, false{% endif %});
 {% elif rpm.property.type.name != rcm.clazz.name %}
     this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'), this._node, {% if flatten_embedded(rpm.target) %}embeddedFor_{{to_ts_name(rpm.property)}}(embedded, this._node, '{{rpm.property.name}}'){% else %}embeddedUnder(embedded, '{{rpm.property.id}}.'){% endif %});
 {% endif %}
@@ -223,7 +223,7 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
-  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute('{{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}');
+  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute('{{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}'{% if rpm.target.nullable is defined and not rpm.target.nullable %}, undefined, undefined, false{% endif %});
 {% elif rpm.property.type.name != rcm.clazz.name %}
   private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'){% if flatten_embedded(rpm.target) %}, undefined, embeddedFor_{{to_ts_name(rpm.property)}}(undefined, undefined, '{{rpm.property.name}}'){% endif %});
 {% endif %}
