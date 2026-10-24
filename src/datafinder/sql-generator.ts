@@ -133,6 +133,7 @@ const SCALAR_SQL_NAMES: Record<ScalarFunction, string> = {
   [ScalarFunction.REPEAT]: 'REPEAT',
   [ScalarFunction.REPLACE]: 'REPLACE',
   [ScalarFunction.SUBSTRING]: 'SUBSTRING',
+  [ScalarFunction.COALESCE]: 'COALESCE',
 };
 
 function constantValueString(op: ConstantOperation): string {

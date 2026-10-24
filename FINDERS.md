@@ -144,6 +144,16 @@ af.findAll(null, null, [af.count()]).toSql()
 // → SELECT COUNT(*) FROM ref_data.account_master
 ```
 
+## Replacing a missing value
+
+`.orElse(default, ...)` selects (`COALESCE` in SQL) the value, or the first default that is not NULL when it is. It works on any attribute, including one reached through an association (for example a manager that may not exist). Defaults are strings, numbers or booleans.
+
+```ts
+ef.findAll(null, null, [ef.name(), ef.manager().name().orElse('nobody')])
+```
+
+The GraphQL runner does not compute functions on the client, so it reports `GraphQLClientComputationError` for an `orElse` column, as for the other functions.
+
 ## Reverse associations
 
 When a `Trade → Account` association exists, `AccountFinder` gets a `trades()` method. Because ESM circular imports can't be resolved statically, finders self-register at module load — import the source finder first:

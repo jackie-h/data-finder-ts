@@ -13,6 +13,8 @@ import {
   JoinTreeNodeOperation,
   Alias,
   Aliasable,
+  ScalarFunction,
+  ScalarFunctionOperation,
   WindowFunction,
   WindowFunctionOperation,
   WindowSpecification,
@@ -68,6 +70,17 @@ export abstract class Attribute implements Aliasable {
   /** Name this column in the result: `f.price().sum().alias('Total')`. */
   alias(name: string): Alias {
     return new Alias(this, name);
+  }
+
+  /** The value, or the first default that is not NULL when it is NULL: `name().orElse('N/A')`. */
+  orElse(...defaults: (string | number | boolean)[]): ScalarFunctionOperation {
+    if (defaults.length === 0) throw new Error('orElse needs at least one default');
+    for (const d of defaults) {
+      if (!['string', 'number', 'boolean'].includes(typeof d)) {
+        throw new TypeError(`An orElse default is a string, number or boolean, not ${d === null ? 'null' : typeof d}`);
+      }
+    }
+    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.COALESCE, 'Coalesce ' + this._displayName, undefined, defaults);
   }
 
   /** Sort this attribute in ascending order. Pass to `orderBy` or a window function's `orderBy`. */
