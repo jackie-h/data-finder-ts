@@ -235,13 +235,19 @@ export class DateDiffOperation extends UnaryOperation {
 
 export class Column extends RelationalOperationElement {
   table?: Table;
+  /** Whether the column may hold NULL. As in Legend, a primary key is never null. */
+  readonly nullable: boolean;
 
   constructor(
     readonly name: string,
     readonly type: string,
     readonly owner?: string,
     readonly primaryKey: boolean = false,
-  ) { super(); }
+    nullable: boolean = true,
+  ) {
+    super();
+    this.nullable = nullable && !primaryKey;
+  }
 }
 
 export class ForeignKey {
