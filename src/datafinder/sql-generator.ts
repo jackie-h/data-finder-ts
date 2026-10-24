@@ -356,6 +356,8 @@ function walkRefs(
              op instanceof IsNullOperation || op instanceof IsNotNullOperation ||
              op instanceof InOperation || op instanceof NotInOperation) {
     walkRefs((op as UnaryOperation).element, visit, visitExists);
+  } else if (op instanceof Alias) {
+    walkRefs(op.element, visit, visitExists);
   } else if (op instanceof SortOperation) {
     walkRefs(op.column, visit, visitExists);
   } else if (op instanceof LogicalOperation || op instanceof ComparisonOperation) {
@@ -616,86 +618,93 @@ class SQLQueryGenerator {
       this._addJoin(node);
     }
 
-    for (const col of cols) {
-      if (col instanceof Attribute) {
-        const { column, parent: node } = this._resolve(col);
-        let ta: TableAlias;
-        if (node !== undefined) {
-          ta = this._tableAliasForTable(column.owner!, node);
-        } else {
-          ta = this._tableAliasForTable(column.owner!, column.owner!);
-          this._from.add(ta);
-        }
-        this._select.push(new Alias(new TableAliasColumn(column, ta), col.displayName()));
-      } else if (col instanceof WindowFunctionOperation) {
-        const rewritten = this._rewriteOperation(col) as WindowFunctionOperation;
-        let alias: string;
-        if (col.displayName) {
-          alias = col.displayName;
-        } else if ([WindowFunction.ROW_NUMBER, WindowFunction.RANK, WindowFunction.DENSE_RANK].includes(col.func)) {
-          alias = col.func.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        } else if (col.element) {
-          alias = col.func + ' ' + findColumn(col).column.name;
-        } else {
-          alias = col.func;
-        }
-        this._select.push(new Alias(rewritten, alias));
-      } else if (col instanceof AggregateOperation) {
-        const colNested = this._resolve(findColumn(col));
-        const node = colNested.parent;
-        let ta: TableAlias;
-        if (node !== undefined) {
-          ta = this._tableAliasForTable(colNested.column.owner!, node);
-        } else {
-          ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
-          this._from.add(ta);
-        }
-        const alias = col.displayName ?? col.operator + ' ' + findColumn(col).column.name;
-        const rewrittenAgg = new AggregateOperation(
-          new TableAliasColumn(colNested.column, ta), col.operator, undefined,
-          col.window ? this._rewriteWindowSpec(col.window) : undefined,
-        );
-        this._select.push(new Alias(rewrittenAgg, alias));
-      } else if (col instanceof ScalarFunctionOperation) {
-        const colNested = this._resolve(findColumn(col));
-        const node = colNested.parent;
-        let ta: TableAlias;
-        if (node !== undefined) {
-          ta = this._tableAliasForTable(colNested.column.owner!, node);
-        } else {
-          ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
-          this._from.add(ta);
-        }
-        const alias = col.displayName ?? col.func + ' ' + findColumn(col).column.name;
-        this._select.push(new Alias(
-          new ScalarFunctionOperation(new TableAliasColumn(colNested.column, ta), col.func, undefined, col.secondArg, col.extraArgs),
-          alias,
-        ));
-      } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation || col instanceof DateDiffOperation) {
-        const colNested = this._resolve(findColumn(col as RelationalOperationElement));
-        const node = colNested.parent;
-        let ta: TableAlias;
-        if (node !== undefined) {
-          ta = this._tableAliasForTable(colNested.column.owner!, node);
-        } else {
-          ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
-          this._from.add(ta);
-        }
-        const alias = (col as DateExtractOperation).displayName ?? findColumn(col as RelationalOperationElement).column.name;
-        let aliasedOp: RelationalOperationElement;
-        if (col instanceof DateExtractOperation) {
-          aliasedOp = new DateExtractOperation(new TableAliasColumn(colNested.column, ta), col.part);
-        } else if (col instanceof DateArithmeticOperation) {
-          aliasedOp = new DateArithmeticOperation(new TableAliasColumn(colNested.column, ta), col.n, col.unit, col.isAdd);
-        } else {
-          aliasedOp = new DateDiffOperation(new TableAliasColumn(colNested.column, ta), (col as DateDiffOperation).other, (col as DateDiffOperation).unit);
-        }
-        this._select.push(new Alias(aliasedOp, alias));
-      } else if (col instanceof CountAllOperation) {
-        const ta = this._tableAliasForTable(col.table, col.table);
+    for (const col of cols) this._selectColumn(col);
+  }
+
+  /** Add one column to the select list. An alias reads the column it wraps, then names the entry. */
+  private _selectColumn(col: Attribute | RelationalOperationElement): void {
+    if (col instanceof Alias) {
+      this._selectColumn(col.element);
+      const read = this._select.pop()!;
+      this._select.push(new Alias(read.element, col.name));
+    } else if (col instanceof Attribute) {
+      const { column, parent: node } = this._resolve(col);
+      let ta: TableAlias;
+      if (node !== undefined) {
+        ta = this._tableAliasForTable(column.owner!, node);
+      } else {
+        ta = this._tableAliasForTable(column.owner!, column.owner!);
         this._from.add(ta);
-        this._select.push(new Alias(col, 'Count'));
       }
+      this._select.push(new Alias(new TableAliasColumn(column, ta), col.displayName()));
+    } else if (col instanceof WindowFunctionOperation) {
+      const rewritten = this._rewriteOperation(col) as WindowFunctionOperation;
+      let alias: string;
+      if (col.displayName) {
+        alias = col.displayName;
+      } else if ([WindowFunction.ROW_NUMBER, WindowFunction.RANK, WindowFunction.DENSE_RANK].includes(col.func)) {
+        alias = col.func.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      } else if (col.element) {
+        alias = col.func + ' ' + findColumn(col).column.name;
+      } else {
+        alias = col.func;
+      }
+      this._select.push(new Alias(rewritten, alias));
+    } else if (col instanceof AggregateOperation) {
+      const colNested = this._resolve(findColumn(col));
+      const node = colNested.parent;
+      let ta: TableAlias;
+      if (node !== undefined) {
+        ta = this._tableAliasForTable(colNested.column.owner!, node);
+      } else {
+        ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
+        this._from.add(ta);
+      }
+      const alias = col.displayName ?? col.operator + ' ' + findColumn(col).column.name;
+      const rewrittenAgg = new AggregateOperation(
+        new TableAliasColumn(colNested.column, ta), col.operator, undefined,
+        col.window ? this._rewriteWindowSpec(col.window) : undefined,
+      );
+      this._select.push(new Alias(rewrittenAgg, alias));
+    } else if (col instanceof ScalarFunctionOperation) {
+      const colNested = this._resolve(findColumn(col));
+      const node = colNested.parent;
+      let ta: TableAlias;
+      if (node !== undefined) {
+        ta = this._tableAliasForTable(colNested.column.owner!, node);
+      } else {
+        ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
+        this._from.add(ta);
+      }
+      const alias = col.displayName ?? col.func + ' ' + findColumn(col).column.name;
+      this._select.push(new Alias(
+        new ScalarFunctionOperation(new TableAliasColumn(colNested.column, ta), col.func, undefined, col.secondArg, col.extraArgs),
+        alias,
+      ));
+    } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation || col instanceof DateDiffOperation) {
+      const colNested = this._resolve(findColumn(col as RelationalOperationElement));
+      const node = colNested.parent;
+      let ta: TableAlias;
+      if (node !== undefined) {
+        ta = this._tableAliasForTable(colNested.column.owner!, node);
+      } else {
+        ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
+        this._from.add(ta);
+      }
+      const alias = (col as DateExtractOperation).displayName ?? findColumn(col as RelationalOperationElement).column.name;
+      let aliasedOp: RelationalOperationElement;
+      if (col instanceof DateExtractOperation) {
+        aliasedOp = new DateExtractOperation(new TableAliasColumn(colNested.column, ta), col.part);
+      } else if (col instanceof DateArithmeticOperation) {
+        aliasedOp = new DateArithmeticOperation(new TableAliasColumn(colNested.column, ta), col.n, col.unit, col.isAdd);
+      } else {
+        aliasedOp = new DateDiffOperation(new TableAliasColumn(colNested.column, ta), (col as DateDiffOperation).other, (col as DateDiffOperation).unit);
+      }
+      this._select.push(new Alias(aliasedOp, alias));
+    } else if (col instanceof CountAllOperation) {
+      const ta = this._tableAliasForTable(col.table, col.table);
+      this._from.add(ta);
+      this._select.push(new Alias(col, 'Count'));
     }
   }
 

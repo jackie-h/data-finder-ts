@@ -63,6 +63,14 @@ export enum SortDirection {
 
 export abstract class RelationalOperationElement {}
 
+/**
+ * Something that can be a column of the result, so can be given a name there:
+ * `f.price().sum().alias('Total')`. The name is held by an `Alias` that wraps the column.
+ */
+export interface Aliasable {
+  alias(name: string): Alias;
+}
+
 export abstract class Operation extends RelationalOperationElement {
   and(other: RelationalOperationElement): Operation {
     return new LogicalOperation(this, LogicalOperator.AND, other);
@@ -85,7 +93,10 @@ export class NoOperation extends Operation {
   }
 }
 
-export abstract class ConstantOperation extends RelationalOperationElement {}
+export abstract class ConstantOperation extends RelationalOperationElement implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+}
 
 export class IntegerConstantOperation extends ConstantOperation {
   constructor(readonly value: number) { super(); }
@@ -173,7 +184,10 @@ export class WindowSpecification {
   ) {}
 }
 
-export class AggregateOperation extends UnaryOperation {
+export class AggregateOperation extends UnaryOperation implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly operator: AggregateOperator,
@@ -200,7 +214,10 @@ export enum WindowFunction {
   PERCENT_RANK = 'PERCENT_RANK',
 }
 
-export class WindowFunctionOperation extends UnaryOperation {
+export class WindowFunctionOperation extends UnaryOperation implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement | null,
     readonly func: WindowFunction,
@@ -216,7 +233,10 @@ export class WindowFunctionOperation extends UnaryOperation {
   }
 }
 
-export class ScalarFunctionOperation extends UnaryOperation {
+export class ScalarFunctionOperation extends UnaryOperation implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly func: ScalarFunction,
@@ -226,7 +246,10 @@ export class ScalarFunctionOperation extends UnaryOperation {
   ) { super(element); }
 }
 
-export class DateExtractOperation extends UnaryOperation {
+export class DateExtractOperation extends UnaryOperation implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly part: DatePart,
@@ -234,7 +257,10 @@ export class DateExtractOperation extends UnaryOperation {
   ) { super(element); }
 }
 
-export class DateArithmeticOperation extends UnaryOperation {
+export class DateArithmeticOperation extends UnaryOperation implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly n: number,
@@ -244,7 +270,10 @@ export class DateArithmeticOperation extends UnaryOperation {
   ) { super(element); }
 }
 
-export class DateDiffOperation extends UnaryOperation {
+export class DateDiffOperation extends UnaryOperation implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(
     element: RelationalOperationElement,
     readonly other: Date,
@@ -372,12 +401,22 @@ export class SortOperation {
   ) {}
 }
 
-export class CountAllOperation extends RelationalOperationElement {
+export class CountAllOperation extends RelationalOperationElement implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(readonly table: string) { super(); }
 }
 
-export class Alias extends RelationalOperationElement {
+/**
+ * A column of the result under another name, wrapping the column it names. Only things that can be a
+ * column of the result have `alias()` (an `Attribute`, an aggregate, a function, a constant, ...), so a
+ * filter cannot be aliased; aliasing an alias replaces its name.
+ */
+export class Alias extends RelationalOperationElement implements Aliasable {
   constructor(readonly element: RelationalOperationElement, readonly name: string) { super(); }
+
+  alias(name: string): Alias { return new Alias(this.element, name); }
 }
 
 /** Returned by `RelatedFinder.exists()`. A backend translates it to a join-presence check. */
