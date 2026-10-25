@@ -89,6 +89,10 @@ A numeric column, aggregate, number function or another calculation has `.plus()
 
 `.concat(...parts)` on a text column or a function that gives text joins text, where Python writes `+`: `cf.name().concat(' (', cf.category(), ')')`. A part is a string, a text column, a function that gives text, or another concatenation, and `concat(...)` starts one from anything: `concat('Company: ', cf.name())`. Concatenations join into one, so `a.concat('-').concat(b)` is `a || '-' || b`. A NULL in any part makes the whole result NULL, as with SQL's `||`. The result is named "Expression" unless `.alias()` names it, and can be compared, sorted and aliased. The GraphQL runner does not compute it on the client.
 
+### First day of a period
+
+`.firstDayOfWeek()` (a Monday), `.firstDayOfMonth()`, `.firstDayOfQuarter()` and `.firstDayOfYear()` on a date or timestamp attribute give the date the period starts, as a date: `pf.tradeDate().firstDayOfMonth()`. The result is named after the function and the column (`First Day Of Month Trade Date`), and can be compared (`.eq(new DateOnly('2024-07-01'))`), sorted and aliased.
+
 ## Sorting
 
 Sort with `.orderBy()` and limit with `.limit()`. Several `orderBy` calls accumulate: the latest call takes priority and the earlier ones break its ties, so the two sorts below order by category and then by name. Sorting a column again replaces its earlier direction.

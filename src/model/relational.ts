@@ -340,6 +340,26 @@ export class DateExtractOperation extends UnaryOperation implements Aliasable, S
   ) { super(element); }
 }
 
+/** The first day of the week, month, quarter or year that the date falls in, as a date. */
+export class DateTruncOperation extends UnaryOperation implements Aliasable, Sortable {
+  constructor(
+    element: RelationalOperationElement,
+    readonly part: DatePart,
+    readonly displayName?: string,
+  ) { super(element); }
+
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
+  /** Sort by this expression, earliest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, latest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+
+  comparisonOperand(): RelationalOperationElement { return this; }
+}
+
 export class DateArithmeticOperation extends UnaryOperation implements Aliasable, Sortable {
   /** Name this column in the result. */
   alias(name: string): Alias { return new Alias(this, name); }
@@ -774,6 +794,9 @@ export function concat(...parts: ConcatPart[]): ConcatOperation {
 
 export interface ConcatOperation extends Comparable {}
 applyMixins(ConcatOperation, [Comparable]);
+
+export interface DateTruncOperation extends Comparable {}
+applyMixins(DateTruncOperation, [Comparable]);
 
 export interface ArithmeticOperation extends Arithmetic, Comparable {}
 applyMixins(ArithmeticOperation, [Arithmetic, Comparable]);
