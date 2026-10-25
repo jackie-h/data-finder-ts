@@ -284,7 +284,7 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
   }
   if (operation instanceof DateArithmeticOperation) {
     const op = operation.isAdd ? '+' : '-';
-    return sqlOperationToString(operation.element) + ' ' + op + ' INTERVAL ' + operation.n + ' ' + operation.unit;
+    return sqlOperationToString(operation.element) + ' ' + op + " INTERVAL '" + operation.n + "' " + operation.unit;
   }
   if (operation instanceof DateDiffOperation) {
     const otherSql = sqlFormatDatetime(operation.other);
