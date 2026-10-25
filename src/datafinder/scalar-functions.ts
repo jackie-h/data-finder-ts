@@ -8,7 +8,10 @@
  * labelled by its display name; a function result is itself the input and is labelled by its own name.
  */
 import {
+  ConcatOperation,
+  ConcatPart,
   RelationalOperationElement,
+  concat,
   ScalarFunction,
   ScalarFunctionOperation,
   applyMixins,
@@ -49,6 +52,11 @@ export abstract class StringFunctions {
   abstract functionInput(): RelationalOperationElement;
   /** @internal What a function of this is labelled after. */
   abstract functionLabel(): string;
+
+  /** Join text on the end: `f.first().concat(' ', f.last())`. A NULL part makes the whole NULL. */
+  concat(...more: ConcatPart[]): ConcatOperation {
+    return concat(this as unknown as ConcatPart, ...more);
+  }
 
   /** Convert every character to uppercase. */
   toUpperCase(): StringFunctionOperation {
