@@ -24,6 +24,7 @@ import {
   ScalarFunctionOperation,
   DatePart,
   DateExtractOperation,
+  DateTruncOperation,
   DateArithmeticOperation,
   DateDiffOperation,
   JoinTreeNodeOperation,
@@ -337,6 +338,14 @@ export class DateAttribute extends Attribute {
   week(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.WEEK, 'Week ' + this.displayName()); }
   /** Extract the day of the week (0 = Sunday through 6 = Saturday). */
   dayOfWeek(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.DOW, 'Day Of Week ' + this.displayName()); }
+  /** The date of the first day of the week the date falls in (a Monday). */
+  firstDayOfWeek(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.WEEK, 'First Day Of Week ' + this.displayName()); }
+  /** The date of the first day of the month the date falls in. */
+  firstDayOfMonth(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.MONTH, 'First Day Of Month ' + this.displayName()); }
+  /** The date of the first day of the quarter the date falls in. */
+  firstDayOfQuarter(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.QUARTER, 'First Day Of Quarter ' + this.displayName()); }
+  /** The date of the first day of the year the date falls in. */
+  firstDayOfYear(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.YEAR, 'First Day Of Year ' + this.displayName()); }
 
   /** Add `n` days to this date. */
   addDays(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.DAY, true, 'Add Days ' + this.displayName()); }
@@ -417,6 +426,14 @@ export class DateTimeAttribute extends Attribute {
   week(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.WEEK, 'Week ' + this.displayName()); }
   /** Extract the day of the week (0 = Sunday through 6 = Saturday). */
   dayOfWeek(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.DOW, 'Day Of Week ' + this.displayName()); }
+  /** The date of the first day of the week the date falls in (a Monday). */
+  firstDayOfWeek(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.WEEK, 'First Day Of Week ' + this.displayName()); }
+  /** The date of the first day of the month the date falls in. */
+  firstDayOfMonth(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.MONTH, 'First Day Of Month ' + this.displayName()); }
+  /** The date of the first day of the quarter the date falls in. */
+  firstDayOfQuarter(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.QUARTER, 'First Day Of Quarter ' + this.displayName()); }
+  /** The date of the first day of the year the date falls in. */
+  firstDayOfYear(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.YEAR, 'First Day Of Year ' + this.displayName()); }
 
   /** Add `n` days to this timestamp. */
   addDays(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.DAY, true, 'Add Days ' + this.displayName()); }
