@@ -37,7 +37,8 @@ describe('a condition as a column', () => {
     expect(sql(a, a.gt(3))).toBe('SELECT t0.a AS "A",t0.a > 3 AS "Expression" FROM t AS t0');
   });
 
-  it('can be named by wrapping it in an Alias', () => {
+  it('can be named', () => {
+    expect(sql(a.gt(3).alias('Big'))).toBe('SELECT t0.a > 3 AS "Big" FROM t AS t0');
     expect(sql(new Alias(a.gt(3), 'Big'))).toBe('SELECT t0.a > 3 AS "Big" FROM t AS t0');
   });
 });
