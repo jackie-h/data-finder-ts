@@ -93,7 +93,10 @@ export interface Sortable {
   descending(): SortOperation;
 }
 
-export abstract class Operation extends RelationalOperationElement {
+export abstract class Operation extends RelationalOperationElement implements Aliasable {
+  /** Name this column in the result: `f.price().sum().alias('Total')`, `f.age().gt(30).alias('Adult')`. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   and(other: RelationalOperationElement): Operation {
     return new LogicalOperation(this, LogicalOperator.AND, other);
   }
@@ -219,10 +222,7 @@ export class WindowSpecification {
   ) {}
 }
 
-export class AggregateOperation extends UnaryOperation implements Aliasable, Sortable {
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
-
+export class AggregateOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
   ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
 
@@ -261,10 +261,7 @@ export enum WindowFunction {
   PERCENT_RANK = 'PERCENT_RANK',
 }
 
-export class WindowFunctionOperation extends UnaryOperation implements Aliasable, Sortable {
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
-
+export class WindowFunctionOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
   ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
 
@@ -286,10 +283,7 @@ export class WindowFunctionOperation extends UnaryOperation implements Aliasable
   }
 }
 
-export class ScalarFunctionOperation extends UnaryOperation implements Aliasable, Sortable {
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
-
+export class ScalarFunctionOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
   ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
 
@@ -323,10 +317,7 @@ export const NUMERIC_FUNCTIONS: ReadonlySet<ScalarFunction> = new Set([
   ScalarFunction.POWER, ScalarFunction.SQRT, ScalarFunction.ROUND, ScalarFunction.LENGTH,
 ]);
 
-export class DateExtractOperation extends UnaryOperation implements Aliasable, Sortable {
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
-
+export class DateExtractOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
   ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
 
@@ -341,15 +332,12 @@ export class DateExtractOperation extends UnaryOperation implements Aliasable, S
 }
 
 /** The first day of the week, month, quarter or year that the date falls in, as a date. */
-export class DateTruncOperation extends UnaryOperation implements Aliasable, Sortable {
+export class DateTruncOperation extends UnaryOperation implements Sortable {
   constructor(
     element: RelationalOperationElement,
     readonly part: DatePart,
     readonly displayName?: string,
   ) { super(element); }
-
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
 
   /** Sort by this expression, earliest first. */
   ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
@@ -360,10 +348,7 @@ export class DateTruncOperation extends UnaryOperation implements Aliasable, Sor
   comparisonOperand(): RelationalOperationElement { return this; }
 }
 
-export class DateArithmeticOperation extends UnaryOperation implements Aliasable, Sortable {
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
-
+export class DateArithmeticOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
   ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
 
@@ -379,10 +364,7 @@ export class DateArithmeticOperation extends UnaryOperation implements Aliasable
   ) { super(element); }
 }
 
-export class DateDiffOperation extends UnaryOperation implements Aliasable, Sortable {
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
-
+export class DateDiffOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
   ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
 
@@ -553,20 +535,20 @@ export class Alias extends RelationalOperationElement implements Aliasable, Sort
 }
 
 /** `CASE WHEN condition THEN then ELSE fallback END`; without a `fallback` the value is NULL. */
-export class CaseOperation extends Operation implements Aliasable {
+export class CaseOperation extends Operation {
   constructor(
     readonly condition: RelationalOperationElement,
     readonly then: RelationalOperationElement,
     readonly fallback?: RelationalOperationElement,
     readonly displayName?: string,
   ) { super(); }
-
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
 }
 
 /** Returned by `RelatedFinder.exists()`. A backend translates it to a join-presence check. */
-export class ExistsOperation extends RelationalOperationElement {
+export class ExistsOperation extends RelationalOperationElement implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(readonly node: JoinTreeNodeOperation) { super(); }
 
   and(other: RelationalOperationElement): LogicalOperation {
@@ -579,7 +561,10 @@ export class ExistsOperation extends RelationalOperationElement {
 }
 
 /** Returned by `RelatedFinder.notExists()`. A backend translates it to a join-absence check. */
-export class NotExistsOperation extends RelationalOperationElement {
+export class NotExistsOperation extends RelationalOperationElement implements Aliasable {
+  /** Name this column in the result. */
+  alias(name: string): Alias { return new Alias(this, name); }
+
   constructor(readonly node: JoinTreeNodeOperation) { super(); }
 
   and(other: RelationalOperationElement): LogicalOperation {
@@ -731,16 +716,13 @@ export abstract class Arithmetic {
 }
 
 /** `left operator right` on numbers, e.g. `price * quantity`. */
-export class ArithmeticOperation extends BinaryOperation implements Aliasable, Sortable {
+export class ArithmeticOperation extends BinaryOperation implements Sortable {
   constructor(
     left: RelationalOperationElement,
     readonly operator: ArithmeticOperator,
     right: RelationalOperationElement,
     readonly displayName?: string,
   ) { super(left, right); }
-
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
 
   /** Sort by this expression, smallest first. */
   ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
@@ -753,7 +735,7 @@ export class ArithmeticOperation extends BinaryOperation implements Aliasable, S
 }
 
 /** Text joined end to end. A NULL in any part makes the whole NULL, as with SQL's `||`. */
-export class ConcatOperation extends Operation implements Aliasable, Sortable {
+export class ConcatOperation extends Operation implements Sortable {
   constructor(
     readonly parts: RelationalOperationElement[],
     readonly displayName?: string,
@@ -761,9 +743,6 @@ export class ConcatOperation extends Operation implements Aliasable, Sortable {
 
   /** Join more text on the end: `f.first().concat(' ', f.last())`. A concatenation joins into one. */
   concat(...more: ConcatPart[]): ConcatOperation { return concat(this, ...more); }
-
-  /** Name this column in the result. */
-  alias(name: string): Alias { return new Alias(this, name); }
 
   /** Sort by this expression, smallest first. */
   ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }

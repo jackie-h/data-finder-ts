@@ -61,9 +61,26 @@ describe('alias in SQL', () => {
     expect(columns.map(c => c.alias('X')).every(a => a instanceof Alias)).toBe(true);
   });
 
-  it('only a column can be aliased', () => {
-    expect('alias' in id.eq(1)).toBe(false);
+  it('a sort cannot be aliased', () => {
     expect('alias' in id.ascending()).toBe(false);
+  });
+});
+
+describe('alias of a condition', () => {
+  const a = new StringAttribute('A', 'a', 'VARCHAR', 't');
+  const b = new IntegerAttribute('B', 'b', 'INT', 't');
+  const table = new Table('t', [new Column('a', 'VARCHAR', 't'), new Column('b', 'INT', 't')]);
+
+  it('a condition can be named', () => {
+    const sql = toSql(null, null, [a.isNull().alias('Missing'), a.isNotNull().alias('There'), b.gt(1).alias('Big'),
+      a.isIn(['x']).alias('Listed')], table, new NoOperation());
+    expect(sql).toBe(`SELECT t0.a IS NULL AS "Missing",t0.a IS NOT NULL AS "There",t0.b > 1 AS "Big",` +
+      `t0.a IN ('x') AS "Listed" FROM t AS t0`);
+  });
+
+  it('a combined condition and a CASE can be named', () => {
+    expect(toSql(null, null, [b.gt(1).or(b.lt(0)).alias('Odd')], table, new NoOperation()))
+      .toBe('SELECT t0.b > 1 OR t0.b < 0 AS "Odd" FROM t AS t0');
   });
 });
 

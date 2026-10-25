@@ -117,7 +117,7 @@ A column is named in the result after its property. Give it another name with `.
 cf.findAll(null, null, [cf.name().alias('Company'), cf.id().count().alias('N')])
 ```
 
-Only a column of the result can be aliased, so a filter has no `.alias()`. Aliasing an alias replaces its name.
+A condition can be named too (`cf.id().gt(3).alias('Big')`). A sort has no `.alias()`. Aliasing an alias replaces its name.
 
 ## Joins
 
@@ -184,7 +184,7 @@ The GraphQL runner fills a constant in itself rather than reading it from the se
 
 ## Conditions as columns, and `when`
 
-A condition (a comparison, a null check, `isIn`, `exists`, or `.and()` / `.or()` of those) can be selected as a column: true or false for each row, named "Expression" unless wrapped in an `Alias`. A comparison with a missing value is missing, not false.
+A condition (a comparison, a null check, `isIn`, `exists`, or `.and()` / `.or()` of those) can be selected as a column: true or false for each row, named "Expression" unless `.alias()` names it. A comparison with a missing value is missing, not false.
 
 `when(condition).then(value).otherwise(value)` is a value that depends on a condition (`CASE WHEN`). Further cases follow with `.when(...).then(...)`; with no `otherwise` the value is missing. A value is a column, an expression or a plain value.
 
