@@ -22,3 +22,4 @@ export {
   DEFAULT_TIMEOUT_MS,
   QueryTimeoutError,
 } from './runner';
+export { DatabricksConnect, DatabricksConfig, DatabricksQueryError } from './databricks-runner';
