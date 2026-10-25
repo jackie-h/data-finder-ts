@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { expect } from 'vitest';
 import { DuckDBConnection } from '@duckdb/node-api';
 import type { FinderResult } from '../src/datafinder/runner';
+import type { DialectName, SqlDialect } from '../src/datafinder/dialect';
 
 let _examplesDir: string | undefined;
 
@@ -49,6 +50,8 @@ export type Backend = 'duckdb' | 'graphql';
 /** What a runner reports about the last query it ran. */
 export interface ColumnReporter {
   readonly lastColumns: string[];
+  /** The dialect of the SQL the runner sends, which the expected SQL fragments are in. */
+  readonly dialect?: DialectName | SqlDialect;
 }
 
 function instant(text: string): number {
@@ -77,7 +80,7 @@ export async function runExpectation(
   backend: Backend = 'duckdb',
 ): Promise<void> {
   if (backend === 'duckdb') {
-    const sql = result.toSql();
+    const sql = result.toSql(runner.dialect);
     if (expected.sql !== undefined) expect(sql).toContain(expected.sql);
     if (expected.unexpectedSql !== undefined) expect(sql).not.toContain(expected.unexpectedSql);
   }

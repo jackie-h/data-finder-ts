@@ -49,6 +49,29 @@ Finders for tables with a business date (single business date, business date + p
 cpf.findForDateRange('2023-01-15', '2023-01-16', new Date(), [cpf.quantity()])
 ```
 
+## SQL dialects
+
+`toSql()` writes Postgres. Ask for another database's SQL with `toSql('duckdb')` or `toSql('databricks')`, and a runner that executes SQL declares its own with a `dialect` property (the DuckDB test runner is `'duckdb'`).
+
+```ts
+tf.findAll(null, null, [tf.symbol().alias('Symbol')]).orderBy(tf.symbol().descending()).toSql('databricks')
+// SELECT t0.sym AS `Symbol` FROM … ORDER BY t0.sym DESC NULLS FIRST
+```
+
+Only what differs is written per dialect; everything the databases share is written once:
+
+| | Postgres | DuckDB | Databricks |
+|---|---|---|---|
+| a result column's name | `"Name"` | `"Name"` | `` `Name` `` |
+| a quote or backslash in a string | `'it''s'` | `'it''s'` | `'it\'s'` (a doubled quote would be lost, and `\` starts an escape) |
+| sort null placement | default | `DESC NULLS FIRST` | `ASC NULLS LAST` / `DESC NULLS FIRST` |
+| join a group's values | `STRING_AGG(x, ',' ORDER BY …)` | same | `LISTAGG(x, ',') WITHIN GROUP (ORDER BY …)` |
+| day of the week (0 = Sunday) | `EXTRACT(DOW FROM x)` | same | `(DAYOFWEEK(x) - 1)` |
+| `diffDays` and the others | date and `AGE` arithmetic | `DATE_DIFF('day', a, b)` | `DATEDIFF(DAY, a, b)` |
+| a selected float | `CAST(1.5 AS DOUBLE PRECISION)` | `CAST(1.5 AS DOUBLE)` | `CAST(1.5 AS DOUBLE)` |
+
+A sort puts nulls where Postgres does (last when ascending, first when descending) in every dialect, so the same query gives the same order everywhere. `npm run check:dialects` parses the SQL the finders write in each dialect with sqlglot and lists where it differs from what sqlglot would write; a parse is weak evidence, though, since sqlglot accepts constructs a database does not. Months and years between dates are whole units in Postgres and Databricks, but DuckDB counts the month or year boundaries crossed.
+
 ## Query timeout
 
 Queries time out after 60 seconds by default. Override per query with `.timeout(ms)`; a runner that exceeds it rejects with `QueryTimeoutError`.

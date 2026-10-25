@@ -21,7 +21,7 @@ const select = (...columns: (Attribute | RelationalOperationElement)[]) =>
 describe('the SQL', () => {
   it('types', () => {
     expect(select(constant('x').alias('S'), constant(1).alias('I'), constant(1.5).alias('F'), constant(true).alias('B')))
-      .toBe(`SELECT 'x' AS "S",1 AS "I",CAST(1.5 AS DOUBLE) AS "F",TRUE AS "B" FROM t AS t0`);
+      .toBe(`SELECT 'x' AS "S",1 AS "I",CAST(1.5 AS DOUBLE PRECISION) AS "F",TRUE AS "B" FROM t AS t0`);
   });
 
   it('dates are typed', () => {

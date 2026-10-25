@@ -5,6 +5,8 @@ import type { Attribute } from '../src/datafinder/attribute';
 import type { Table, SortOperation, RelationalOperationElement } from '../src/model/relational';
 
 export class DuckDbRunner implements QueryRunner {
+  readonly dialect = 'duckdb' as const;
+
   /** Column names of the most recent result, in the order they were selected. */
   lastColumns: string[] = [];
 
@@ -24,7 +26,7 @@ export class DuckDbRunner implements QueryRunner {
     distinct: boolean = false,
     offset?: number,
   ): Promise<unknown[][]> {
-    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset);
+    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, this.dialect);
     console.log('[SQL]', sql);
     const timer = setTimeout(() => this.conn.interrupt(), timeoutMs);
     let result;

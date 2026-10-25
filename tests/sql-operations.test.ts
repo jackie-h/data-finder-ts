@@ -499,7 +499,7 @@ describe('DateAttribute diff operations (SQL)', () => {
   it('diffDays() → DATE_DIFF(day, ...)', async () => {
     const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
-    const sql = cpf.findAll(null, null, [cpf.businessDate().diffDays(new Date('2024-01-01'))]).toSql();
+    const sql = cpf.findAll(null, null, [cpf.businessDate().diffDays(new Date('2024-01-01'))]).toSql('duckdb');
     expect(sql).toContain('DATE_DIFF(');
     expect(sql).toContain("'day'");
   });
@@ -507,7 +507,7 @@ describe('DateAttribute diff operations (SQL)', () => {
   it('diffMonths() → DATE_DIFF(month, ...)', async () => {
     const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
-    const sql = cpf.findAll(null, null, [cpf.businessDate().diffMonths(new Date('2024-01-01'))]).toSql();
+    const sql = cpf.findAll(null, null, [cpf.businessDate().diffMonths(new Date('2024-01-01'))]).toSql('duckdb');
     expect(sql).toContain("'month'");
   });
 });
@@ -550,7 +550,7 @@ describe('DateTimeAttribute extract and arithmetic (SQL)', () => {
   it('diffHours() → DATE_DIFF(hour, ...)', async () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
-    const sql = tf.findAll(null, null, [tf.validFrom().diffHours(new Date('2024-01-01'))]).toSql();
+    const sql = tf.findAll(null, null, [tf.validFrom().diffHours(new Date('2024-01-01'))]).toSql('duckdb');
     expect(sql).toContain("'hour'");
   });
 });
