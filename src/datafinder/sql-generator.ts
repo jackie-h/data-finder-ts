@@ -76,6 +76,13 @@ class Join {
     readonly target: TableAliasColumn,
     readonly filterOp?: RelationalOperationElement,
   ) {}
+
+  /** `source = target`, written with the key column first as Legend writes a join defined as key = foreign key. */
+  condition(): string {
+    let [first, second] = [this.source, this.target];
+    if (second.column.primaryKey && !first.column.primaryKey) [first, second] = [second, first];
+    return first.tableAlias.alias + '.' + first.column.name + ' = ' + second.tableAlias.alias + '.' + second.column.name;
+  }
 }
 
 function sqlFormatDatetime(value: Date): string {
@@ -979,8 +986,7 @@ class SQLQueryGenerator {
   buildQueryString(): string {
     const joins = this._join.map(j =>
       ' LEFT OUTER JOIN ' + j.target.tableAlias.table + ' AS ' + j.target.tableAlias.alias +
-      ' ON (' + j.source.tableAlias.alias + '.' + j.source.column.name +
-      ' = ' + j.target.tableAlias.alias + '.' + j.target.column.name +
+      ' ON (' + j.condition() +
       (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
