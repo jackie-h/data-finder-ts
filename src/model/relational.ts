@@ -37,6 +37,8 @@ export enum AggregateOperator {
   STDDEV_POP = 'STDDEV_POP',
   VAR_SAMP = 'VAR_SAMP',
   VAR_POP = 'VAR_POP',
+  BOOL_AND = 'BOOL_AND',
+  BOOL_OR = 'BOOL_OR',
 }
 
 export enum ScalarFunction {
@@ -660,6 +662,56 @@ export abstract class Comparable {
   gte(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, other); }
 }
 
+/** Whether a standard deviation or variance is the sample one (`ddof` 1) or the population one (0). */
+export function sample(ddof: number): boolean {
+  if (ddof !== 0 && ddof !== 1) throw new RangeError(`ddof is 0 (population) or 1 (sample), not ${ddof}`);
+  return ddof === 1;
+}
+
+/**
+ * Aggregates of an expression, as a column has them: `f.price().times(f.quantity()).sum()`, `constant(1).sum()`,
+ * `when(f.price().gt(10)).then(5.0).otherwise(1.0).sum()`. Mixed into the expressions that have it.
+ */
+export abstract class Aggregates {
+  private _aggregate(operator: AggregateOperator, label: string): AggregateOperation {
+    return new AggregateOperation(this as unknown as RelationalOperationElement, operator, label + ' Expression');
+  }
+
+  /** Sum of the values in the group. */
+  sum(): AggregateOperation { return this._aggregate(AggregateOperator.SUM, 'Sum'); }
+  /** Smallest value in the group. */
+  min(): AggregateOperation { return this._aggregate(AggregateOperator.MIN, 'Min'); }
+  /** Largest value in the group. */
+  max(): AggregateOperation { return this._aggregate(AggregateOperator.MAX, 'Max'); }
+  /** Arithmetic mean of the values in the group. */
+  average(): AggregateOperation { return this._aggregate(AggregateOperator.AVERAGE, 'Average'); }
+  /** Number of non-null values in the group. */
+  count(): AggregateOperation { return this._aggregate(AggregateOperator.COUNT, 'Count'); }
+  /** Standard deviation of the values in the group: the sample one by default, `ddof = 0` for the population one. */
+  std(ddof = 1): AggregateOperation {
+    return this._aggregate(sample(ddof) ? AggregateOperator.STDDEV_SAMP : AggregateOperator.STDDEV_POP, 'Std');
+  }
+  /** Variance of the values in the group: the sample one by default, `ddof = 0` for the population one. */
+  var(ddof = 1): AggregateOperation {
+    return this._aggregate(sample(ddof) ? AggregateOperator.VAR_SAMP : AggregateOperator.VAR_POP, 'Var');
+  }
+}
+
+/**
+ * Aggregates of a condition: `f.quantity().gt(20).all()` is true for a group where every row holds, `.any()` where at
+ * least one does. Mixed into the conditions.
+ */
+export abstract class BooleanAggregates {
+  /** True for a group where every row satisfies the condition. */
+  all(): AggregateOperation {
+    return new AggregateOperation(this as unknown as RelationalOperationElement, AggregateOperator.BOOL_AND, 'All Expression');
+  }
+  /** True for a group where at least one row satisfies the condition. */
+  any(): AggregateOperation {
+    return new AggregateOperation(this as unknown as RelationalOperationElement, AggregateOperator.BOOL_OR, 'Any Expression');
+  }
+}
+
 /**
  * Mix the methods of the base classes into `derived`, the TypeScript handbook's way to inherit from more than
  * one class: the type side comes from an `interface Derived extends Base {}` beside the class.
@@ -792,3 +844,33 @@ applyMixins(AggregateOperation, [Arithmetic]);
 
 export interface NumericConstantOperation extends Arithmetic {}
 applyMixins(NumericConstantOperation, [Arithmetic]);
+
+export interface ConstantOperation extends Aggregates {}
+applyMixins(ConstantOperation, [Aggregates]);
+
+export interface ArithmeticOperation extends Aggregates {}
+applyMixins(ArithmeticOperation, [Aggregates]);
+
+export interface ScalarFunctionOperation extends Aggregates {}
+applyMixins(ScalarFunctionOperation, [Aggregates]);
+
+export interface CaseOperation extends Aggregates {}
+applyMixins(CaseOperation, [Aggregates]);
+
+export interface IsNullOperation extends BooleanAggregates {}
+applyMixins(IsNullOperation, [BooleanAggregates]);
+
+export interface IsNotNullOperation extends BooleanAggregates {}
+applyMixins(IsNotNullOperation, [BooleanAggregates]);
+
+export interface InOperation extends BooleanAggregates {}
+applyMixins(InOperation, [BooleanAggregates]);
+
+export interface NotInOperation extends BooleanAggregates {}
+applyMixins(NotInOperation, [BooleanAggregates]);
+
+export interface ComparisonOperation extends BooleanAggregates {}
+applyMixins(ComparisonOperation, [BooleanAggregates]);
+
+export interface LogicalOperation extends BooleanAggregates {}
+applyMixins(LogicalOperation, [BooleanAggregates]);
