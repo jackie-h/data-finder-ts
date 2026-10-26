@@ -15,3 +15,4 @@ tests/generated_examples/
 
 # Generated TypeScript finders from the datafinder_examples GraphQL mappings
 tests/generated_graphql/
+.dialect-corpus.json

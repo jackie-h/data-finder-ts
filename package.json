@@ -77,7 +77,8 @@
     "generate:dual-assoc": "uv run python example/generate_dual_assoc.py",
     "generate:examples": "uv run python example/generate_examples.py",
     "generate:graphql": "uv run python example/generate_graphql_examples.py",
-    "generate:specs": "uv run python scripts/generate_spec_tests.py"
+    "generate:specs": "uv run python scripts/generate_spec_tests.py",
+    "check:dialects": "DIALECT_CORPUS=.dialect-corpus.json vitest run tests/dialects.test.ts && uv run python scripts/validate_dialects.py .dialect-corpus.json"
   },
   "dependencies": {
     "vite-tsconfig-paths": "^6.1.1"
