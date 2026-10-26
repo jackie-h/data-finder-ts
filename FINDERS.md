@@ -162,6 +162,11 @@ af.findAll(null, null, [af.count()]).toSql()
 // → SELECT COUNT(*) FROM ref_data.account_master
 ```
 
+`countAll()` counts the rows of a group, `COUNT(*)`, where `.count()` of a column skips rows where it is missing:
+`f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category())`. `.std()` and `.var()` give the sample standard
+deviation and variance, and `.std(0)` / `.var(0)` the population ones, as in pandas. `.min()` and `.max()` also work on
+text and dates.
+
 `.countDistinct()` counts the different non-NULL values (`COUNT(DISTINCT column)`); use it with `.groupBy()` to count per group. The GraphQL runner does not compute aggregates on the client.
 
 `.join(separator, orderBy)` on a string attribute joins the values of a group into one text (`STRING_AGG`): `cf.findAll(null, null, [cf.category(), cf.name().join(', ', [cf.name().ascending()])]).groupBy(cf.category())`. `orderBy` is the order they are joined in; without it the order is not defined. Missing values are skipped.
