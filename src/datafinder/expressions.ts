@@ -1,6 +1,7 @@
 /** Expressions that are not a column of a finder: values to select next to the columns. */
 import {
   BooleanConstantOperation,
+  CountAllOperation,
   ConstantOperation,
   DateConstantOperation,
   DateOnly,
@@ -28,4 +29,12 @@ export function constant(value: boolean | number | string | Date): ConstantOpera
   if (value instanceof DateOnly) return new DateConstantOperation(value); // before Date: DateOnly is a Date
   if (value instanceof Date) return new DateTimeConstantOperation(value);
   throw new TypeError(`A constant column holds a boolean, a finite number, a string or a date, not ${value === null ? 'null' : typeof value}`);
+}
+
+/**
+ * The number of rows in the group, `COUNT(*)`: `f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category())`.
+ * Unlike `count()` of a column it also counts rows where that column is missing.
+ */
+export function countAll(): CountAllOperation {
+  return new CountAllOperation('');
 }

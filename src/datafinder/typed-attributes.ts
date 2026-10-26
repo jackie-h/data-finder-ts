@@ -28,7 +28,28 @@ import {
   DateArithmeticOperation,
   DateDiffOperation,
   JoinTreeNodeOperation,
+  ColumnWithJoin,
 } from '../model/relational';
+
+/** The smallest and largest value of a group, for a column that can be ordered but not summed. */
+abstract class MinMax {
+  abstract cwj(): ColumnWithJoin;
+  abstract displayName(): string;
+
+  /** Smallest value in the group. */
+  min(): AggregateOperation {
+    return new AggregateOperation(this.cwj(), AggregateOperator.MIN, 'Min ' + this.displayName());
+  }
+  /** Largest value in the group. */
+  max(): AggregateOperation {
+    return new AggregateOperation(this.cwj(), AggregateOperator.MAX, 'Max ' + this.displayName());
+  }
+}
+
+function sample(ddof: number): boolean {
+  if (ddof !== 0 && ddof !== 1) throw new RangeError(`ddof is 0 (population) or 1 (sample), not ${ddof}`);
+  return ddof === 1;
+}
 
 export class StringAttribute extends Attribute {
   constructor(
@@ -79,8 +100,8 @@ export class StringAttribute extends Attribute {
   }
 }
 
-export interface StringAttribute extends StringFunctions {}
-applyMixins(StringAttribute, [StringFunctions]);
+export interface StringAttribute extends MinMax, StringFunctions {}
+applyMixins(StringAttribute, [MinMax, StringFunctions]);
 
 export abstract class NumericAttribute extends Attribute {
   constructor(
@@ -97,22 +118,24 @@ export abstract class NumericAttribute extends Attribute {
   sum(): AggregateOperation {
     return new AggregateOperation(this.cwj(), AggregateOperator.SUM, 'Sum ' + this.displayName());
   }
-  /** Smallest value in the group. */
-  min(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.MIN, 'Min ' + this.displayName());
-  }
-  /** Largest value in the group. */
-  max(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.MAX, 'Max ' + this.displayName());
-  }
   /** Arithmetic mean of all values in the group. */
   average(): AggregateOperation {
     return new AggregateOperation(this.cwj(), AggregateOperator.AVERAGE, 'Average ' + this.displayName());
   }
+  /** Standard deviation of the values in the group: the sample one by default, `ddof = 0` for the population one, as `Series.std`. */
+  std(ddof = 1): AggregateOperation {
+    const operator = sample(ddof) ? AggregateOperator.STDDEV_SAMP : AggregateOperator.STDDEV_POP;
+    return new AggregateOperation(this.cwj(), operator, 'Std ' + this.displayName());
+  }
+  /** Variance of the values in the group: the sample one by default, `ddof = 0` for the population one, as `Series.var`. */
+  var(ddof = 1): AggregateOperation {
+    const operator = sample(ddof) ? AggregateOperator.VAR_SAMP : AggregateOperator.VAR_POP;
+    return new AggregateOperation(this.cwj(), operator, 'Var ' + this.displayName());
+  }
 }
 
-export interface NumericAttribute extends NumericFunctions, Arithmetic {}
-applyMixins(NumericAttribute, [NumericFunctions, Arithmetic]);
+export interface NumericAttribute extends MinMax, NumericFunctions, Arithmetic {}
+applyMixins(NumericAttribute, [MinMax, NumericFunctions, Arithmetic]);
 
 export class DoubleAttribute extends NumericAttribute {
   constructor(
@@ -473,3 +496,9 @@ export class DateTimeAttribute extends Attribute {
   /** Number of whole seconds between this timestamp and `other`. */
   diffSeconds(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.SECOND, 'Diff Seconds ' + this.displayName()); }
 }
+
+export interface DateAttribute extends MinMax {}
+applyMixins(DateAttribute, [MinMax]);
+
+export interface DateTimeAttribute extends MinMax {}
+applyMixins(DateTimeAttribute, [MinMax]);

@@ -880,8 +880,7 @@ class SQLQueryGenerator {
     } else if (col instanceof ConstantOperation) {
       this._select.push(new Alias(col, 'Constant'));
     } else if (col instanceof CountAllOperation) {
-      const ta = this._tableAliasForTable(col.table, col.table);
-      this._from.add(ta);
+      if (col.table !== '') this._from.add(this._tableAliasForTable(col.table, col.table));
       this._select.push(new Alias(col, 'Count'));
     }
   }
