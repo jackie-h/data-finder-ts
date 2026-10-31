@@ -1,6 +1,6 @@
 {
   "name": "data-finder-ts",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "TypeScript runtime library for data-finder generated finders",
   "keywords": [
     "data",
