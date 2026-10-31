@@ -28,4 +28,4 @@
 
 | Name          | Source | Source Property Name | Source Property ID | Source Multiplicity | Target   | Target Property Name | Target Property ID | Target Multiplicity | Description |
 |---------------|--------|----------------------|--------------------|---------------------|----------|----------------------|--------------------|---------------------|-------------|
-| OrderCustomer | Order  | Orders               | orders             | *                   | Customer | Customer             | customer           | 1                   |             |
+| OrderCustomer | Order  | Customer             | customer           | 1                   | Customer | Orders               | orders             | *                   |             |

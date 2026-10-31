@@ -1,9 +1,9 @@
-// Reads the JSON written by `python -m mapping_markdown.export_json` and shapes it for the generator.
+// Reads the JSON written by data-finder's `python -m mapping_markdown.export_json` and shapes it for the generator.
 // The markdown is parsed in Python, by the loaders the rest of the project uses; nothing here reads markdown.
 import { readFileSync } from "node:fs";
 
 // -> { classes: Map("file::Name" -> {file, name, desc, props:[{name,id,type,mult,key,desc}]}), byName: Map(Name -> [keys]),
-//      assocs: [{name, file, source, sourceMult, target, targetPropName, targetMult}],
+//      assocs: [{name, file, source, sourcePropName, sourceMult, target, targetPropName, targetMult}],
 //      mappings: Map(file -> {file, title, models, datastore, tables:[{name, cls, schema, columns:[...]}], associations}) }
 export function loadData(path) {
   const data = JSON.parse(readFileSync(path, "utf8"));
@@ -17,8 +17,10 @@ export function loadData(path) {
       });
       byName.set(c.name, [...(byName.get(c.name) ?? []), key]);
     }
+    // each end is the property added to its own class: the source property (on the source class) returns the target and has
+    // sourceMult; the target property (on the target class, null when one-way) returns the source; targetMult is declared either way
     for (const a of pkg.associations) assocs.push({
-      name: a.name, file: model.file, source: a.source, sourceMult: a.sourceMultiplicity,
+      name: a.name, file: model.file, source: a.source, sourcePropName: a.sourcePropertyName, sourceMult: a.sourceMultiplicity,
       target: a.target, targetPropName: a.targetPropertyName, targetMult: a.targetMultiplicity,
     });
   }

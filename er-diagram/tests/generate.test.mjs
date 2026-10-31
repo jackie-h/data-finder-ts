@@ -12,12 +12,12 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
 
-// the markdown is parsed in Python (export_json.py, using the installed data-finder loaders); the generator draws the JSON it writes
+// the markdown is parsed in Python (data-finder's mapping_markdown.export_json); the generator draws the JSON it writes
 const repo = resolve(root, "..");
 const requirements = join(root, "requirements.txt");
 function generate(config) {
   const out = mkdtempSync(join(tmpdir(), "er-diagram-"));
-  execFileSync("uv", ["run", "--with-requirements", requirements, "python", join(root, "export_json.py"), "--config", config, "--out", join(out, "data.json")], { cwd: repo, stdio: "pipe" });
+  execFileSync("uv", ["run", "--with-requirements", requirements, "python", "-m", "mapping_markdown.export_json", "--config", config, "--out", join(out, "data.json")], { cwd: repo, stdio: "pipe" });
   const stdout = execFileSync("node", [join(root, "generate.mjs"), "--config", config, "--out", out], { stdio: "pipe" }).toString();
   return { out, stdout, read: f => readFileSync(join(out, f), "utf8"), has: f => existsSync(join(out, f)) };
 }
@@ -82,7 +82,7 @@ test("a schema over 90 tables is split into pages, keeping joined tables togethe
   const header = "| Property | Id | Type | Multiplicity | Key | Description |\n|---|---|---|---|---|---|\n| Id | id | Integer | 1 | Y | |\n";
   writeFileSync(join(dir, "big_model.md"), "# Big\n\n## Sub-Domain: big\n\n" + ids.map(i =>
     `### Class: ${cls(i)}\n\n| Name | Description |\n|---|---|\n| ${cls(i)} | |\n\n${header}`).join("\n") +
-    `\n### Association: Link\n\n| Name | Source | Source Property Name | Source Property ID | Source Multiplicity | Target | Target Property Name | Target Property ID | Target Multiplicity | Description |\n|---|---|---|---|---|---|---|---|---|---|\n| Link | ${cls(99)} | Items | items | * | ${cls(0)} | Zero | zero | 1 | |\n`);
+    `\n### Association: Link\n\n| Name | Source | Source Property Name | Source Property ID | Source Multiplicity | Target | Target Property Name | Target Property ID | Target Multiplicity | Description |\n|---|---|---|---|---|---|---|---|---|---|\n| Link | ${cls(99)} | Zero | zero | 1 | ${cls(0)} | Items | items | * | |\n`);
   writeFileSync(join(dir, "big_mapping.md"), "# Big Mapping\n\n## Model: big_model.md\n\n## DataStore: big_db (Database)\n\n### Schema: main\n\n" + ids.map(i =>
     `#### Table: t${i} → ${cls(i)}\n\n| Column | Type | Key | Nullable | Property ID |\n|---|---|---|---|---|\n| id | INT | PK | N | id |\n` + (i === 99 ? "| zero_id | INT | FK | Y | zero |\n" : "")).join("\n") +
     "\n#### Association: Link\n\n| Source Column | Target Table | Target Column |\n|---|---|---|\n| zero_id | t0 | id |\n");
@@ -141,7 +141,7 @@ test("e2e: full model is a flowchart with a clickable box per model file", () =>
     assert.match(mmd, new RegExp(`click m${i} href "model__${key(m).replace(/_model$/, "")}.html"`), m);
     assert.ok(has(`model__${key(m).replace(/_model$/, "")}.html`), m);
   });
-  assert.match(mmd, /m2 -->\|"1 association"\| m3/);                                   // finance -> finance_trade
+  assert.match(mmd, /m2 -->\|"2 associations"\| m3/);                                  // finance -> finance_trade (TradeAccount, TradeInstrument)
 });
 
 test("e2e: each model file has its own diagram; references to other models are stubs linking to them", () => {
@@ -153,7 +153,7 @@ test("e2e: each model file has its own diagram; references to other models are s
   const trade = read("model__finance_trade.mmd");
   assert.match(trade, /\n\s+class Account\["Account"\]\n/);                            // stub: no attributes
   assert.match(trade, /Trade "\*" --> "1" Account : Account/);
-  assert.deepEqual(stubsOf(read("model__finance_trade.html")), { Account: "model__finance.html" });
+  assert.deepEqual(stubsOf(read("model__finance_trade.html")), { Account: "model__finance.html", Instrument: "model__finance.html" });
 });
 
 test("e2e: all classes in one diagram, duplicates labelled by model", () => {
@@ -168,13 +168,13 @@ test("e2e: a mapped model has the same views as the full model, restricted to th
   const flow = read("finance_mapping__model.mmd");                                      // a clickable box per model file
   assert.match(flow, /m0\["<b>Finance<\/b><br\/>3 classes"\]/);
   assert.match(flow, /m1\["<b>Finance Trade<\/b><br\/>2 classes"\]/);
-  assert.match(flow, /m0 -->\|"1 association"\| m1/);
+  assert.match(flow, /m0 -->\|"2 associations"\| m1/);
   assert.match(flow, /click m0 href "finance_mapping__model__finance.html"/);
   assert.match(flow, /click m1 href "finance_mapping__model__finance_trade.html"/);
   assert.match(read("finance_mapping__model.html"), /finance_mapping__model__all.html/);
   const trade = read("finance_mapping__model__finance_trade.mmd");
   assert.match(trade, /Trade "\*" --> "1" Account : Account/);
-  assert.deepEqual(stubsOf(read("finance_mapping__model__finance_trade.html")), { Account: "finance_mapping__model__finance.html" });   // mapped: its page in this view
+  assert.deepEqual(stubsOf(read("finance_mapping__model__finance_trade.html")), { Account: "finance_mapping__model__finance.html", Instrument: "finance_mapping__model__finance.html" });   // mapped: their pages in this view
   const all = read("finance_mapping__model__all.mmd");
   assert.match(all, /class Account\["Account"\] \{\n\s+Id\u00a0+Integer\u00a0+\[1\]\u00a0+PK\n\s+Name\u00a0+String\u00a0+\[1\]\n\s+\}/);
   assert.match(all, /Account "\*" --> "0..1" Branch : Branch/);
@@ -184,6 +184,16 @@ test("e2e: a mapped model only has boxes for model files with mapped classes", (
   const flow = read("orgchart_inheritance_mapping__model.mmd");
   assert.match(flow, /m0\["<b>Orgchart Inheritance<\/b><br\/>2 classes"\]/);           // Employee and Project; not Person or Contactable
   assert.ok(!/m1/.test(flow));
+});
+
+test("e2e: associations follow the model's ends: the source property labels the arrow, each multiplicity sits at the far end", () => {
+  const trade = read("model__finance_trade.mmd");
+  assert.match(trade, /Trade "\*" --> "1" Account : Account/);                           // Trade.account (1): one account per trade; * trades per account
+  assert.match(trade, /Trade "\*" --> "0..1" Instrument : Instrument/);                  // one-way: no Instrument.trades, still * trades per instrument
+  assert.match(read("model__finance.mmd"), /Account "\*" --> "0..1" Branch : Branch/);     // Account.branch (0..1), Branch.accounts (*)
+  const trading = read("finance_mapping__database__trading.mmd");
+  assert.match(trading, /ref_data__account_master \|\|--o\{ trading__trades : "account_id to ID"/);   // a trade has exactly one account
+  assert.match(trading, /ref_data__price \|o--o\{ trading__trades : "sym to SYM"/);                   // ... and at most one instrument
 });
 
 test("e2e: inheritance is drawn UML style, with superclasses as stubs where they are not mapped", () => {
@@ -207,7 +217,7 @@ test("e2e: a database has a flowchart with a clickable box per schema", () => {
   const flow = read("finance_mapping__database.mmd");
   assert.match(flow, /s0\["<b>ref_data<\/b><br\/>3 tables"\]/);
   assert.match(flow, /s1\["<b>trading<\/b><br\/>2 tables"\]/);
-  assert.match(flow, /s0 -->\|"1 foreign key"\| s1/);                                    // trades.account_id -> ref_data.account_master
+  assert.match(flow, /s0 -->\|"2 foreign keys"\| s1/);                                   // trades.account_id and trades.instrument_id into ref_data
   assert.match(flow, /click s0 href "finance_mapping__database__ref_data.html"/);
   assert.match(flow, /click s1 href "finance_mapping__database__trading.html"/);
   assert.match(read("finance_mapping__database.html"), /finance_mapping__database__all.html/);
@@ -223,7 +233,7 @@ test("e2e: finance database: each schema has its own page with PK/FK columns; a 
   const trading = read("finance_mapping__database__trading.mmd");
   assert.match(trading, /INT account_id FK/);
   assert.match(trading, /ref_data__account_master \|\|--o\{ trading__trades : "account_id to ID"/);
-  assert.deepEqual(stubsOf(read("finance_mapping__database__trading.html")), { ref_data__account_master: "finance_mapping__database__ref_data.html" });
+  assert.deepEqual(stubsOf(read("finance_mapping__database__trading.html")), { ref_data__account_master: "finance_mapping__database__ref_data.html", ref_data__price: "finance_mapping__database__ref_data.html" });
   assert.ok(!/trading__trades/.test(ref));                                            // each page holds only its own schema's tables
 });
 
@@ -247,5 +257,5 @@ test("e2e: column hover shows the logical property description", () => {
 });
 
 test("e2e: every foreign key is drawn and every association resolved", () => {
-  assert.match(gen.stdout, /9 mappings, 7 foreign keys \(0 associations unresolved\)/);
+  assert.match(gen.stdout, /9 mappings, 8 foreign keys \(0 associations unresolved\)/);
 });

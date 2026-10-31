@@ -103,7 +103,9 @@ function classText(rels, fullKeys, alwaysInclude, scope) {
     descs[id] = d;
   }
   for (const [sk, key] of inherit) lines.push(`    ${ids.get(sk)} <|-- ${ids.get(key)}`);
-  for (const a of rels) lines.push(`    ${ids.get(a.s)} "${a.sourceMult}" --> "${a.targetMult}" ${ids.get(a.t)} : ${a.targetPropName.replace(/[:"]/g, "")}`);
+  // an arrow from the source class to the target, labelled with the source property (Account.branch); the multiplicity at the target
+  // end is that property's (0..1 branches per account) and at the source end the target property's (* accounts per branch)
+  for (const a of rels) lines.push(`    ${ids.get(a.s)} "${a.targetMult}" --> "${a.sourceMult}" ${ids.get(a.t)} : ${a.sourcePropName.replace(/[:"]/g, "")}`);
   if (stubIds.length) lines.push("    classDef stub stroke:#555,stroke-dasharray:6", `    cssClass "${stubIds.join(",")}" stub`);
   return { text: lines.join("\n") + "\n", used, ids, descs };
 }
@@ -215,6 +217,8 @@ function dbViews(mp, scope) {
   for (const a of mp.associations) for (const r of a.rows) {
     const child = table(r.sourceSchema, r.sourceTable), parent = table(r.targetSchema, r.targetTable);
     if (!child || !parent) { unresolved++; continue; }
+    // the source property sits on the child (the table with the foreign key) and returns the parent, so its multiplicity is how many
+    // parents a child has; the target multiplicity is how many children a parent has
     edges.push({ def: { sourceMult: a.sourceMultiplicity, targetMult: a.targetMultiplicity }, r: { srcCol: r.sourceColumn, tgtCol: r.targetColumn }, child, parent });
   }
   const schemas = [...new Set(mp.tables.map(t => t.schema))];
@@ -223,7 +227,7 @@ function dbViews(mp, scope) {
     return parts.map((tables, i) => ({ schema, name: `${prefix}__${slug(schema)}${parts.length > 1 ? `_part${i + 1}` : ""}`, part: i + 1, of: parts.length, tables, rels: [], stubs: new Map() }));
   });
   const pageOf = new Map(pages.flatMap(pg => pg.tables.map(t => [t, pg])));
-  const relOf = ({ def, r, child, parent }) => ({ child, parent, srcCol: r.srcCol, tgtCol: r.tgtCol, childMult: def.sourceMult, parentMult: def.targetMult });
+  const relOf = ({ def, r, child, parent }) => ({ child, parent, srcCol: r.srcCol, tgtCol: r.tgtCol, childMult: def.targetMult, parentMult: def.sourceMult });
   for (const e of edges) {
     const pg = pageOf.get(e.child);
     pg.rels.push(relOf(e));

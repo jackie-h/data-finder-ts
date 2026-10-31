@@ -14,14 +14,14 @@ A viewer for data-finder models and mappings: Mermaid diagrams generated from th
 uv sync
 npm ci --prefix er-diagram
 npm run generate --prefix er-diagram     # writes er-diagram/out/ (open out/index.html)
-npm test --prefix er-diagram             # viewer tests (node:test)
-npm run test:export --prefix er-diagram  # exporter tests (pytest)
+npm test --prefix er-diagram             # viewer tests (node:test, they run the export too)
 ```
 
 ## How it fits together
 
-1. `export_json.py` parses the markdown with data-finder's own loaders (`model_markdown`, `mapping_markdown`) and writes `out/data.json`:
-   classes, properties, associations, tables, columns and foreign keys. There is one definition of the format; nothing here re-parses markdown.
+1. data-finder's `mapping_markdown.export_json` (in the Python data-finder repo, so there is always a way to get the model and mappings as JSON)
+   parses the markdown with the project's own loaders and writes `out/data.json`: classes, properties, associations, tables, columns and joins.
+   The markdown format has one definition; nothing here re-parses markdown.
 2. `generate.mjs` draws that JSON (`data.mjs` loads it, `common.mjs` has the palettes and the HTML page template).
 
 `data-finder.config.json` says what to show: `models` (the full model) and `mappings` (each gets a mapped-model and a database diagram).
@@ -30,8 +30,9 @@ markdown the e2e tests run on). Other keys: `title`, `out`, `attrs` (limit attri
 
 ## Note on the data-finder version
 
-The viewer needs property multiplicities and column nullability, which are newer than the data-finder 0.1.17 on PyPI, so the export step
-runs with `data-finder` pinned to a commit of its main branch (`requirements.txt`, used via `uv run --with-requirements`). This does not
-touch the root `pyproject.toml` or `uv.lock`. After data-finder's next release, delete `requirements.txt` and require that release instead.
+`mapping_markdown.export_json`, property multiplicities, column nullability and the current association semantics are newer than the
+data-finder 0.1.17 on PyPI. So the export step runs with `data-finder` pinned to a commit (`requirements.txt`, used via
+`uv run --with-requirements`), which does not touch the root `pyproject.toml` or `uv.lock`. After data-finder's next release, delete
+`requirements.txt` and require that release instead. When the JSON or the markdown format changes in data-finder, bump the pin.
 
-CI (`.github/workflows/ci.yml`, job `er-diagram`) runs both test suites, builds the diagrams and uploads `er-diagram/out` as the `er-diagrams` artifact.
+CI (`.github/workflows/ci.yml`, job `er-diagram`) runs the tests, builds the diagrams and uploads `er-diagram/out` as the `er-diagrams` artifact.

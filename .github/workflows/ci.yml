@@ -75,9 +75,6 @@ jobs:
       - name: Test the diagram generator
         run: npm test --prefix er-diagram
 
-      - name: Test the JSON export
-        run: npm run test:export --prefix er-diagram
-
       - name: Build the diagrams (model and mapping markdown to HTML)
         run: npm run generate --prefix er-diagram
 
