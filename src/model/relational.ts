@@ -33,6 +33,10 @@ export enum AggregateOperator {
   AVERAGE = 'AVERAGE',
   STRING_AGG = 'STRING_AGG',
   COUNT_DISTINCT = 'COUNT_DISTINCT',
+  STDDEV_SAMP = 'STDDEV_SAMP',
+  STDDEV_POP = 'STDDEV_POP',
+  VAR_SAMP = 'VAR_SAMP',
+  VAR_POP = 'VAR_POP',
 }
 
 export enum ScalarFunction {
