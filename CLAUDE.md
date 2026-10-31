@@ -81,3 +81,7 @@ Key generator behaviours:
 - Other `*.test.ts` — hand-written tests against `tests/generated_examples/` finders; most seed data via `INSERT` statements.
 
 `tsconfig.json` includes `example/generated/**/*`; `tests/**/*` already covers `tests/generated_examples/`.
+
+### ER diagram viewer (`er-diagram/`)
+
+Mermaid diagrams of the `datafinder_examples` models and mappings, built to static HTML (see `er-diagram/README.md`). `export_json.py` parses the markdown with data-finder's loaders into JSON and `generate.mjs` draws it; `data-finder.config.json` says which models and mappings to show. It has its own `package.json` and tests (`npm test --prefix er-diagram`, `npm run test:export --prefix er-diagram`) and is excluded from vitest. The export runs against a data-finder commit pinned in `er-diagram/requirements.txt` (newer than PyPI's 0.1.17). CI builds it and uploads `er-diagram/out` as the `er-diagrams` artifact.

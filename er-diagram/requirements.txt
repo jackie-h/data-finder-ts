@@ -1,0 +1,5 @@
+# The Python used by export_json.py: data-finder's markdown loaders, pinned to a commit of its main branch.
+# The viewer needs property multiplicities and column nullability, which are newer than the data-finder 0.1.17 on PyPI, so this
+# is used with `uv run --with-requirements` (it does not change the root pyproject or uv.lock).
+# TODO: once data-finder releases past 0.1.17, drop this file and require that release in the root pyproject instead.
+data-finder[markdown] @ git+https://github.com/jackie-h/data-finder@ebd19b1d96dafbef4cf27e1b345ad0485263a27a

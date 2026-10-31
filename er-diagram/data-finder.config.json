@@ -1,0 +1,27 @@
+{
+  "title": "Data Finder examples",
+  "dir": "python:datafinder_examples",
+  "out": "out",
+  "models": [
+    "companies_model.md",
+    "diamond_model.md",
+    "finance.md",
+    "finance_trade.md",
+    "null_end_milestoning_model.md",
+    "orgchart.md",
+    "orgchart_inheritance.md",
+    "people_denormalised_model.md",
+    "positions_model.md"
+  ],
+  "mappings": [
+    "companies_mapping.md",
+    "diamond_mapping.md",
+    "finance_mapping.md",
+    "finance_mapping_embedded.md",
+    "null_end_milestoning_mapping.md",
+    "orgchart_mapping.md",
+    "orgchart_inheritance_mapping.md",
+    "people_denormalised_mapping.md",
+    "positions_mapping.md"
+  ]
+}

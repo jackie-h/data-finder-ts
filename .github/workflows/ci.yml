@@ -50,3 +50,40 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  er-diagram:
+    name: ER diagrams
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: er-diagram/package-lock.json
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Install Node dependencies
+        run: npm ci --prefix er-diagram
+
+      - name: Test the diagram generator
+        run: npm test --prefix er-diagram
+
+      - name: Test the JSON export
+        run: npm run test:export --prefix er-diagram
+
+      - name: Build the diagrams (model and mapping markdown to HTML)
+        run: npm run generate --prefix er-diagram
+
+      - name: Upload the diagrams
+        uses: actions/upload-artifact@v4
+        with:
+          name: er-diagrams
+          path: er-diagram/out
+          if-no-files-found: error
