@@ -78,6 +78,9 @@ jobs:
       - name: Build the diagrams (model and mapping markdown to HTML)
         run: npm run generate --prefix er-diagram
 
+      - name: Check the package contents
+        run: npm pack --dry-run --prefix er-diagram
+
       - name: Upload the diagrams
         uses: actions/upload-artifact@v4
         with:

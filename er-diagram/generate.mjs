@@ -1,5 +1,6 @@
+#!/usr/bin/env node
 // Mermaid ER diagram viewer for model and mapping markdown files.
-// usage: node generate.mjs --config <config.json> [--out dir] [--attrs all|N] [--open]
+// usage: data-finder-er-diagram (or node generate.mjs) --config <config.json> [--out dir] [--attrs all|N] [--open]
 //
 // The config file says which models and mappings to show (see loadConfig in common.mjs). Output, one HTML + .mmd per diagram:
 //   index.html                   landing page: a box for the full model, then a box per mapping holding a
@@ -13,19 +14,19 @@
 // Hover an attribute or column for its description; click a dashed stub box to open the page that owns it.
 // Class names can repeat between models, so a name is resolved within the file, then within the mapping's models, then first found.
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, relative, basename } from "node:path";
+import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import { BLUE, GREEN, page, loadConfig, setAcronyms, spaced, multLeft, multRight } from "./common.mjs";
 import { loadData } from "./data.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.argv.slice(2));
 setAcronyms(cfg.acronyms);
 const { out: outDir, maxAttrs } = cfg;
 if (!cfg.models.length) { console.error("config lists no models"); process.exit(1); }
 mkdirSync(outDir, { recursive: true });
-const mermaidJs = relative(outDir, join(here, "node_modules/mermaid/dist/mermaid.min.js"));
+// found wherever npm put it: beside this file in a checkout, or hoisted into the parent node_modules when installed
+const mermaidJs = relative(outDir, createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js"));
 
 const slug = s => s.replace(/[^A-Za-z0-9]+/g, "_");
 const words = s => s.split("_").filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
