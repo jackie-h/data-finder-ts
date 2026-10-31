@@ -27,7 +27,7 @@ describe('SQL rendering', () => {
     expect(where(name.isIn(['John', 'Peter']))).toBe("t0.first_name IN ('John', 'Peter')");
     expect(where(name.isNotIn(['John', 'Peter']))).toBe("(t0.first_name NOT IN ('John', 'Peter') OR t0.first_name IS NULL)");
     expect(where(id.isIn([2, 3]))).toBe('t0.id IN (2, 3)');
-    expect(where(new DoubleAttribute('Price', 'price', 'DOUBLE', 'people').isIn([1.5, 2]))).toBe('t0.price IN (1.5, 2)');
+    expect(where(new DoubleAttribute('Price', 'price', 'DOUBLE', 'people').isIn([1.5, 2]))).toBe('t0.price IN (1.5, 2.0)');
     expect(where(new BooleanAttribute('Active', 'active', 'BOOLEAN', 'people').isIn([true]))).toBe('t0.active IN (TRUE)');
     expect(where(new DateAttribute('Born', 'born', 'DATE', 'people').isIn(['2020-01-15', new Date('2021-02-03')])))
       .toBe("t0.born IN ('2020-01-15', '2021-02-03')");

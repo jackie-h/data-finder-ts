@@ -55,7 +55,8 @@ export class StringAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
-  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable); }
+    optional: boolean = false,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
 
   protected toConstant(value: AttributeValue): ConstantOperation {
     return new StringConstantOperation(String(value));
@@ -107,7 +108,8 @@ export abstract class NumericAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
-  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable); }
+    optional: boolean = false,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
 
   /** Sum of all values in the group. */
   sum(): AggregateOperation {
@@ -141,7 +143,8 @@ export class DoubleAttribute extends NumericAttribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
-  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable); }
+    optional: boolean = false,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
 
   protected toConstant(value: AttributeValue): ConstantOperation {
     return new FloatConstantOperation(Number(value));
@@ -185,7 +188,8 @@ export class DecimalAttribute extends NumericAttribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
-  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable); }
+    optional: boolean = false,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
 
   protected toConstant(value: AttributeValue): ConstantOperation {
     return new DecimalConstantOperation(Number(value));
@@ -226,7 +230,8 @@ export class IntegerAttribute extends NumericAttribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
-  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable); }
+    optional: boolean = false,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
 
   protected toConstant(value: AttributeValue): ConstantOperation {
     return new IntegerConstantOperation(Number(value));
@@ -267,7 +272,8 @@ export class BooleanAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
-  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable); }
+    optional: boolean = false,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
 
   protected toConstant(value: AttributeValue): ConstantOperation {
     return new BooleanConstantOperation(Boolean(value));
@@ -313,7 +319,8 @@ export class DateAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
-  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable); }
+    optional: boolean = false,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
 
   protected toConstant(value: AttributeValue): ConstantOperation {
     return new DateConstantOperation(parseDate(value as Date | string));
@@ -395,7 +402,8 @@ export class DateTimeAttribute extends Attribute {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
-  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable); }
+    optional: boolean = false,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
 
   protected toConstant(value: AttributeValue): ConstantOperation {
     return temporalConstant(value as Date | string);

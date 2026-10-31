@@ -3,6 +3,7 @@ export { registerRelatedFinderClass, getRelatedFinderClass } from './finder-regi
 export * from './typed-attributes';
 export { StringFunctionOperation, NumericFunctionOperation } from './scalar-functions';
 export { constant, countAll } from './expressions';
+export { concat } from '../model/relational';
 export { when } from './conditional';
 export { toSql, selectSqlToString } from './sql-generator';
 export { DialectName, SqlDialect, POSTGRES, DUCKDB, DATABRICKS, dialectOf } from './dialect';

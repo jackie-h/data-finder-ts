@@ -15,6 +15,15 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
       ] },
   },
   {
+    name: 'average_price_per_account_grouped_by_the_plain_columns',
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().average()]).orderBy(f.account().name().ascending()),
+    expected: { columns: ['Account Name', 'Average Price'], rows: [
+        ['Alpha Fund', 150.0],
+        ['Beta Fund', 350.0],
+        ['Gamma Fund', 500.0],
+      ], sql: 'GROUP BY t1.ACCT_NAME' },
+  },
+  {
     name: 'average_price_settled_only',
     query: f => f.findAll(null, _AT, [f.account().name(), f.price().average()], f.isSettled().isTrue()).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Average Price'], rows: [
