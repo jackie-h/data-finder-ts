@@ -15,6 +15,7 @@ import {
   LogicalOperation,
   LogicalOperator,
   NoOperation,
+  Operation,
   RelationalOperationElement,
   SortDirection,
   SortOperation,
@@ -455,6 +456,7 @@ export class GraphQLConnect implements QueryRunner {
     businessDateTo: Date | null = null,
     distinct: boolean = false,
     offset?: number,
+    having?: Operation,
   ): Promise<Row[]> {
     // an alias only names the column in the result: read the column, then name it
     const columns = selected.map(c => c instanceof Alias ? c.element : c);
@@ -466,6 +468,9 @@ export class GraphQLConnect implements QueryRunner {
     const query = table as GraphQLQuery;
     // validates that every column is a plain field before anything is sent
     const fieldsStr = buildFieldsStr(fieldColumns, query.endpoint.filterConvention);
+    if (having !== undefined) {
+      throw new GraphQLClientComputationError('The GraphQL runner does not support having: the groups of an aggregation are not computed on the client');
+    }
     if (groupBy && groupBy.length > 0) {
       throw new GraphQLClientComputationError('The GraphQL runner does not support group by: aggregation is not computed on the client');
     }

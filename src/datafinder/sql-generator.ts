@@ -528,6 +528,7 @@ function buildQueryOperation(
   businessDateTo: Date | null = null,
   distinct: boolean = false,
   offset?: number,
+  having?: Operation,
 ): SelectOperation {
   let filter = op;
   const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) =>
@@ -570,7 +571,7 @@ function buildQueryOperation(
     if (combined !== undefined) joinFilters.set(node, combined);
   }
 
-  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset);
+  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having);
 }
 
 /**
@@ -607,6 +608,7 @@ class SQLQueryGenerator {
   private _from: Set<TableAlias> = new Set();
   private _join: Join[] = [];
   private _groupByParts: string[] = [];
+  private _having = '';
   private _orderByParts: string[] = [];
   private _where = '';
   private _limit?: number;
@@ -636,6 +638,13 @@ class SQLQueryGenerator {
       this._addJoin(node);
     }
     this._groupByParts = this._groupByPartsFor(select);
+    this._having = '';
+    if (select.having !== undefined) {
+      const havingJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
+      this._collectRequiredJoins(select.having, havingJoins);
+      for (const node of havingJoins.values()) this._addJoin(node);
+      this._having = this.buildFilter(select.having);
+    }
     this._orderByParts = select.orderBy.map(s =>
       this._sortExpression(s.column) + this._dialect.orderDirection(s.direction),
     );
@@ -952,7 +961,7 @@ class SQLQueryGenerator {
     }
     if (op instanceof ConstantOperation) return constantValueString(op, this._dialect);
     if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation || op instanceof ConcatOperation
-        || op instanceof DateTruncOperation) {
+        || op instanceof DateTruncOperation || op instanceof AggregateOperation || op instanceof CountAllOperation) {
       // an expression compared in a filter needs its columns' joins, then is written as in a select list
       const required = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
       this._collectRequiredJoins(op, required);
@@ -998,6 +1007,7 @@ class SQLQueryGenerator {
       joins.join('') +
       this._buildWhere() +
       this._buildGroupBy() +
+      this._buildHaving() +
       this._buildOrderBy() +
       this._buildLimit() +
       this._buildOffset();
@@ -1008,6 +1018,9 @@ class SQLQueryGenerator {
   }
   private _buildGroupBy(): string {
     return this._groupByParts.length > 0 ? ' GROUP BY ' + this._groupByParts.join(', ') : '';
+  }
+  private _buildHaving(): string {
+    return this._having.length > 0 ? ' HAVING ' + this._having : '';
   }
   private _buildOrderBy(): string {
     return this._orderByParts.length > 0 ? ' ORDER BY ' + this._orderByParts.join(', ') : '';
@@ -1039,9 +1052,10 @@ export function toSql(
   businessDateTo: Date | null = null,
   distinct: boolean = false,
   offset?: number,
+  having?: Operation,
   dialect: DialectName | SqlDialect = 'postgres',
 ): string {
-  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset);
+  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having);
   return selectSqlToString(selectOp, dialect);
 }
 

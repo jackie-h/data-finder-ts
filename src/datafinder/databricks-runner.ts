@@ -11,6 +11,7 @@ import { DEFAULT_TIMEOUT_MS, QueryRunner, QueryTarget, QueryTimeoutError, Row } 
 import { toSql } from './sql-generator';
 import {
   DateOnly,
+  Operation,
   RelationalOperationElement,
   SortOperation,
   Table,
@@ -103,10 +104,11 @@ export class DatabricksConnect implements QueryRunner {
     businessDateTo: Date | null = null,
     distinct: boolean = false,
     offset?: number,
+    having?: Operation,
   ): Promise<Row[]> {
     const statement = toSql(
       businessDate, processingDatetime, columns, table as Table, op, orderBy, groupBy, limit,
-      businessDateTo, distinct, offset, this.dialect,
+      businessDateTo, distinct, offset, having, this.dialect,
     );
     const deadline = Date.now() + timeoutMs;
     const controller = new AbortController();

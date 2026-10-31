@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
+import { countAll } from '../src/datafinder';
 import { DatabricksConnect, DatabricksQueryError, convertValue } from '../src/datafinder/databricks-runner';
 import { QueryTimeoutError, clearRunner, registerRunner } from '../src/datafinder/runner';
 import { DateOnly } from '../src/model/relational';
@@ -62,6 +63,13 @@ describe('what it sends', () => {
     expect(post.body!.statement).toBe(query().toSql('databricks'));
     expect(post.body!.statement).toContain('AS `Company`');
     expect(post.body!.statement).toContain('ORDER BY t0.name DESC NULLS FIRST');
+  });
+
+  it('sends the HAVING of a grouped query', async () => {
+    const { fetch, requests } = fake(() => ({ body: succeeded([], [['Category', 'STRING'], ['Count', 'BIGINT']]) }));
+    registerRunner(new DatabricksConnect({ ...config, fetch }));
+    await f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1)).toRows();
+    expect(requests[0].body!.statement).toContain('GROUP BY t0.category HAVING COUNT(*) > 1');
   });
 
   it('leaves out the catalog, schema and token when there are none', async () => {

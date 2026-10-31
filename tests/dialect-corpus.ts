@@ -19,7 +19,7 @@ const child = new StringAttribute('Child Name', 'name', 'VARCHAR', 'u', new Join
 type Query = (dialect: DialectName) => string;
 const q = (columns: Parameters<typeof toSql>[2], filter: Parameters<typeof toSql>[4] = new NoOperation(),
   orderBy: Parameters<typeof toSql>[5] = [], groupBy: Parameters<typeof toSql>[6] = [], limit?: number, offset?: number): Query =>
-  dialect => toSql(null, null, columns, table, filter, orderBy, groupBy, limit, null, false, offset, dialect);
+  dialect => toSql(null, null, columns, table, filter, orderBy, groupBy, limit, null, false, offset, undefined, dialect);
 
 export const CORPUS: Record<string, Query> = {
   'aliases need quoting': q([text.alias('My "Col"'), n.alias('Total')]),
@@ -30,7 +30,7 @@ export const CORPUS: Record<string, Query> = {
   'is null': q([text], text.isNull().or(n.isNotNull())),
   'sort ascending and descending': q([text, n], new NoOperation(), [text.ascending(), n.descending()]),
   'limit and offset': q([text], new NoOperation(), [text.ascending()], [], 3, 2),
-  'distinct': dialect => toSql(null, null, [text], table, new NoOperation(), [], [], undefined, null, true, undefined, dialect),
+  'distinct': dialect => toSql(null, null, [text], table, new NoOperation(), [], [], undefined, null, true, undefined, undefined, dialect),
   'join': q([text, child]),
   'group by with aggregates': q([text, n.count(), price.sum(), price.average(), n.countDistinct()], new NoOperation(), [], [text]),
   'implicit group by': q([text, price.max()]),

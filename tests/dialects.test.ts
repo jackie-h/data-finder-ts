@@ -22,7 +22,7 @@ const price = new DoubleAttribute('Price', 'price', 'DOUBLE', 't');
 const day = new DateAttribute('Day', 'day', 'DATE', 't');
 const table = new Table('t', [new Column('name', 'VARCHAR', 't'), new Column('price', 'DOUBLE', 't'), new Column('day', 'DATE', 't')]);
 const sql = (dialect: 'postgres' | 'duckdb' | 'databricks', column: Parameters<typeof toSql>[2][number], orderBy: Parameters<typeof toSql>[5] = []) =>
-  toSql(null, null, [column], table, new NoOperation(), orderBy, [], undefined, null, false, undefined, dialect);
+  toSql(null, null, [column], table, new NoOperation(), orderBy, [], undefined, null, false, undefined, undefined, dialect);
 
 describe('the default is Postgres', () => {
   it('writes the same as asking for Postgres', () => {
@@ -56,7 +56,7 @@ describe('quoting', () => {
 describe('a backslash in a LIKE pattern', () => {
   it('names the escape so the backslash is not LIKE\'s own', () => {
     for (const dialect of DIALECTS) {
-      const sqlText = toSql(null, null, [name], table, name.contains('a\\b'), [], [], undefined, null, false, undefined, dialect);
+      const sqlText = toSql(null, null, [name], table, name.contains('a\\b'), [], [], undefined, null, false, undefined, undefined, dialect);
       expect(sqlText, dialect).toContain("ESCAPE '!'");
     }
   });

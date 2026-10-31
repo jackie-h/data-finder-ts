@@ -46,6 +46,7 @@ export interface QueryRunner {
     businessDateTo?: Date | null,
     distinct?: boolean,
     offset?: number,
+    having?: Operation,
   ): Promise<Row[]>;
 }
 
@@ -82,6 +83,7 @@ export class FinderResult {
   private _limit?: number;
   private _distinct = false;
   private _offset?: number;
+  private _having?: Operation;
   private _timeoutMs: number = DEFAULT_TIMEOUT_MS;
 
   constructor(
@@ -128,6 +130,16 @@ export class FinderResult {
     return this.offset(start).limit(stop - start);
   }
 
+  /**
+   * Keep the groups for which every condition holds: `HAVING`. A condition tests an aggregate or a grouping column:
+   * `f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1))`.
+   * Calls accumulate, as `and` does.
+   */
+  having(...conditions: Operation[]): this {
+    for (const condition of conditions) this._having = this._having === undefined ? condition : this._having.and(condition) as Operation;
+    return this;
+  }
+
   /** Return each distinct row once: `SELECT DISTINCT`. A sort on a distinct query has to use a selected column. */
   distinct(): this {
     this._distinct = true;
@@ -154,6 +166,7 @@ export class FinderResult {
       this._businessDateTo,
       this._distinct,
       this._offset,
+      this._having,
       dialect,
     );
   }
@@ -172,6 +185,7 @@ export class FinderResult {
       this._businessDateTo,
       this._distinct,
       this._offset,
+      this._having,
     );
   }
 }
