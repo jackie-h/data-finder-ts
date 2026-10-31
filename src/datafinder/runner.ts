@@ -1,5 +1,6 @@
 import { Attribute } from './attribute';
 import { toSql } from './sql-generator';
+import { DialectName, SqlDialect } from './dialect';
 import {
   Table,
   Operation,
@@ -29,6 +30,9 @@ export interface QueryTarget {
 }
 
 export interface QueryRunner {
+  /** The SQL a runner that executes SQL sends: `toSql()` writes it for this dialect. Postgres when absent. */
+  readonly dialect?: DialectName | SqlDialect;
+
   select(
     businessDate: Date | null,
     processingDatetime: Date | null,
@@ -148,7 +152,8 @@ export class FinderResult {
     return this;
   }
 
-  toSql(): string {
+  /** The query as SQL, in Postgres unless a dialect is given: `toSql('databricks')`. Nothing is run. */
+  toSql(dialect: DialectName | SqlDialect = 'postgres'): string {
     return toSql(
       this._businessDate,
       this._processingDatetime,
@@ -162,6 +167,7 @@ export class FinderResult {
       this._distinct,
       this._offset,
       this._having,
+      dialect,
     );
   }
 

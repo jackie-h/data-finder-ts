@@ -36,6 +36,7 @@ import {
   JoinTreeNodeOperation,
   SortOperation,
   SortDirection,
+  DatePart,
   CountAllOperation,
   UnaryOperation,
   Alias,
@@ -61,6 +62,7 @@ import {
   SingleBusinessDateColumn,
 } from '../model/milestoning';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
+import { DialectName, SqlDialect, dialectOf } from './dialect';
 
 class TableAlias {
   constructor(readonly table: string, readonly alias: string) {}
@@ -151,13 +153,8 @@ const SCALAR_SQL_NAMES: Record<ScalarFunction, string> = {
   [ScalarFunction.COALESCE]: 'COALESCE',
 };
 
-/** A string as a SQL literal: a quote inside it is doubled, so a value can never end the literal early. */
-function sqlStringLiteral(value: string): string {
-  return "'" + value.replaceAll("'", "''") + "'";
-}
-
-function constantValueString(op: ConstantOperation): string {
-  if (op instanceof StringConstantOperation) return sqlStringLiteral(op.value);
+function constantValueString(op: ConstantOperation, d: SqlDialect): string {
+  if (op instanceof StringConstantOperation) return d.stringLiteral(op.value);
   if (op instanceof DateConstantOperation) return sqlFormatDate(op.value);
   if (op instanceof DateTimeConstantOperation) return sqlFormatDatetime(op.value);
   if (op instanceof IntegerConstantOperation) return String(op.value);
@@ -171,21 +168,21 @@ function constantValueString(op: ConstantOperation): string {
  * A constant in the select list. A bare quoted literal would come back as text, so dates are typed, and a
  * bare 1.5 would come back as a DECIMAL, so a float is cast to DOUBLE.
  */
-function selectedConstantString(op: ConstantOperation): string {
-  if (op instanceof FloatConstantOperation) return 'CAST(' + constantValueString(op) + ' AS DOUBLE)';
-  if (op instanceof DateTimeConstantOperation) return 'TIMESTAMP ' + constantValueString(op);
-  if (op instanceof DateConstantOperation) return 'DATE ' + constantValueString(op);
-  return constantValueString(op);
+function selectedConstantString(op: ConstantOperation, d: SqlDialect): string {
+  if (op instanceof FloatConstantOperation) return 'CAST(' + constantValueString(op, d) + ' AS ' + d.doubleType + ')';
+  if (op instanceof DateTimeConstantOperation) return 'TIMESTAMP ' + constantValueString(op, d);
+  if (op instanceof DateConstantOperation) return 'DATE ' + constantValueString(op, d);
+  return constantValueString(op, d);
 }
 
-function windowSpecToString(window: WindowSpecification): string {
+function windowSpecToString(window: WindowSpecification, d: SqlDialect): string {
   const parts: string[] = [];
   if (window.partitionBy.length > 0) {
-    parts.push('PARTITION BY ' + window.partitionBy.map(p => sqlOperationToString(p)).join(', '));
+    parts.push('PARTITION BY ' + window.partitionBy.map(p => sqlOperationToString(p, d)).join(', '));
   }
   if (window.orderBy.length > 0) {
     parts.push('ORDER BY ' + window.orderBy.map(s =>
-      sqlOperationToString(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
+      sqlOperationToString(s.column, d) + d.orderDirection(s.direction),
     ).join(', '));
   }
   return 'OVER (' + parts.join(' ') + ')';
@@ -210,8 +207,8 @@ export function arithmeticNeedsParentheses(parent: ArithmeticOperation, child: R
     && (parent.operator === ArithmeticOperator.SUBTRACT || parent.operator === ArithmeticOperator.DIVIDE));
 }
 
-function operandString(operation: RelationalOperationElement): string {
-  return operation instanceof ConstantOperation ? constantValueString(operation) : sqlOperationToString(operation);
+function operandString(operation: RelationalOperationElement, d: SqlDialect): string {
+  return operation instanceof ConstantOperation ? constantValueString(operation, d) : sqlOperationToString(operation, d);
 }
 
 /**
@@ -228,7 +225,7 @@ function isCondition(op: unknown): boolean {
     || op instanceof ExistsOperation || op instanceof NotExistsOperation;
 }
 
-function sqlOperationToString(operation: RelationalOperationElement): string {
+function sqlOperationToString(operation: RelationalOperationElement, d: SqlDialect): string {
   if (operation instanceof TableAliasColumn) {
     return operation.tableAlias.alias + '.' + operation.column.name;
   }
@@ -236,73 +233,71 @@ function sqlOperationToString(operation: RelationalOperationElement): string {
     const fn = WINDOW_SQL_NAMES[operation.func];
     const parts: string[] = [];
     if (operation.element !== null && operation.element !== undefined) {
-      parts.push(sqlOperationToString(operation.element));
+      parts.push(sqlOperationToString(operation.element, d));
     }
     if (operation.secondArg !== undefined) parts.push(String(operation.secondArg));
     for (const arg of operation.extraArgs) {
-      parts.push(typeof arg === 'string' ? sqlStringLiteral(arg) : String(arg));
+      parts.push(typeof arg === 'string' ? d.stringLiteral(arg) : String(arg));
     }
     const sql = fn + '(' + parts.join(', ') + ')';
-    return sql + (operation.window !== undefined ? ' ' + windowSpecToString(operation.window) : ' OVER ()');
+    return sql + (operation.window !== undefined ? ' ' + windowSpecToString(operation.window, d) : ' OVER ()');
   }
   if (operation instanceof AggregateOperation && operation.operator === AggregateOperator.COUNT_DISTINCT) {
-    return 'COUNT(DISTINCT ' + sqlOperationToString(operation.element) + ')';
+    return 'COUNT(DISTINCT ' + sqlOperationToString(operation.element, d) + ')';
   }
   if (operation instanceof AggregateOperation && operation.operator === AggregateOperator.STRING_AGG) {
-    let sql = 'STRING_AGG(' + sqlOperationToString(operation.element) + ', ' + sqlStringLiteral(operation.separator ?? '');
-    if (operation.orderBy.length > 0) {
-      sql += ' ORDER BY ' + operation.orderBy.map(s =>
-        sqlOperationToString(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
-      ).join(', ');
-    }
-    sql += ')';
-    if (operation.window !== undefined) sql += ' ' + windowSpecToString(operation.window);
+    let sql = d.stringAgg(
+      sqlOperationToString(operation.element, d),
+      d.stringLiteral(operation.separator ?? ''),
+      operation.orderBy.map(s => sqlOperationToString(s.column, d) + d.orderDirection(s.direction)),
+    );
+    if (operation.window !== undefined) sql += ' ' + windowSpecToString(operation.window, d);
     return sql;
   }
   if (operation instanceof AggregateOperation) {
     const fn = AGGREGATE_SQL_NAMES[operation.operator] ?? operation.operator;
-    let sql = fn + '(' + sqlOperationToString(operation.element) + ')';
+    let sql = fn + '(' + sqlOperationToString(operation.element, d) + ')';
     if (operation.window !== undefined) {
-      sql += ' ' + windowSpecToString(operation.window);
+      sql += ' ' + windowSpecToString(operation.window, d);
     }
     return sql;
   }
   if (operation instanceof ScalarFunctionOperation) {
     const fn = SCALAR_SQL_NAMES[operation.func];
-    const parts: string[] = [sqlOperationToString(operation.element)];
+    const parts: string[] = [sqlOperationToString(operation.element, d)];
     if (operation.secondArg !== undefined) parts.push(String(operation.secondArg));
     for (const arg of operation.extraArgs) {
-      parts.push(typeof arg === 'string' ? sqlStringLiteral(arg) : String(arg));
+      parts.push(typeof arg === 'string' ? d.stringLiteral(arg) : String(arg));
     }
     return fn + '(' + parts.join(', ') + ')';
   }
   if (operation instanceof DateExtractOperation) {
-    return 'EXTRACT(' + operation.part + ' FROM ' + sqlOperationToString(operation.element) + ')';
+    const element = sqlOperationToString(operation.element, d);
+    return operation.part === DatePart.DOW ? d.dayOfWeek(element) : 'EXTRACT(' + operation.part + ' FROM ' + element + ')';
   }
   if (operation instanceof DateTruncOperation) {
-    return "CAST(DATE_TRUNC('" + operation.part.toLowerCase() + "', " + sqlOperationToString(operation.element) + ') AS DATE)';
+    return "CAST(DATE_TRUNC('" + operation.part.toLowerCase() + "', " + sqlOperationToString(operation.element, d) + ') AS DATE)';
   }
   if (operation instanceof DateArithmeticOperation) {
     const op = operation.isAdd ? '+' : '-';
-    return sqlOperationToString(operation.element) + ' ' + op + " INTERVAL '" + operation.n + "' " + operation.unit;
+    return sqlOperationToString(operation.element, d) + ' ' + op + " INTERVAL '" + operation.n + "' " + operation.unit;
   }
   if (operation instanceof DateDiffOperation) {
-    const otherSql = sqlFormatDatetime(operation.other);
-    return "DATE_DIFF('" + operation.unit.toLowerCase() + "', " + sqlOperationToString(operation.element) + ', ' + otherSql + ')';
+    return d.dateDiff(operation.unit, sqlOperationToString(operation.element, d), 'TIMESTAMP ' + sqlFormatDatetime(operation.other));
   }
   if (operation instanceof CountAllOperation) return 'COUNT(*)';
-  if (operation instanceof ConstantOperation) return selectedConstantString(operation);
+  if (operation instanceof ConstantOperation) return selectedConstantString(operation, d);
   if (operation instanceof RenderedSql) return operation.sql;
-  if (operation instanceof ConcatOperation) return operation.parts.map(operandString).join(' || ');
+  if (operation instanceof ConcatOperation) return operation.parts.map(part => operandString(part, d)).join(' || ');
   if (operation instanceof ArithmeticOperation) {
-    let left = operandString(operation.left);
-    let right = operandString(operation.right);
+    let left = operandString(operation.left, d);
+    let right = operandString(operation.right, d);
     if (arithmeticNeedsParentheses(operation, operation.left, false)) left = '(' + left + ')';
     if (arithmeticNeedsParentheses(operation, operation.right, true)) right = '(' + right + ')';
     return left + ' ' + operation.operator + ' ' + right;
   }
   if (operation instanceof Alias) {
-    return sqlOperationToString(operation.element) + ' AS "' + operation.name + '"';
+    return sqlOperationToString(operation.element, d) + ' AS ' + d.quoteIdentifier(operation.name);
   }
   throw new TypeError('Unknown operation in sqlOperationToString: ' + operation.constructor.name);
 }
@@ -607,6 +602,8 @@ function unaliased(op: unknown): unknown {
 }
 
 class SQLQueryGenerator {
+  constructor(private readonly _dialect: SqlDialect) {}
+
   private _select: Alias[] = [];
   private _from: Set<TableAlias> = new Set();
   private _join: Join[] = [];
@@ -649,7 +646,7 @@ class SQLQueryGenerator {
       this._having = this.buildFilter(select.having);
     }
     this._orderByParts = select.orderBy.map(s =>
-      this._sortExpression(s.column) + (s.direction === SortDirection.ASC ? ' ASC' : ' DESC'),
+      this._sortExpression(s.column) + this._dialect.orderDirection(s.direction),
     );
     this._limit = select.limit;
     this._distinct = select.distinct;
@@ -675,14 +672,14 @@ class SQLQueryGenerator {
     const grouped = select.display
       .map((column, i) => ({ column, shown: this._select[i] }))
       .filter(({ column }) => !containsAggregateOrWindow(column) && !(unaliased(column) instanceof ConstantOperation))
-      .map(({ shown }) => sqlOperationToString(shown.element));
+      .map(({ shown }) => sqlOperationToString(shown.element, this._dialect));
     return [...new Set([...keys, ...grouped])];
   }
 
   /** What a sort orders by: a column, or an expression such as an aggregate. */
   private _sortExpression(expression: RelationalOperationElement): string {
     if (expression instanceof ColumnWithJoin || expression instanceof Attribute) return this.buildFilter(expression);
-    return sqlOperationToString(this._rewriteOperation(expression));
+    return sqlOperationToString(this._rewriteOperation(expression), this._dialect);
   }
 
   private _columnToString(column: Column): string {
@@ -792,7 +789,7 @@ class SQLQueryGenerator {
   /** The CASE written out now: its condition can only be rendered while the query is being built. */
   private _caseSql(op: CaseOperation): string {
     const branch = (value: RelationalOperationElement): string =>
-      value instanceof ConstantOperation ? constantValueString(value) : sqlOperationToString(this._rewriteOperation(value));
+      value instanceof ConstantOperation ? constantValueString(value, this._dialect) : sqlOperationToString(this._rewriteOperation(value), this._dialect);
     let sql = 'CASE WHEN ' + this.buildFilter(op.condition) + ' THEN ' + branch(op.then);
     if (op.fallback !== undefined) sql += ' ELSE ' + branch(op.fallback);
     return sql + ' END';
@@ -931,11 +928,11 @@ class SQLQueryGenerator {
       return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NULL';
     }
     if (op instanceof InOperation) {
-      return this.buildFilter(op.element) + ' IN (' + op.values.map(constantValueString).join(', ') + ')';
+      return this.buildFilter(op.element) + ' IN (' + op.values.map(value => constantValueString(value, this._dialect)).join(', ') + ')';
     }
     if (op instanceof NotInOperation) {
       const column = this.buildFilter(op.element);
-      const sql = column + ' NOT IN (' + op.values.map(constantValueString).join(', ') + ')';
+      const sql = column + ' NOT IN (' + op.values.map(value => constantValueString(value, this._dialect)).join(', ') + ')';
       // NULL NOT IN (...) is not true in SQL, so a nullable column has to match its NULLs explicitly
       if (op.element instanceof ColumnWithJoin && this._resolve(op.element).column.nullable) {
         return '(' + sql + ' OR ' + column + ' IS NULL)';
@@ -954,19 +951,22 @@ class SQLQueryGenerator {
     if (op instanceof ComparisonOperation) {
       let sql = this.buildFilter(op.left) + COMPARISON_OPERATOR_STR[op.operator] + this.buildFilter(op.right);
       if ((op.operator === ComparisonOperator.LIKE || op.operator === ComparisonOperator.NOT_LIKE)
-        && op.right instanceof StringConstantOperation && op.right.value.includes(LIKE_ESCAPE)) {
-        sql += " ESCAPE '" + LIKE_ESCAPE + "'"; // the pattern has a literal %, _ or escape character in it
+        && op.right instanceof StringConstantOperation
+        && (op.right.value.includes(LIKE_ESCAPE) || op.right.value.includes('\\'))) {
+        // the pattern has a literal %, _ or escape character in it, or a backslash, which Postgres and Databricks
+        // would otherwise take as LIKE's own escape
+        sql += " ESCAPE '" + LIKE_ESCAPE + "'";
       }
       return sql;
     }
-    if (op instanceof ConstantOperation) return constantValueString(op);
+    if (op instanceof ConstantOperation) return constantValueString(op, this._dialect);
     if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation || op instanceof ConcatOperation
         || op instanceof DateTruncOperation || op instanceof AggregateOperation || op instanceof CountAllOperation) {
       // an expression compared in a filter needs its columns' joins, then is written as in a select list
       const required = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
       this._collectRequiredJoins(op, required);
       for (const node of required.values()) this._addJoin(node);
-      return sqlOperationToString(this._rewriteOperation(op));
+      return sqlOperationToString(this._rewriteOperation(op), this._dialect);
     }
     if (op instanceof ColumnWithJoin) {
       const { column, parent: node } = this._resolve(op);
@@ -1002,7 +1002,7 @@ class SQLQueryGenerator {
       (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
-    return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca)).join(',') +
+    return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca, this._dialect)).join(',') +
       ' FROM ' + Array.from(this._from).map(ta => ta.table + ' AS ' + ta.alias).join(',') +
       joins.join('') +
       this._buildWhere() +
@@ -1034,8 +1034,8 @@ class SQLQueryGenerator {
   }
 }
 
-export function selectSqlToString(selectOperation: SelectOperation): string {
-  const qg = new SQLQueryGenerator();
+export function selectSqlToString(selectOperation: SelectOperation, dialect: DialectName | SqlDialect = 'postgres'): string {
+  const qg = new SQLQueryGenerator(dialectOf(dialect));
   qg.generate(selectOperation);
   return qg.buildQueryString();
 }
@@ -1053,9 +1053,10 @@ export function toSql(
   distinct: boolean = false,
   offset?: number,
   having?: Operation,
+  dialect: DialectName | SqlDialect = 'postgres',
 ): string {
   const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having);
-  return selectSqlToString(selectOp);
+  return selectSqlToString(selectOp, dialect);
 }
 
 export { buildQueryOperation };

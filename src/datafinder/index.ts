@@ -5,6 +5,7 @@ export { StringFunctionOperation, NumericFunctionOperation } from './scalar-func
 export { constant, countAll } from './expressions';
 export { when } from './conditional';
 export { toSql, selectSqlToString } from './sql-generator';
+export { DialectName, SqlDialect, POSTGRES, DUCKDB, DATABRICKS, dialectOf } from './dialect';
 export { titleCase } from './naming';
 export { EmbeddedAttributes, embeddedUnder } from './embedded';
 export { RelatedFinder } from './finder';
@@ -21,3 +22,4 @@ export {
   DEFAULT_TIMEOUT_MS,
   QueryTimeoutError,
 } from './runner';
+export { DatabricksConnect, DatabricksConfig, DatabricksQueryError } from './databricks-runner';
