@@ -2,7 +2,7 @@ import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { DEFAULT_TIMEOUT_MS, QueryRunner, QueryTarget, QueryTimeoutError, registerRunner, clearRunner } from '../src/datafinder/runner';
 import { toSql } from '../src/datafinder/sql-generator';
 import type { Attribute } from '../src/datafinder/attribute';
-import type { Table, SortOperation, RelationalOperationElement } from '../src/model/relational';
+import type { Table, SortOperation, RelationalOperationElement, Operation } from '../src/model/relational';
 
 export class DuckDbRunner implements QueryRunner {
   /** Column names of the most recent result, in the order they were selected. */
@@ -23,8 +23,9 @@ export class DuckDbRunner implements QueryRunner {
     businessDateTo: Date | null = null,
     distinct: boolean = false,
     offset?: number,
+    having?: Operation,
   ): Promise<unknown[][]> {
-    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset);
+    const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having);
     console.log('[SQL]', sql);
     const timer = setTimeout(() => this.conn.interrupt(), timeoutMs);
     let result;

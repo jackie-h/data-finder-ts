@@ -171,6 +171,12 @@ An expression has the aggregates a column has: `f.price().times(f.quantity()).su
 `when(f.price().gt(10)).then(5.5).otherwise(1.5).sum()`. A condition has `.all()` and `.any()`:
 `f.price().gt(10).all()` is true for a group where every row holds.
 
+`.having(...)` keeps the groups that satisfy a condition on an aggregate or a grouping column:
+`f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1))`. An aggregate compares
+as a column does (`eq`, `ne`, `lt`, `lte`, `gt`, `gte`), and `contains`, `startsWith` and `endsWith` also work on an
+expression that holds text, such as `f.name().toUpperCase().startsWith('AC')` or a joined text. The GraphQL runner
+throws `GraphQLClientComputationError` for `having`.
+
 `.countDistinct()` counts the different non-NULL values (`COUNT(DISTINCT column)`); use it with `.groupBy()` to count per group. The GraphQL runner does not compute aggregates on the client.
 
 `.join(separator, orderBy)` on a string attribute joins the values of a group into one text (`STRING_AGG`): `cf.findAll(null, null, [cf.category(), cf.name().join(', ', [cf.name().ascending()])]).groupBy(cf.category())`. `orderBy` is the order they are joined in; without it the order is not defined. Missing values are skipped.

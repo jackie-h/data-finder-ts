@@ -247,6 +247,7 @@ export class AggregateOperation extends UnaryOperation implements Sortable {
   ) { super(element); }
 
   arithmeticOperand(): RelationalOperationElement { return this; }
+  comparisonOperand(): RelationalOperationElement { return this; }
 
   over(partitionBy?: RelationalOperationElement[], orderBy?: SortOperation[]): AggregateOperation {
     return new AggregateOperation(this.element, this.operator, this.displayName,
@@ -521,6 +522,8 @@ export class CountAllOperation extends RelationalOperationElement implements Ali
   descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 
   constructor(readonly table: string) { super(); }
+
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
 
 /**
@@ -599,6 +602,8 @@ export class SelectOperation {
     readonly distinct: boolean = false,
     /** How many rows to skip before the first one returned. */
     readonly offset?: number,
+    /** Keeps the groups that satisfy it (`HAVING`). */
+    readonly having?: Operation,
   ) {}
 }
 
@@ -666,6 +671,25 @@ export abstract class Comparable {
 export function sample(ddof: number): boolean {
   if (ddof !== 0 && ddof !== 1) throw new RangeError(`ddof is 0 (population) or 1 (sample), not ${ddof}`);
   return ddof === 1;
+}
+
+/**
+ * Pattern tests on an expression that holds text, as on a column: `f.name().toUpperCase().startsWith('AC')`,
+ * `f.name().join(',').contains('John')`. Mixed into the expressions that have it.
+ */
+export abstract class StringPredicates {
+  abstract comparisonOperand(): RelationalOperationElement;
+
+  private _like(pattern: string): ComparisonOperation {
+    return new ComparisonOperation(this.comparisonOperand(), ComparisonOperator.LIKE, new StringConstantOperation(pattern));
+  }
+
+  /** Filter to rows where this text contains `value`. */
+  contains(value: string): ComparisonOperation { return this._like(`%${escapeLike(value)}%`); }
+  /** Filter to rows where this text starts with `prefix`. */
+  startsWith(prefix: string): ComparisonOperation { return this._like(`${escapeLike(prefix)}%`); }
+  /** Filter to rows where this text ends with `suffix`. */
+  endsWith(suffix: string): ComparisonOperation { return this._like(`%${escapeLike(suffix)}`); }
 }
 
 /**
@@ -827,8 +851,8 @@ export function concat(...parts: ConcatPart[]): ConcatOperation {
   return new ConcatOperation(parts.flatMap(partsOf));
 }
 
-export interface ConcatOperation extends Comparable {}
-applyMixins(ConcatOperation, [Comparable]);
+export interface ConcatOperation extends Comparable, StringPredicates {}
+applyMixins(ConcatOperation, [Comparable, StringPredicates]);
 
 export interface DateTruncOperation extends Comparable {}
 applyMixins(DateTruncOperation, [Comparable]);
@@ -836,11 +860,14 @@ applyMixins(DateTruncOperation, [Comparable]);
 export interface ArithmeticOperation extends Arithmetic, Comparable {}
 applyMixins(ArithmeticOperation, [Arithmetic, Comparable]);
 
-export interface ScalarFunctionOperation extends Comparable, Arithmetic {}
-applyMixins(ScalarFunctionOperation, [Comparable, Arithmetic]);
+export interface ScalarFunctionOperation extends Comparable, Arithmetic, StringPredicates {}
+applyMixins(ScalarFunctionOperation, [Comparable, Arithmetic, StringPredicates]);
 
-export interface AggregateOperation extends Arithmetic {}
-applyMixins(AggregateOperation, [Arithmetic]);
+export interface AggregateOperation extends Arithmetic, Comparable, StringPredicates {}
+applyMixins(AggregateOperation, [Arithmetic, Comparable, StringPredicates]);
+
+export interface CountAllOperation extends Comparable {}
+applyMixins(CountAllOperation, [Comparable]);
 
 export interface NumericConstantOperation extends Arithmetic {}
 applyMixins(NumericConstantOperation, [Arithmetic]);
