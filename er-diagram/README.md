@@ -17,6 +17,20 @@ npm run generate --prefix er-diagram     # writes er-diagram/out/ (open out/inde
 npm test --prefix er-diagram             # viewer tests (node:test, they run the export too)
 ```
 
+## Install
+
+It is published to npm as `data-finder-er-diagram`, with a command of the same name:
+
+```bash
+npm i -D data-finder-er-diagram
+# write the JSON the diagrams are drawn from (needs Python with data-finder[markdown]>=0.1.18)
+python -m mapping_markdown.export_json --config er.config.json --out er-out/data.json
+npx data-finder-er-diagram --config er.config.json --data er-out/data.json --out er-out
+```
+
+The pages load mermaid from the `node_modules` that holds it, by a path relative to the output folder, so generate them where
+`node_modules` stays reachable (the default `out` beside the config is fine), or copy `mermaid/dist/mermaid.min.js` next to them.
+
 ## How it fits together
 
 1. data-finder's `mapping_markdown.export_json` (in the Python data-finder repo, so there is always a way to get the model and mappings as JSON)

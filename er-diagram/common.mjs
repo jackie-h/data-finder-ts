@@ -48,7 +48,7 @@ export const attrName = n => n.trim().replace(/\s+/g, "_").replace(/[^A-Za-z0-9_
 export function loadConfig(args) {
   const opt = (name, dflt) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : dflt; };
   const file = opt("config");
-  if (!file) { console.error("usage: node generate.mjs --config <config.json> [--data data.json] [--out dir] [--attrs all|N] [--open]"); process.exit(1); }
+  if (!file) { console.error("usage: data-finder-er-diagram --config <config.json> [--data data.json] [--out dir] [--attrs all|N] [--open]"); process.exit(1); }
   const path = resolve(file), base = dirname(path), raw = JSON.parse(readFileSync(path, "utf8"));
   const attrs = opt("attrs", String(raw.attrs ?? "all"));
   const out = resolve(opt("out") ? process.cwd() : base, opt("out", raw.out ?? "out"));

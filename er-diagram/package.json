@@ -1,8 +1,32 @@
 {
-  "name": "er-diagram",
-  "private": true,
-  "type": "module",
+  "name": "data-finder-er-diagram",
+  "version": "0.1.5",
   "description": "Mermaid ER diagram viewer; draws the JSON that mapping_markdown.export_json writes from model and mapping markdown",
+  "type": "module",
+  "bin": {
+    "data-finder-er-diagram": "./generate.mjs"
+  },
+  "files": [
+    "generate.mjs",
+    "common.mjs",
+    "data.mjs",
+    "README.md"
+  ],
+  "keywords": [
+    "data-finder",
+    "er-diagram",
+    "mermaid",
+    "class-diagram"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jackie-h/data-finder-ts.git",
+    "directory": "er-diagram"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "export": "cd .. && uv run python -m mapping_markdown.export_json --config er-diagram/data-finder.config.json --out er-diagram/out/data.json",
     "generate": "npm run export --silent && node generate.mjs --config data-finder.config.json",
@@ -10,5 +34,9 @@
   },
   "dependencies": {
     "mermaid": "12.2.0"
-  }
+  },
+  "bugs": {
+    "url": "https://github.com/jackie-h/data-finder-ts/issues"
+  },
+  "homepage": "https://github.com/jackie-h/data-finder-ts/tree/main/er-diagram"
 }
