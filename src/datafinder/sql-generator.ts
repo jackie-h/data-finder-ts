@@ -749,6 +749,7 @@ class SQLQueryGenerator {
       );
     }
     if (op instanceof CaseOperation) return new RenderedSql(this._caseSql(op));
+    if (isCondition(op)) return new RenderedSql(this.buildFilter(op as Operation)); // a condition inside an expression, such as the argument of an aggregate
     if (op instanceof ConcatOperation) return new ConcatOperation(op.parts.map(part => this._rewriteOperation(part)), op.displayName);
     if (op instanceof ArithmeticOperation) {
       return new ArithmeticOperation(this._rewriteOperation(op.left), op.operator, this._rewriteOperation(op.right), op.displayName);
@@ -827,6 +828,9 @@ class SQLQueryGenerator {
         alias = col.func;
       }
       this._select.push(new Alias(rewritten, alias));
+    } else if (col instanceof AggregateOperation && !(col.element instanceof ColumnWithJoin)) {
+      // an aggregate of an expression: rewritten as a whole, so every column in it is resolved
+      this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (col instanceof AggregateOperation) {
       const colNested = this._resolve(findColumn(col));
       const node = colNested.parent;

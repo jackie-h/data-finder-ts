@@ -212,6 +212,10 @@ af.findAll(null, null, [af.count()]).toSql()
 deviation and variance, and `.std(0)` / `.var(0)` the population ones, as in pandas. `.min()` and `.max()` also work on
 text and dates.
 
+An expression has the aggregates a column has: `f.price().times(f.quantity()).sum()`, `constant(1).sum()`,
+`when(f.price().gt(10)).then(5.5).otherwise(1.5).sum()`. A condition has `.all()` and `.any()`:
+`f.price().gt(10).all()` is true for a group where every row holds.
+
 `.countDistinct()` counts the different non-NULL values (`COUNT(DISTINCT column)`); use it with `.groupBy()` to count per group. The GraphQL runner does not compute aggregates on the client.
 
 `.join(separator, orderBy)` on a string attribute joins the values of a group into one text (`STRING_AGG`): `cf.findAll(null, null, [cf.category(), cf.name().join(', ', [cf.name().ascending()])]).groupBy(cf.category())`. `orderBy` is the order they are joined in; without it the order is not defined. Missing values are skipped.

@@ -3,7 +3,6 @@ import { NumericFunctions, StringFunctions } from './scalar-functions';
 import {
   ComparisonOperation,
   ComparisonOperator,
-  Operation,
   StringConstantOperation,
   FloatConstantOperation,
   IntegerConstantOperation,
@@ -29,6 +28,7 @@ import {
   DateDiffOperation,
   JoinTreeNodeOperation,
   ColumnWithJoin,
+  sample,
 } from '../model/relational';
 
 /** The smallest and largest value of a group, for a column that can be ordered but not summed. */
@@ -44,11 +44,6 @@ abstract class MinMax {
   max(): AggregateOperation {
     return new AggregateOperation(this.cwj(), AggregateOperator.MAX, 'Max ' + this.displayName());
   }
-}
-
-function sample(ddof: number): boolean {
-  if (ddof !== 0 && ddof !== 1) throw new RangeError(`ddof is 0 (population) or 1 (sample), not ${ddof}`);
-  return ddof === 1;
 }
 
 export class StringAttribute extends Attribute {
@@ -75,27 +70,27 @@ export class StringAttribute extends Attribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: string): Operation {
+  eq(value: string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new StringConstantOperation(value));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: string): Operation {
+  ne(value: string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new StringConstantOperation(value));
   }
   /** Filter to rows where this attribute contains `value` as a substring. */
-  contains(value: string): Operation {
+  contains(value: string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`%${escapeLike(value)}%`));
   }
   /** Filter to rows where this attribute begins with `prefix`. */
-  startsWith(prefix: string): Operation {
+  startsWith(prefix: string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`${escapeLike(prefix)}%`));
   }
   /** Filter to rows where this attribute ends with `suffix`. */
-  endsWith(suffix: string): Operation {
+  endsWith(suffix: string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`%${escapeLike(suffix)}`));
   }
   /** Filter to rows where this attribute does not contain `value` as a substring. */
-  notContains(value: string): Operation {
+  notContains(value: string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_LIKE, new StringConstantOperation(`%${escapeLike(value)}%`));
   }
 }
@@ -153,27 +148,27 @@ export class DoubleAttribute extends NumericAttribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: number): Operation {
+  eq(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new FloatConstantOperation(value));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: number): Operation {
+  ne(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new FloatConstantOperation(value));
   }
   /** Filter to rows where this attribute is greater than `value`. */
-  gt(value: number): Operation {
+  gt(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, new FloatConstantOperation(value));
   }
   /** Filter to rows where this attribute is less than `value`. */
-  lt(value: number): Operation {
+  lt(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, new FloatConstantOperation(value));
   }
   /** Filter to rows where this attribute is greater than or equal to `value`. */
-  gte(value: number): Operation {
+  gte(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, new FloatConstantOperation(value));
   }
   /** Filter to rows where this attribute is less than or equal to `value`. */
-  lte(value: number): Operation {
+  lte(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, new FloatConstantOperation(value));
   }
 }
@@ -197,27 +192,27 @@ export class DecimalAttribute extends NumericAttribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: number): Operation {
+  eq(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new DecimalConstantOperation(value));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: number): Operation {
+  ne(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new DecimalConstantOperation(value));
   }
   /** Filter to rows where this attribute is greater than `value`. */
-  gt(value: number): Operation {
+  gt(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, new DecimalConstantOperation(value));
   }
   /** Filter to rows where this attribute is less than `value`. */
-  lt(value: number): Operation {
+  lt(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, new DecimalConstantOperation(value));
   }
   /** Filter to rows where this attribute is greater than or equal to `value`. */
-  gte(value: number): Operation {
+  gte(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, new DecimalConstantOperation(value));
   }
   /** Filter to rows where this attribute is less than or equal to `value`. */
-  lte(value: number): Operation {
+  lte(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, new DecimalConstantOperation(value));
   }
 }
@@ -238,27 +233,27 @@ export class IntegerAttribute extends NumericAttribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: number): Operation {
+  eq(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new IntegerConstantOperation(value));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: number): Operation {
+  ne(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new IntegerConstantOperation(value));
   }
   /** Filter to rows where this attribute is greater than `value`. */
-  gt(value: number): Operation {
+  gt(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, new IntegerConstantOperation(value));
   }
   /** Filter to rows where this attribute is less than `value`. */
-  lt(value: number): Operation {
+  lt(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, new IntegerConstantOperation(value));
   }
   /** Filter to rows where this attribute is greater than or equal to `value`. */
-  gte(value: number): Operation {
+  gte(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, new IntegerConstantOperation(value));
   }
   /** Filter to rows where this attribute is less than or equal to `value`. */
-  lte(value: number): Operation {
+  lte(value: number): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, new IntegerConstantOperation(value));
   }
 }
@@ -279,15 +274,15 @@ export class BooleanAttribute extends Attribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: boolean): Operation {
+  eq(value: boolean): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new BooleanConstantOperation(value));
   }
   /** Filter to rows where this attribute is true. */
-  isTrue(): Operation {
+  isTrue(): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new BooleanConstantOperation(true));
   }
   /** Filter to rows where this attribute is false. */
-  isFalse(): Operation {
+  isFalse(): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new BooleanConstantOperation(false));
   }
 }
@@ -325,27 +320,27 @@ export class DateAttribute extends Attribute {
   }
 
   /** Filter to rows where this date equals `value`. */
-  eq(value: Date | string): Operation {
+  eq(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new DateConstantOperation(parseDate(value)));
   }
   /** Filter to rows where this date does not equal `value`. */
-  ne(value: Date | string): Operation {
+  ne(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new DateConstantOperation(parseDate(value)));
   }
   /** Filter to rows where this date is after `value`. */
-  gt(value: Date | string): Operation {
+  gt(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, new DateConstantOperation(parseDate(value)));
   }
   /** Filter to rows where this date is before `value`. */
-  lt(value: Date | string): Operation {
+  lt(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, new DateConstantOperation(parseDate(value)));
   }
   /** Filter to rows where this date is on or after `value`. */
-  gte(value: Date | string): Operation {
+  gte(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, new DateConstantOperation(parseDate(value)));
   }
   /** Filter to rows where this date is on or before `value`. */
-  lte(value: Date | string): Operation {
+  lte(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, new DateConstantOperation(parseDate(value)));
   }
 
@@ -407,27 +402,27 @@ export class DateTimeAttribute extends Attribute {
   }
 
   /** Filter to rows where this timestamp equals `value`. */
-  eq(value: Date | string): Operation {
+  eq(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, temporalConstant(value));
   }
   /** Filter to rows where this timestamp does not equal `value`. */
-  ne(value: Date | string): Operation {
+  ne(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, temporalConstant(value));
   }
   /** Filter to rows where this timestamp is after `value`. */
-  gt(value: Date | string): Operation {
+  gt(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, temporalConstant(value));
   }
   /** Filter to rows where this timestamp is before `value`. */
-  lt(value: Date | string): Operation {
+  lt(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, temporalConstant(value));
   }
   /** Filter to rows where this timestamp is on or after `value`. */
-  gte(value: Date | string): Operation {
+  gte(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, temporalConstant(value));
   }
   /** Filter to rows where this timestamp is on or before `value`. */
-  lte(value: Date | string): Operation {
+  lte(value: Date | string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, temporalConstant(value));
   }
 
