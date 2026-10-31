@@ -8,7 +8,7 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'generator', 'src'))
 
 from ts_generator.generator import generate
-from model.m3 import Class, Property, String, Integer, Package
+from model.m3 import Class, Property, String, Integer, Package, ONE_TO_ONE
 from model.mapping import Mapping
 from model.relational import Column, Table, Schema, Database
 from model.relational_mapping import RelationalPropertyMapping, RelationalClassMapping, Join
@@ -17,14 +17,14 @@ repo = Database('test_db', 'duckdb://test.db')
 schema = Schema('shop', repo)
 
 account_c = Class('Account', [
-    Property('Id', 'id', Integer),
-    Property('Name', 'name', String),
+    Property('Id', 'id', Integer, ONE_TO_ONE),
+    Property('Name', 'name', String, ONE_TO_ONE),
 ], Package('shop'))
 
 order_c = Class('Order', [
-    Property('Id', 'id', Integer),
-    Property('Billing Account', 'billingAccount', account_c),
-    Property('Shipping Account', 'shippingAccount', account_c),
+    Property('Id', 'id', Integer, ONE_TO_ONE),
+    Property('Billing Account', 'billingAccount', account_c, ONE_TO_ONE),
+    Property('Shipping Account', 'shippingAccount', account_c, ONE_TO_ONE),
 ], Package('shop'))
 
 ac1 = Column('ID', 'INT')
