@@ -117,6 +117,15 @@ const AGGREGATE_SQL_NAMES: Partial<Record<AggregateOperator, string>> = {
   [AggregateOperator.AVERAGE]: 'AVG',
 };
 
+/**
+ * Comparisons that are never true for a missing value. Legend guards these on an optional property with IS NOT NULL;
+ * it does not guard `=` (which a missing value never matches either) or `<>`.
+ */
+const GUARDED_COMPARISONS = new Set<ComparisonOperator>([
+  ComparisonOperator.LESS_THAN, ComparisonOperator.GREATER_THAN, ComparisonOperator.LESS_THAN_OR_EQUAL_TO,
+  ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, ComparisonOperator.LIKE,
+]);
+
 const WINDOW_SQL_NAMES: Record<WindowFunction, string> = {
   [WindowFunction.ROW_NUMBER]: 'ROW_NUMBER',
   [WindowFunction.RANK]: 'RANK',
@@ -158,7 +167,7 @@ function constantValueString(op: ConstantOperation, d: SqlDialect): string {
   if (op instanceof DateConstantOperation) return sqlFormatDate(op.value);
   if (op instanceof DateTimeConstantOperation) return sqlFormatDatetime(op.value);
   if (op instanceof IntegerConstantOperation) return String(op.value);
-  if (op instanceof FloatConstantOperation) return String(op.value);
+  if (op instanceof FloatConstantOperation) return Number.isInteger(op.value) && Math.abs(op.value) < 1e21 ? op.value.toFixed(1) : String(op.value); // 200.0, so it stays a float
   if (op instanceof BooleanConstantOperation) return op.value ? 'TRUE' : 'FALSE';
   if (op instanceof DecimalConstantOperation) return String(op.value);
   throw new Error('Unknown constant operation');
@@ -620,6 +629,7 @@ class SQLQueryGenerator {
   private _rootTable?: Table;
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
+  private _guardOptional = true;
 
   generate(select: SelectOperation): void {
     this._rootTable = select.table;
@@ -643,7 +653,13 @@ class SQLQueryGenerator {
       const havingJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
       this._collectRequiredJoins(select.having, havingJoins);
       for (const node of havingJoins.values()) this._addJoin(node);
-      this._having = this.buildFilter(select.having);
+      // HAVING filters the grouped result, which Legend does not guard: it is a filter on projected columns
+      this._guardOptional = false;
+      try {
+        this._having = this.buildFilter(select.having);
+      } finally {
+        this._guardOptional = true;
+      }
     }
     this._orderByParts = select.orderBy.map(s =>
       this._sortExpression(s.column) + this._dialect.orderDirection(s.direction),
@@ -733,6 +749,14 @@ class SQLQueryGenerator {
       if (embedded !== undefined) return this._resolve(embedded);
     }
     return { column, parent };
+  }
+
+  /** Whether the value `op` reads can be missing, in the join or embedded form that is used for it. */
+  private _resolveOptional(op: ColumnWithJoin): boolean {
+    if (op.parent !== undefined && this._elidableNodes.has(op.parent) && op.embedded !== undefined) {
+      return this._resolveOptional(op.embedded);
+    }
+    return op.optional;
   }
 
   private _rewriteWindowSpec(window: WindowSpecification): WindowSpecification {
@@ -956,6 +980,11 @@ class SQLQueryGenerator {
         // the pattern has a literal %, _ or escape character in it, or a backslash, which Postgres and Databricks
         // would otherwise take as LIKE's own escape
         sql += " ESCAPE '" + LIKE_ESCAPE + "'";
+      }
+      if (this._guardOptional && GUARDED_COMPARISONS.has(op.operator) && op.left instanceof ColumnWithJoin
+        && this._resolveOptional(op.left)) {
+        // as in Legend, an ordering or pattern comparison on an optional property says it needs a value
+        sql = '(' + this.buildFilter(op.left) + ' IS NOT NULL AND ' + sql + ')';
       }
       return sql;
     }

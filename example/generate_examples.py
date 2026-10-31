@@ -23,6 +23,7 @@ _MAPPINGS = [
     'positions_mapping.md',
     'diamond_mapping.md',
     'null_end_milestoning_mapping.md',
+    'people_denormalised_mapping.md',
 ]
 
 if __name__ == '__main__':

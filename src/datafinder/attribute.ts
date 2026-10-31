@@ -30,6 +30,7 @@ export abstract class Attribute implements Aliasable {
   private readonly _owner: string;
   private readonly _parent?: JoinTreeNodeOperation;
   private readonly _embedded?: Attribute;
+  private readonly _optional: boolean;
 
   constructor(
     displayName: string,
@@ -39,7 +40,9 @@ export abstract class Attribute implements Aliasable {
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
+    optional: boolean = false,
   ) {
+    this._optional = optional;
     this._displayName = displayName;
     this._column = new Column(columnName, columnDbType, owner, false, nullable);
     this._owner = owner;
@@ -71,7 +74,7 @@ export abstract class Attribute implements Aliasable {
   }
 
   cwj(): ColumnWithJoin {
-    return new ColumnWithJoin(this._column, this._parent, this._embedded?.cwj());
+    return new ColumnWithJoin(this._column, this._parent, this._embedded?.cwj(), this._optional);
   }
 
   /** Count the number of non-null values. Use in a projection with `groupBy` to aggregate per group. */

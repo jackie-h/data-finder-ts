@@ -66,11 +66,8 @@ def prop_jsdoc(prop: Property) -> str:
 
 
 def to_ts_name(prop: Property) -> str:
-    """Convert a Property display name to a TypeScript camelCase method name."""
-    words = prop.name.lower().split()
-    if not words:
-        return ''
-    result = words[0] + ''.join(w.capitalize() for w in words[1:])
+    """The TypeScript method name of a property: its camelCase id (``legalName``)."""
+    result = prop.id
     if result in _TS_RESERVED:
         result += '_'
     return result
@@ -109,6 +106,71 @@ def flatten_embedded(join: Join) -> list:
     return result
 
 
+def embedded_optional(join: Join) -> dict[str, bool]:
+    """For each dotted path ``flatten_embedded`` gives, whether the value can be missing because the leaf property or
+    one of the embedded properties on the way to it is optional (its multiplicity starts at 0)."""
+    result: dict[str, bool] = {}
+    if join is None or join.embedded is None:
+        return result
+
+    def _walk(esm: EmbeddedSetMapping, prefix: str, optional: bool):
+        for pm in esm.property_mappings:
+            dotted = f'{prefix}.{pm.property.id}' if prefix else pm.property.id
+            here = optional or pm.property.multiplicity.lower == 0
+            if isinstance(pm.target, Column):
+                result[dotted] = here
+            elif isinstance(pm.target, EmbeddedSetMapping):
+                _walk(pm.target, dotted, here)
+
+    _walk(join.embedded, '', False)
+    return result
+
+
+class _ClassView:
+    """A class mapping as the finder templates see it: the properties reached by a join or held in a column, with the
+    embedded (join-less) ones apart in ``embedded_mappings``."""
+
+    def __init__(self, rcm):
+        self.clazz = rcm.clazz
+        self.milestone_mapping = rcm.milestone_mapping
+        self.property_mappings = [pm for pm in rcm.property_mappings if not isinstance(pm.target, EmbeddedSetMapping)]
+        self.embedded_mappings = [pm for pm in rcm.property_mappings if isinstance(pm.target, EmbeddedSetMapping)]
+
+
+class EmbeddedClass:
+    """A class embedded in its owner's row: its properties are columns of the owner's table, so it needs no join."""
+
+    def __init__(self, name: str, label: str, columns: list, children: list, optional: bool = False):
+        self.name = name
+        self.label = label
+        self.columns = columns
+        self.children = children
+        # whether the embedded property that holds this class, or one above it, is optional
+        self.optional = optional
+
+
+def embedded_classes(rcm: _ClassView) -> list[EmbeddedClass]:
+    """The embedded classes of a class mapping, nested ones before the classes that hold them."""
+    found: list[EmbeddedClass] = []
+
+    def _walk(esm: EmbeddedSetMapping, stem: str, label: str, optional: bool) -> str:
+        columns, children = [], []
+        for pm in esm.property_mappings:
+            if isinstance(pm.target, Column):
+                columns.append((pm.property, pm.target))
+            elif isinstance(pm.target, EmbeddedSetMapping):
+                child = _walk(pm.target, stem + pm.property.id[:1].upper() + pm.property.id[1:], f"{label} {pm.property.name}",
+                              optional or pm.property.multiplicity.lower == 0)
+                children.append((pm.property, child))
+        found.append(EmbeddedClass(stem + "Embedded", label, columns, children, optional))
+        return stem + "Embedded"
+
+    for pm in rcm.embedded_mappings:
+        _walk(pm.target, f"_{rcm.clazz.name}{pm.property.id[:1].upper()}{pm.property.id[1:]}", pm.property.name,
+              pm.property.multiplicity.lower == 0)
+    return found
+
+
 _FILTER_TS_TYPES = {
     'String': 'string', 'Integer': 'number', 'Float': 'number', 'Double': 'number', 'Decimal': 'number',
     'Boolean': 'boolean', 'Date': 'Date', 'DateTime': 'Date',
@@ -137,6 +199,9 @@ def get_used_attr_types(rcm) -> list:
         elif rpm.property.type.name != rcm.clazz.name:
             for _, leaf_prop, _ in flatten_embedded(rpm.target):
                 _add(leaf_prop)
+    for ec in embedded_classes(rcm):
+        for prop, _ in ec.columns:
+            _add(prop)
     return result
 
 
@@ -158,7 +223,7 @@ def _build_association_lookup(mapping: Mapping) -> dict:
             for child in rcm.clazz.package.children:
                 if isinstance(child, Association) and id(child) not in seen_assocs:
                     seen_assocs.add(id(child))
-                    result[(child.source, child.target, child.target_property.id)] = child
+                    result[(child.source, child.target, child.source_property.id)] = child
     return result
 
 
@@ -172,7 +237,9 @@ def _build_reverse_assoc_map(mapping: Mapping, assoc_lookup: dict) -> dict:
             assoc = assoc_lookup.get((rcm.clazz.name, target_cls.name, rpm.property.id))
             if assoc is None:
                 continue
-            reverse_name = assoc.source_property.id
+            if assoc.target_property is None:
+                continue  # a one-way association gives the target class no accessor back
+            reverse_name = assoc.target_property.id
             reverse_map.setdefault(target_cls.name, []).append((rcm, rpm, assoc, reverse_name))
     return reverse_map
 
@@ -216,11 +283,13 @@ def generate(mapping: Mapping, output_directory: str):
         prop_jsdoc=prop_jsdoc,
         flatten_embedded=flatten_embedded,
         filter_ts_type=filter_ts_type,
+        embedded_classes=embedded_classes,
+        embedded_optional=embedded_optional,
     )
 
     for rcm in mapping.mappings:
         reverse_assocs = reverse_assoc_map.get(rcm.clazz.name, [])
-        render_ctx = dict(shared_context, rcm=rcm, reverse_assocs=reverse_assocs)
+        render_ctx = dict(shared_context, rcm=_ClassView(rcm), reverse_assocs=reverse_assocs)
 
         base_filename = f'{rcm.clazz.name}FinderBase.ts'
         base_filepath = os.path.join(output_directory, base_filename)

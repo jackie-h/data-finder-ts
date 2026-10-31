@@ -5,6 +5,35 @@ import type { ProjectFinder } from '../../generated_examples/orgchart_inheritanc
 
 export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
+    name: 'optional_property_pattern_comparison_is_guarded',
+    query: f => f.findAll(null, null, [f.firstName()], f.department().startsWith('Eng')).orderBy(f.firstName().ascending()),
+    expected: { columns: ['First Name'], rows: [
+        ['Bob'],
+        ['Carol'],
+      ], sql: 'IS NOT NULL AND' },
+  },
+  {
+    name: 'optional_property_equality_is_not_guarded',
+    query: f => f.findAll(null, null, [f.firstName()], f.department().eq('QA')),
+    expected: { columns: ['First Name'], rows: [
+        ['Dave'],
+      ], unexpectedSql: 'IS NOT NULL AND' },
+  },
+  {
+    name: 'required_property_comparison_is_not_guarded',
+    query: f => f.findAll(null, null, [f.firstName()], f.firstName().startsWith('C')),
+    expected: { columns: ['First Name'], rows: [
+        ['Carol'],
+      ], unexpectedSql: 'IS NOT NULL AND' },
+  },
+  {
+    name: 'required_property_behind_an_optional_navigation_is_guarded',
+    query: f => f.findAll(null, null, [f.firstName()], f.manager().firstName().startsWith('B')),
+    expected: { columns: ['First Name'], rows: [
+        ['Dave'],
+      ], sql: 'IS NOT NULL AND' },
+  },
+  {
     name: 'all_employees_inherited_name',
     query: f => f.findAll(null, null, [f.firstName(), f.lastName()]).orderBy(f.firstName().ascending()),
     expected: { columns: ['First Name', 'Last Name'], rows: [
@@ -46,7 +75,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'employees_with_all_projects',
     query: f => f.findAll(null, null, [f.firstName(), f.projects().name()]).orderBy(f.firstName().ascending(), f.projects().name().ascending()),
-    expected: { columns: ['First Name', 'Project Name'], rows: [
+    expected: { columns: ['First Name', 'Projects Name'], rows: [
         ['Alice', 'Epsilon Research'],
         ['Bob', 'Alpha Initiative'],
         ['Bob', 'Beta Platform'],
@@ -57,7 +86,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'forward_join_filter_code_alpha',
     query: f => f.findAll(null, null, [f.firstName(), f.projects({ code: 'ALPHA' }).name()]).orderBy(f.firstName().ascending()),
-    expected: { columns: ['First Name', 'Project Name'], rows: [
+    expected: { columns: ['First Name', 'Projects Name'], rows: [
         ['Alice', null],
         ['Bob', 'Alpha Initiative'],
         ['Carol', null],
@@ -67,7 +96,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'multihop_manager_projects_for_dave',
     query: f => f.findAll(null, null, [f.manager().projects().name()], f.firstName().eq('Dave')).orderBy(f.manager().projects().name().ascending()),
-    expected: { columns: ['Manager Project Name'], rows: [
+    expected: { columns: ['Manager Projects Name'], rows: [
         ['Alpha Initiative'],
         ['Beta Platform'],
       ] },
@@ -82,7 +111,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'filter_by_manager_name_select_project',
     query: f => f.findAll(null, null, [f.manager().projects().name()], f.manager().firstName().eq('Alice')).orderBy(f.manager().projects().name().ascending()),
-    expected: { columns: ['Manager Project Name'], rows: [
+    expected: { columns: ['Manager Projects Name'], rows: [
         ['Epsilon Research'],
         ['Epsilon Research'],
       ] },
@@ -129,7 +158,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'employee_projects_for_bob',
     query: f => f.findAll(null, null, [f.projects().code()], f.firstName().eq('Bob')).orderBy(f.projects().code().ascending()),
-    expected: { columns: ['Project Code'], rows: [
+    expected: { columns: ['Projects Code'], rows: [
         ['ALPHA'],
         ['BETA'],
       ] },
@@ -144,7 +173,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'forward_join_filter_name_gamma',
     query: f => f.findAll(null, null, [f.firstName(), f.projects({ name: 'Gamma Tooling' }).name()]).orderBy(f.firstName().ascending()),
-    expected: { columns: ['First Name', 'Project Name'], rows: [
+    expected: { columns: ['First Name', 'Projects Name'], rows: [
         ['Alice', null],
         ['Bob', null],
         ['Carol', 'Gamma Tooling'],
@@ -154,7 +183,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'forward_join_filter_multi_kwarg',
     query: f => f.findAll(null, null, [f.firstName(), f.projects({ name: 'Alpha Initiative', code: 'ALPHA' }).name()]).orderBy(f.firstName().ascending()),
-    expected: { columns: ['First Name', 'Project Name'], rows: [
+    expected: { columns: ['First Name', 'Projects Name'], rows: [
         ['Alice', null],
         ['Bob', 'Alpha Initiative'],
         ['Carol', null],
@@ -164,7 +193,7 @@ export const EMPLOYEE_INHERITANCE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'forward_join_filter_nonexistent',
     query: f => f.findAll(null, null, [f.firstName(), f.projects({ code: 'NONEXISTENT' }).name()]).orderBy(f.firstName().ascending()),
-    expected: { columns: ['First Name', 'Project Name'], rows: [
+    expected: { columns: ['First Name', 'Projects Name'], rows: [
         ['Alice', null],
         ['Bob', null],
         ['Carol', null],

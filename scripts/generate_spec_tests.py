@@ -45,6 +45,7 @@ SEEDS = {
     'companies_string_scalar_specs': 'companies_scalar',
     'diamond_specs': 'diamond',
     'positions_specs': 'positions',
+    'people_denormalised_specs': 'people_denormalised',
 }
 
 # Python finder/attribute methods whose TypeScript names aren't a plain snake -> camel conversion.
@@ -98,10 +99,25 @@ def js_str(value: str) -> str:
     return "'" + value.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n') + "'"
 
 
+def to_snake(name: str) -> str:
+    return re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
+
+
 def camel(name: str) -> str:
     name = name.rstrip('_')
     head, *rest = name.split('_')
     return head + ''.join(w.capitalize() for w in rest)
+
+
+# Free functions of the Python package that the specs call, and their TypeScript names.
+FREE_FUNCTIONS = {'count_all': 'countAll', 'constant': 'constant', 'when': 'when', 'concat': 'concat'}
+# Methods whose result is a number or text, which decides how `+ - * /` between them translates.
+NUMBER_METHODS = {'length', 'abs', 'ceil', 'ceiling', 'floor', 'round', 'sqrt', 'power', 'mod', 'sum', 'average',
+                  'min', 'max', 'count', 'count_distinct', 'std', 'var', 'year', 'month', 'day', 'hour', 'minute',
+                  'second', 'day_of_week', 'day_of_year'}
+TEXT_METHODS = {'upper', 'lower', 'strip', 'lstrip', 'rstrip', 'left', 'right', 'substring', 'reverse', 'repeat',
+                'concat', 'replace', 'join'}
+ARITHMETIC_METHODS = {ast.Add: 'plus', ast.Sub: 'minus', ast.Mult: 'times', ast.Div: 'dividedBy'}
 
 
 def method_name(name: str) -> str:
@@ -110,6 +126,39 @@ def method_name(name: str) -> str:
 
 class Translator:
     """Translate the expression body of a spec's query lambda to TypeScript."""
+
+    def __init__(self) -> None:
+        self.properties: dict[str, str] = {}   # finder method -> type name, of the spec's mapping
+        self.used: set[str] = set()            # free functions the translated queries call
+        self.model_used: set[str] = set()      # model classes the translated queries use
+
+    def type_of(self, node: ast.AST) -> str | None:
+        """'text', 'number' or None: what an expression holds, as far as `+ - * /` needs to know."""
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, str):
+                return 'text'
+            if isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+                return 'number'
+        if isinstance(node, ast.UnaryOp):
+            return self.type_of(node.operand)
+        if isinstance(node, ast.BinOp):
+            left, right = self.type_of(node.left), self.type_of(node.right)
+            if isinstance(node.op, ast.Add) and 'text' in (left, right):
+                return 'text'
+            if isinstance(node.op, ast.Mult) and left == 'text':
+                return 'text'
+            return 'number'
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Name):
+                return self.type_of(node.args[0]) if func.id == 'constant' else None
+            if func.attr in TEXT_METHODS:
+                return 'text'
+            if func.attr in NUMBER_METHODS:
+                return 'number'
+            kind = self.properties.get(func.attr)
+            return {'String': 'text', 'Integer': 'number', 'Float': 'number', 'Decimal': 'number'}.get(kind)
+        return None
 
     def expr(self, node: ast.AST) -> str:
         method = getattr(self, 'visit_' + type(node).__name__, None)
@@ -149,8 +198,25 @@ class Translator:
             (kw,) = right.keywords
             verb = 'add' if isinstance(node.op, ast.Add) else 'subtract'
             return f'{left}.{verb}{TIMEDELTA_UNITS[kw.arg]}({self.expr(kw.value)})'
-        if isinstance(node.op, ast.Mult):
+        try:   # two literals fold, as Python does before the query is built
+            return repr(ast.literal_eval(node))
+        except (ValueError, TypeError):
+            pass
+        kinds = self.type_of(node.left), self.type_of(node.right)
+        if isinstance(node.op, ast.Add) and 'text' in kinds:
+            if isinstance(node.left, ast.Constant):   # "Company: " + f.name(): no column to call concat on
+                self.used.add('concat')
+                return f'concat({left}, {self.expr(right)})'
+            return f'{left}.concat({self.expr(right)})'
+        if isinstance(node.op, ast.Mult) and kinds[0] == 'text':
             return f'{left}.repeat({self.expr(right)})'
+        if type(node.op) in ARITHMETIC_METHODS:
+            if kinds[0] is None and not isinstance(node.left, ast.Call):
+                raise NotImplementedError('arithmetic on an unknown type: ' + ast.dump(node))
+            if isinstance(node.left, ast.Constant):   # 100 - f.price(): a number is not an expression until it is a constant
+                left = f'constant({left})'
+                self.used.add('constant')
+            return f'{left}.{ARITHMETIC_METHODS[type(node.op)]}({self.expr(right)})'
         if isinstance(node.op, ast.Mod):
             return f'{left}.mod({self.expr(right)})'
         if isinstance(node.op, ast.Pow):
@@ -176,6 +242,9 @@ class Translator:
 
     def visit_Call(self, node: ast.Call) -> str:
         func = node.func
+        if isinstance(func, ast.Name):
+            self.used.add(FREE_FUNCTIONS[func.id])
+            return f'{FREE_FUNCTIONS[func.id]}({", ".join(self.expr(a) for a in node.args)})'
         assert isinstance(func, ast.Attribute), ast.dump(node)
         owner = func.value
         # datetime.datetime(...) / datetime.date(...)
@@ -183,9 +252,25 @@ class Translator:
             parts = [ast.literal_eval(a) for a in node.args]
             parts += [0] * (6 - len(parts)) if func.attr == 'datetime' else []
             y, m, d, *rest = parts
+            if func.attr == 'date':   # a date, not a timestamp: it is written as a date literal
+                self.model_used.add('DateOnly')
+                return f"new DateOnly('{y:04d}-{m:02d}-{d:02d}T00:00:00Z')"
             return 'new Date(Date.UTC(' + ', '.join(str(x) for x in [y, m - 1, d, *rest]) + '))'
         args = [self.expr(a) for a in node.args]
         name = method_name(func.attr)
+        if func.attr in ('std', 'var') and node.keywords:
+            # std(ddof=0): the degrees of freedom are the one argument
+            (kw,) = node.keywords
+            assert kw.arg == 'ddof', ast.dump(node)
+            return f'{self.expr(owner)}.{name}({", ".join(args + [self.expr(kw.value)])})'
+        if func.attr == 'join' and node.keywords:
+            # join(",", order_by=[...]): the order the values are joined in is the second argument
+            (kw,) = node.keywords
+            assert kw.arg == 'order_by', ast.dump(node)
+            order = self.expr(kw.value)
+            if not isinstance(kw.value, ast.List):
+                order = f'[{order}]'
+            return f'{self.expr(owner)}.{name}({", ".join((args or ["\'\'"]) + [order])})'
         # Window functions take their keyword arguments as one options object.
         if func.attr in ('rank', 'shift', 'qcut', 'first', 'last') and node.keywords:
             opts = ', '.join(f'{OPTION_KEYS[k.arg]}: {self.expr(k.value)}' for k in node.keywords)
@@ -275,6 +360,12 @@ def generate_module(module_name: str) -> tuple[str, str]:
         spec = getattr(module, var_name)
         directory = mapping_dir(spec.mapping_file)
         mapping = load(os.path.join(EXAMPLES_DIR, spec.mapping_file))
+        translator.properties = {}
+        for rcm in mapping.mappings:
+            for prop in rcm.clazz.all_properties().values():
+                kind = getattr(prop.type, 'name', None)
+                for method in (to_snake(prop.id), to_snake(prop.id) + '_'):
+                    translator.properties[method] = kind
         for rcm in mapping.mappings:
             path = f'../generated_examples/{directory}/{rcm.clazz.name}Finder'
             if rcm.clazz.name + 'Finder' == spec.finder_name:
@@ -354,6 +445,10 @@ describe('trade specs do not depend on order', () => {{
         banner,
         "import { ts, type SpecCase } from '../../spec-harness';",
     ]
+    if translator.model_used:
+        cases_header.append(f"import {{ {', '.join(sorted(translator.model_used))} }} from '../../../src/model/relational';")
+    if translator.used:
+        cases_header.append(f"import {{ {', '.join(sorted(translator.used))} }} from '../../../src/datafinder';")
     cases_header += [f"import type {{ {name} }} from '../{path}';" for name, path in sorted(imports.items())]
     group_entries = ''.join(f"  {js_str(var)}: {{ finder: {js_str(finder)}, cases: {var} }},\n" for var, finder in groups)
     cases_src = ('\n'.join(cases_header) + '\n\n' + ('\n'.join(consts) + '\n\n' if consts else '')
