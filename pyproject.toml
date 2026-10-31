@@ -1,6 +1,6 @@
 [project]
 name = "data-finder-ts-generator"
-version = "0.1.4"
+version = "0.1.5"
 description = "TypeScript finder generator for the data-finder-ts runtime library"
 readme = "README.md"
 requires-python = ">=3.11"
