@@ -1,5 +1,0 @@
-# The Python used to turn the model and mapping markdown into JSON: data-finder's `mapping_markdown.export_json`, pinned to a commit.
-# It is newer than the data-finder 0.1.17 on PyPI (the exporter, property multiplicities, nullability and the new association
-# semantics are unreleased), so this is used with `uv run --with-requirements`; it does not change the root pyproject or uv.lock.
-# TODO: once data-finder releases past 0.1.17, delete this file and require that release in the root pyproject instead.
-data-finder[markdown] @ git+https://github.com/jackie-h/data-finder@4708f7a77d501d9a8b1c5d85edf63ee2fafd20b0

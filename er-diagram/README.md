@@ -28,11 +28,9 @@ npm test --prefix er-diagram             # viewer tests (node:test, they run the
 `dir` is a folder relative to the config, or `python:<package>` for an installed package's folder (here `datafinder_examples`, which is the
 markdown the e2e tests run on). Other keys: `title`, `out`, `attrs` (limit attributes shown), `acronyms`.
 
-## Note on the data-finder version
+## Data-finder version
 
-`mapping_markdown.export_json`, property multiplicities, column nullability and the current association semantics are newer than the
-data-finder 0.1.17 on PyPI. So the export step runs with `data-finder` pinned to a commit (`requirements.txt`, used via
-`uv run --with-requirements`), which does not touch the root `pyproject.toml` or `uv.lock`. After data-finder's next release, delete
-`requirements.txt` and require that release instead. When the JSON or the markdown format changes in data-finder, bump the pin.
+The export needs `mapping_markdown.export_json`, which first shipped in data-finder 0.1.18, so the root `pyproject.toml` requires `data-finder[markdown]>=0.1.18`.
+The JSON is defined by that package: if it changes there, update `data.mjs` and `generate.mjs` to match.
 
 CI (`.github/workflows/ci.yml`, job `er-diagram`) runs the tests, builds the diagrams and uploads `er-diagram/out` as the `er-diagrams` artifact.

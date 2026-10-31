@@ -14,10 +14,9 @@ const root = resolve(here, "..");
 
 // the markdown is parsed in Python (data-finder's mapping_markdown.export_json); the generator draws the JSON it writes
 const repo = resolve(root, "..");
-const requirements = join(root, "requirements.txt");
 function generate(config) {
   const out = mkdtempSync(join(tmpdir(), "er-diagram-"));
-  execFileSync("uv", ["run", "--with-requirements", requirements, "python", "-m", "mapping_markdown.export_json", "--config", config, "--out", join(out, "data.json")], { cwd: repo, stdio: "pipe" });
+  execFileSync("uv", ["run", "python", "-m", "mapping_markdown.export_json", "--config", config, "--out", join(out, "data.json")], { cwd: repo, stdio: "pipe" });
   const stdout = execFileSync("node", [join(root, "generate.mjs"), "--config", config, "--out", out], { stdio: "pipe" }).toString();
   return { out, stdout, read: f => readFileSync(join(out, f), "utf8"), has: f => existsSync(join(out, f)) };
 }
@@ -109,7 +108,7 @@ test("config is required", () => {
 const configPath = join(root, "data-finder.config.json");
 const config = JSON.parse(readFileSync(configPath, "utf8"));
 // the e2e files are the installed datafinder_examples package's markdown ("python:<package>" in the config)
-const dir = execFileSync("uv", ["run", "--with-requirements", requirements, "python", "-c", `import importlib, os; print(os.path.dirname(importlib.import_module("${config.dir.replace("python:", "")}").__file__))`],
+const dir = execFileSync("uv", ["run", "python", "-c", `import importlib, os; print(os.path.dirname(importlib.import_module("${config.dir.replace("python:", "")}").__file__))`],
   { cwd: repo, stdio: "pipe" }).toString().trim();
 const key = m => m.replace(/\.md$/, "");
 
