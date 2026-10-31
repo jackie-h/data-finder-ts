@@ -2,7 +2,7 @@
 Same mapping definitions as the Python data-finder example.
 Used by generate.py to produce TypeScript finders.
 """
-from model.m3 import Class, Property, String, Float, Package, Integer, Date, TaggedValue, DateTime
+from model.m3 import Class, Property, String, Float, Package, Integer, Date, TaggedValue, DateTime, ONE_TO_ONE
 from model.mapping import Mapping, ProcessingDateMilestonesPropertyMapping, SingleBusinessDateMilestonePropertyMapping
 from model.relational import Column, Table, Schema, Database
 from model.relational_mapping import RelationalPropertyMapping, RelationalClassMapping, Join
@@ -13,34 +13,34 @@ def create_description(text: str) -> TaggedValue:
 
 
 def create_account_class() -> Class:
-    p1 = Property('Id', 'id', Integer)
-    p2 = Property('Name', 'name', String)
+    p1 = Property('Id', 'id', Integer, ONE_TO_ONE)
+    p2 = Property('Name', 'name', String, ONE_TO_ONE)
     return Class('Account', [p1, p2], Package('finance'),
                  tagged_values=[create_description('Trading Account used to buy and sell securities')])
 
 
 def create_instrument_class() -> Class:
-    p1 = Property('Symbol', 'symbol', String)
-    p2 = Property('Price', 'price', Float)
+    p1 = Property('Symbol', 'symbol', String, ONE_TO_ONE)
+    p2 = Property('Price', 'price', Float, ONE_TO_ONE)
     return Class('Instrument', [p1, p2], Package('finance'))
 
 
 def create_trade_class(account: Class, instrument: Class) -> Class:
-    p1 = Property('Symbol', 'symbol', String, tagged_values=[create_description('The symbol of the instrument traded')])
-    p2 = Property('Price', 'price', Float, tagged_values=[create_description('The current price of the trade')])
-    p3 = Property('Account', 'account', account, tagged_values=[create_description('The trading account')])
-    p4 = Property('Valid From', 'validFrom', DateTime)
-    p5 = Property('Valid To', 'validTo', DateTime)
-    p6 = Property('Instrument', 'instrument', instrument)
+    p1 = Property('Symbol', 'symbol', String, ONE_TO_ONE, tagged_values=[create_description('The symbol of the instrument traded')])
+    p2 = Property('Price', 'price', Float, ONE_TO_ONE, tagged_values=[create_description('The current price of the trade')])
+    p3 = Property('Account', 'account', account, ONE_TO_ONE, tagged_values=[create_description('The trading account')])
+    p4 = Property('Valid From', 'validFrom', DateTime, ONE_TO_ONE)
+    p5 = Property('Valid To', 'validTo', DateTime, ONE_TO_ONE)
+    p6 = Property('Instrument', 'instrument', instrument, ONE_TO_ONE)
     return Class('Trade', [p1, p2, p3, p4, p5, p6], Package('finance'))
 
 
 def create_contractual_position_class(instrument: Class) -> Class:
-    p1 = Property('Business Date', 'businessDate', Date)
-    p2 = Property('Quantity', 'quantity', Float)
-    p3 = Property('Counterparty', 'counterparty', Integer)
-    p4 = Property('Instrument', 'instrument', instrument)
-    p5 = Property('Npv', 'npv', Float)
+    p1 = Property('Business Date', 'businessDate', Date, ONE_TO_ONE)
+    p2 = Property('Quantity', 'quantity', Float, ONE_TO_ONE)
+    p3 = Property('Counterparty', 'counterparty', Integer, ONE_TO_ONE)
+    p4 = Property('Instrument', 'instrument', instrument, ONE_TO_ONE)
+    p5 = Property('Npv', 'npv', Float, ONE_TO_ONE)
     return Class('ContractualPosition', [p1, p2, p3, p4, p5], Package('finance'))
 
 

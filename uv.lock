@@ -14,7 +14,7 @@ supported-markers = [
 
 [[package]]
 name = "data-finder"
-version = "0.1.17"
+version = "0.1.18"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -22,9 +22,9 @@ dependencies = [
     { name = "pandas", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "sqlglot", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ce/f5/e3e1d3864c98fae36cce5f9912c87e9442106623d2321871c6ae6e04244d/data_finder-0.1.17.tar.gz", hash = "sha256:2502a853a563c08ee6f54a59c74e45af206d9d36cd6931228d22f1ad7252284b", size = 99401, upload-time = "2026-10-19T02:27:43.245Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/b9/7a8280e3a4b9979aef314f94b80714252a20865389468a37a301d977b9b7/data_finder-0.1.18.tar.gz", hash = "sha256:88e00fa79324f85d32f832dd045099b118c3fc7d54c03407a579ea7c42b21aca", size = 130574, upload-time = "2026-10-31T18:24:57.253Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/02/b9ba1306350875e8df35c7c53ebc6a7f9f28ebaa04769f036ffd58072c20/data_finder-0.1.17-py3-none-any.whl", hash = "sha256:5dc2dd67e453354f00041dd49221a54199ad61ffc8495cd84a0b7c791afb7aef", size = 130771, upload-time = "2026-10-19T02:27:41.598Z" },
+    { url = "https://files.pythonhosted.org/packages/77/e5/70f7829ff59125f013d98649850df6bdd0e9c1f1a529ca1064a05e241c0f/data_finder-0.1.18-py3-none-any.whl", hash = "sha256:9c46a278af9028e55b6ffd97ef97c917f39c0c627c95ce54b8ce70aec66d08c9", size = 165541, upload-time = "2026-10-31T18:24:55.54Z" },
 ]
 
 [package.optional-dependencies]
@@ -43,7 +43,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "data-finder", extras = ["markdown"], specifier = ">=0.1.17" },
+    { name = "data-finder", extras = ["markdown"], specifier = ">=0.1.18" },
     { name = "pytest", specifier = ">=9.0.0" },
 ]
 
@@ -318,9 +318,9 @@ wheels = [
 
 [[package]]
 name = "sqlglot"
-version = "30.8.0"
+version = "30.27.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0f/64/89299aefc6ebdf4fc899f5dc14c7fcb7eb9da9290a2b4d615ae7ab884b17/sqlglot-30.8.0.tar.gz", hash = "sha256:1c5f93fb742dd9aaa75eee6bb33a637794a858b9a86375fac23a2dc0f7bc127e", size = 5869750, upload-time = "2026-05-13T09:04:38.923Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/d8/322dee46e3fd283a3b249a22e4f369693f9aad9fdc714df66b815882e99e/sqlglot-30.27.0.tar.gz", hash = "sha256:10617b2beee196e88a310c6a5348482248bf10ac01c6ade22128bf4a690ec0ee", size = 6172431, upload-time = "2026-10-30T18:18:59.13Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/4e/80705091aaf9c95e125d243f0aa871bc9f3670b4c9d963e6bad3b3dce8ff/sqlglot-30.8.0-py3-none-any.whl", hash = "sha256:af903378c331d5b72277a1b41118f07bc3e50cf4478e2d47eed12c96ee6a22a4", size = 687831, upload-time = "2026-05-13T09:04:36.336Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/88/fb7ce53c23e171ad059fd3a5ff6889399da2804cf0cfda2a10c64f32fdf7/sqlglot-30.27.0-py3-none-any.whl", hash = "sha256:b630686fc167762e20960ad3d007ad03d81af0a804c9f7d117f1fe06433c839e", size = 801972, upload-time = "2026-10-30T18:18:57.65Z" },
 ]

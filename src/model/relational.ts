@@ -488,6 +488,8 @@ export class JoinTreeNodeOperation {
      * Pure, that is the multiplicity of the property, not something the join itself says.
      */
     readonly many: boolean = false,
+    /** True when the property this step follows can be missing (its lower bound is 0). */
+    readonly optional: boolean = false,
   ) {}
 }
 
@@ -500,7 +502,16 @@ export class ColumnWithJoin extends RelationalOperationElement {
     readonly column: Column,
     readonly parent?: JoinTreeNodeOperation,
     readonly embedded?: ColumnWithJoin,
+    private readonly _optional: boolean = false,
   ) { super(); }
+
+  /** Whether the value can be missing: its property is optional, or a navigation on the way to it is. */
+  get optional(): boolean {
+    for (let node = this.parent; node !== undefined; node = node.parent) {
+      if (node.optional) return true;
+    }
+    return this._optional;
+  }
 }
 
 export class SortOperation {

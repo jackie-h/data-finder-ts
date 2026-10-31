@@ -88,6 +88,11 @@ export const seeds: Record<string, Seed> = {
     await loadCsv(conn, 'records.items', 'diamond_items.csv');
   },
 
+  people_denormalised: async conn => {
+    await run(conn, 'CREATE TABLE people (id INT, first_name VARCHAR, home VARCHAR, firm_name VARCHAR, firm_address VARCHAR)');
+    await loadCsv(conn, 'people', 'people_denormalised.csv');
+  },
+
   positions: async conn => {
     await run(conn, 'CREATE TABLE positions (id INT, trade_date DATE, npv DOUBLE)');
     await loadCsv(conn, 'positions', 'positions_date.csv');

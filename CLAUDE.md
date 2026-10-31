@@ -56,7 +56,7 @@ Path aliases: `@model/*` → `src/model/*`, `@datafinder/*` → `src/datafinder/
 - `context_template.txt` → `{MappingName}Context.ts` (instantiates all finders)
 
 Key generator behaviours:
-- `to_ts_name(prop)` converts property display names to camelCase. **Only actual JS/TS reserved words** trigger a trailing `_` — type names like `symbol`, `string`, `number` are intentionally excluded.
+- `to_ts_name(prop)` gives a property's camelCase id (`legalName`). **Only actual JS/TS reserved words** trigger a trailing `_` — type names like `symbol`, `string`, `number` are intentionally excluded.
 - Reverse associations use `getRelatedFinderClass` (not `require`/`import`) to avoid circular ESM imports. The source finder's module must be imported before the reverse method is called — in tests, import the source finder explicitly first.
 - All output lands in a single flat directory regardless of class packages.
 

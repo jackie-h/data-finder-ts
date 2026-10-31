@@ -5,7 +5,7 @@ import { registerDuckDb, DuckDbRunner } from '../duckdb-runner';
 import { runExpectation, type SpecCase } from '../spec-harness';
 import { seeds } from '../spec-seeds';
 import { EmployeeFinder } from '../generated_examples/orgchart/EmployeeFinder';
-import { ORGCHART_FINDER_SPECS } from './cases/orgchart';
+import { ORGCHART_AGGREGATE_FINDER_SPECS, ORGCHART_FINDER_SPECS } from './cases/orgchart';
 
 let instance: DuckDBInstance;
 let conn: DuckDBConnection;
@@ -27,6 +27,14 @@ describe('ORGCHART_FINDER_SPECS', () => {
   const f = new EmployeeFinder();
 
   for (const c of ORGCHART_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
+});
+
+describe('ORGCHART_AGGREGATE_FINDER_SPECS', () => {
+  const f = new EmployeeFinder();
+
+  for (const c of ORGCHART_AGGREGATE_FINDER_SPECS) {
     it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

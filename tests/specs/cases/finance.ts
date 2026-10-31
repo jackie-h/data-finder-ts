@@ -448,6 +448,88 @@ export const TRADE_EXISTS_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
 ];
 
+export const TRADE_OR_FINDER_SPECS: SpecCase<TradeFinder>[] = [
+  {
+    name: 'or_returns_rows_matching_either_side',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.symbol().eq('AAPL').or(f.symbol().eq('MSFT'))).orderBy(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['MSFT'],
+      ], sql: ' OR ' },
+  },
+  {
+    name: 'or_where_only_the_right_side_matches',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.symbol().eq('NOSUCH').or(f.symbol().eq('MSFT'))),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+  },
+  {
+    name: 'or_where_neither_side_matches',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.symbol().eq('NOSUCH').or(f.symbol().eq('ALSONOSUCH'))),
+    expected: { columns: ['Symbol'], rows: [] },
+  },
+  {
+    name: 'or_on_different_properties',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.symbol().eq('NOSUCH').or(f.price().gt(200.0))),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+  },
+  {
+    name: 'or_then_and_applies_the_and_to_the_whole_or',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.symbol().eq('AAPL').or(f.symbol().eq('MSFT')).and(f.price().gt(200.0))),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ], sql: '(t0.sym = \'AAPL\' OR t0.sym = \'MSFT\') AND t0.price > 200.0' },
+  },
+  {
+    name: 'and_then_or_applies_the_or_to_the_whole_and',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.symbol().eq('AAPL').and(f.price().gt(1000.0)).or(f.symbol().eq('MSFT'))),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ], sql: '(t0.sym = \'AAPL\' AND t0.price > 1000.0) OR t0.sym = \'MSFT\'' },
+  },
+  {
+    name: 'or_chain_of_three',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.symbol().eq('AAPL').or(f.symbol().eq('GOOG')).or(f.symbol().eq('MSFT'))).orderBy(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['MSFT'],
+      ], sql: 't0.sym = \'AAPL\' OR t0.sym = \'GOOG\' OR t0.sym = \'MSFT\'' },
+  },
+  {
+    name: 'or_across_a_property_and_a_related_property',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().eq('Beta Inc').or(f.symbol().eq('AAPL'))).orderBy(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['MSFT'],
+      ] },
+  },
+  {
+    name: 'or_where_only_the_related_property_matches',
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().name().eq('Beta Inc').or(f.symbol().eq('NOSUCH'))),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ] },
+  },
+  {
+    name: 'exists_or_a_filter',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().exists().or(f.symbol().eq('MSFT'))).orderBy(f.symbol().ascending()),
+    expected: { columns: ['Symbol'], rows: [
+        ['AAPL'],
+        ['MSFT'],
+      ], skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
+  },
+  {
+    name: 'not_exists_or_a_filter',
+    query: f => f.findAll(null, _MSFT_WITHOUT_LIVE_ACCOUNT_AT, [f.symbol()], f.account().notExists().or(f.symbol().eq('NOSUCH'))),
+    expected: { columns: ['Symbol'], rows: [
+        ['MSFT'],
+      ], skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
+  },
+];
+
 export const TRADE_IS_NONE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
     name: 'is_not_none_returns_each_trade_once',
@@ -506,6 +588,39 @@ export const TRADE_IS_NONE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
 ];
 
+export const TRADE_ONE_WAY_ASSOCIATION_FINDER_SPECS: SpecCase<TradeFinder>[] = [
+  {
+    name: 'one_way_association_reads_through_to_the_instrument',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.instrument().price()]).orderBy(f.symbol().ascending()),
+    expected: { columns: ['Symbol', 'Instrument Price'], rows: [
+        ['AAPL', 150.0],
+        ['GOOG', 2800.0],
+      ], sql: 'JOIN', skipGraphql: 'The finance GraphQL mapping does not map the TradeInstrument association' },
+  },
+  {
+    name: 'one_way_association_join_is_anchored_to_the_query_time',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.instrument().price()]),
+    expected: { columns: ['Symbol', 'Instrument Price'], rows: [
+        ['AAPL', 150.0],
+      ], skipGraphql: 'The finance GraphQL mapping does not map the TradeInstrument association' },
+  },
+  {
+    name: 'one_way_association_can_be_filtered_on',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol()], f.instrument().price().gt(1000.0)),
+    expected: { columns: ['Symbol'], rows: [
+        ['GOOG'],
+      ], skipGraphql: 'The finance GraphQL mapping does not map the TradeInstrument association' },
+  },
+  {
+    name: 'one_way_association_is_read_with_the_association',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.instrument().price(), f.account().name()]).orderBy(f.symbol().ascending()),
+    expected: { columns: ['Symbol', 'Instrument Price', 'Account Name'], rows: [
+        ['AAPL', 150.0, 'Acme Ltd'],
+        ['GOOG', 2800.0, 'Acme Ltd'],
+      ], skipGraphql: 'The finance GraphQL mapping does not map the TradeInstrument association' },
+  },
+];
+
 export const CONTRACTUAL_POSITION_FINDER_SPECS: SpecCase<ContractualPositionFinder>[] = [
   {
     name: 'position_jan15_current',
@@ -556,6 +671,8 @@ export const SPEC_GROUPS = {
   'TRADE_FINDER_SPECS': { finder: 'TradeFinder', cases: TRADE_FINDER_SPECS },
   'TRADE_MULTI_HOP_FINDER_SPECS': { finder: 'TradeFinder', cases: TRADE_MULTI_HOP_FINDER_SPECS },
   'TRADE_EXISTS_FINDER_SPECS': { finder: 'TradeFinder', cases: TRADE_EXISTS_FINDER_SPECS },
+  'TRADE_OR_FINDER_SPECS': { finder: 'TradeFinder', cases: TRADE_OR_FINDER_SPECS },
   'TRADE_IS_NONE_FINDER_SPECS': { finder: 'TradeFinder', cases: TRADE_IS_NONE_FINDER_SPECS },
+  'TRADE_ONE_WAY_ASSOCIATION_FINDER_SPECS': { finder: 'TradeFinder', cases: TRADE_ONE_WAY_ASSOCIATION_FINDER_SPECS },
   'CONTRACTUAL_POSITION_FINDER_SPECS': { finder: 'ContractualPositionFinder', cases: CONTRACTUAL_POSITION_FINDER_SPECS },
 };

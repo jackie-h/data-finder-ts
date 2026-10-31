@@ -9,7 +9,7 @@ import '../generated_examples/finance/AccountFinder';
 import '../generated_examples/finance/BranchFinder';
 import '../generated_examples/finance/ContractualPositionFinder';
 import '../generated_examples/finance/InstrumentFinder';
-import { TRADE_NUMERIC_FINDER_SPECS } from './cases/finance-numeric';
+import { TRADE_ARITHMETIC_FINDER_SPECS, TRADE_NUMERIC_FINDER_SPECS } from './cases/finance-numeric';
 
 let instance: DuckDBInstance;
 let conn: DuckDBConnection;
@@ -31,6 +31,14 @@ describe('TRADE_NUMERIC_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_NUMERIC_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
+});
+
+describe('TRADE_ARITHMETIC_FINDER_SPECS', () => {
+  const f = new TradeFinder();
+
+  for (const c of TRADE_ARITHMETIC_FINDER_SPECS) {
     it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

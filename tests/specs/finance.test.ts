@@ -9,7 +9,7 @@ import { ContractualPositionFinder } from '../generated_examples/finance/Contrac
 import { TradeFinder } from '../generated_examples/finance/TradeFinder';
 import '../generated_examples/finance/BranchFinder';
 import '../generated_examples/finance/InstrumentFinder';
-import { ACCOUNT_FINDER_SPECS, CONTRACTUAL_POSITION_FINDER_SPECS, TRADE_EXISTS_FINDER_SPECS, TRADE_FINDER_SPECS, TRADE_IS_NONE_FINDER_SPECS, TRADE_MULTI_HOP_FINDER_SPECS } from './cases/finance';
+import { ACCOUNT_FINDER_SPECS, CONTRACTUAL_POSITION_FINDER_SPECS, TRADE_EXISTS_FINDER_SPECS, TRADE_FINDER_SPECS, TRADE_IS_NONE_FINDER_SPECS, TRADE_MULTI_HOP_FINDER_SPECS, TRADE_ONE_WAY_ASSOCIATION_FINDER_SPECS, TRADE_OR_FINDER_SPECS } from './cases/finance';
 
 let instance: DuckDBInstance;
 let conn: DuckDBConnection;
@@ -59,10 +59,26 @@ describe('TRADE_EXISTS_FINDER_SPECS', () => {
   }
 });
 
+describe('TRADE_OR_FINDER_SPECS', () => {
+  const f = new TradeFinder();
+
+  for (const c of TRADE_OR_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
+});
+
 describe('TRADE_IS_NONE_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_IS_NONE_FINDER_SPECS) {
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
+});
+
+describe('TRADE_ONE_WAY_ASSOCIATION_FINDER_SPECS', () => {
+  const f = new TradeFinder();
+
+  for (const c of TRADE_ONE_WAY_ASSOCIATION_FINDER_SPECS) {
     it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
