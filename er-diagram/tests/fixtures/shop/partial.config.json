@@ -1,0 +1,6 @@
+{
+  "title": "Partial shop",
+  "dir": ".",
+  "models": ["shop_model.md"],
+  "mappings": ["partial_mapping.md"]
+}

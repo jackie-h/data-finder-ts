@@ -1,0 +1,6 @@
+{
+  "title": "Shop",
+  "dir": ".",
+  "models": ["shop_model.md"],
+  "mappings": ["shop_mapping.md"]
+}
