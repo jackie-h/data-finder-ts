@@ -73,7 +73,7 @@ export abstract class {{rcm.clazz.name}}FinderBase {
   abstract count(): CountAllOperation;
   abstract findAll(
     businessDate: Date | string | null,
-    processingValidAt: Date | string | null,
+    processingTime: Date | string | null,
     displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
     filterOp?: Operation,
   ): FinderResult;
@@ -81,7 +81,7 @@ export abstract class {{rcm.clazz.name}}FinderBase {
   abstract findForDateRange(
     businessDateFrom: Date | string,
     businessDateTo: Date | string,
-    processingValidAt: Date | string,
+    processingTime: Date | string,
     displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
     filterOp?: Operation,
   ): FinderResult;
