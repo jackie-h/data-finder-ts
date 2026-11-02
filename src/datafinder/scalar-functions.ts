@@ -136,6 +136,42 @@ export abstract class NumericFunctions {
   sqrt(): NumericFunctionOperation {
     return numberFunction(this.functionInput(), ScalarFunction.SQRT, 'Sqrt ' + this.functionLabel());
   }
+  /** Sine of the value (in radians). */
+  sin(): NumericFunctionOperation {
+    return numberFunction(this.functionInput(), ScalarFunction.SIN, 'Sin ' + this.functionLabel());
+  }
+  /** Cosine of the value (in radians). */
+  cos(): NumericFunctionOperation {
+    return numberFunction(this.functionInput(), ScalarFunction.COS, 'Cos ' + this.functionLabel());
+  }
+  /** Tangent of the value (in radians). */
+  tan(): NumericFunctionOperation {
+    return numberFunction(this.functionInput(), ScalarFunction.TAN, 'Tan ' + this.functionLabel());
+  }
+  /** Inverse sine, in radians. */
+  asin(): NumericFunctionOperation {
+    return numberFunction(this.functionInput(), ScalarFunction.ASIN, 'Asin ' + this.functionLabel());
+  }
+  /** Inverse cosine, in radians. */
+  acos(): NumericFunctionOperation {
+    return numberFunction(this.functionInput(), ScalarFunction.ACOS, 'Acos ' + this.functionLabel());
+  }
+  /** Inverse tangent, in radians. */
+  atan(): NumericFunctionOperation {
+    return numberFunction(this.functionInput(), ScalarFunction.ATAN, 'Atan ' + this.functionLabel());
+  }
+  /** atan2(value, `x`), in radians. */
+  atan2(x: number): NumericFunctionOperation {
+    return numberFunction(this.functionInput(), ScalarFunction.ATAN2, 'Atan2 ' + this.functionLabel(), x);
+  }
+  /** e raised to the value. */
+  exp(): NumericFunctionOperation {
+    return numberFunction(this.functionInput(), ScalarFunction.EXP, 'Exp ' + this.functionLabel());
+  }
+  /** Natural logarithm of the value. */
+  log(): NumericFunctionOperation {
+    return numberFunction(this.functionInput(), ScalarFunction.LOG, 'Log ' + this.functionLabel());
+  }
   /** Remainder after dividing by `n`. */
   mod(n: number): NumericFunctionOperation {
     return numberFunction(this.functionInput(), ScalarFunction.MOD, 'Mod ' + this.functionLabel(), n);
