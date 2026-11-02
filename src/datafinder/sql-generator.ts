@@ -629,7 +629,6 @@ class SQLQueryGenerator {
   private _rootTable?: Table;
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
-  private _guardOptional = true;
 
   generate(select: SelectOperation): void {
     this._rootTable = select.table;
@@ -639,7 +638,7 @@ class SQLQueryGenerator {
       this._from.add(this._tableAliasForTable(this._rootTable.qualifiedName, this._rootTable.qualifiedName));
     }
     this.processSelect(select.display);
-    this._where = this.buildFilter(select.filter);
+    this._where = this.buildFilter(this._guarded(select.filter));
     const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
     for (const expr of select.groupBy) {
       this._collectRequiredJoins(expr, groupByJoins);
@@ -654,12 +653,7 @@ class SQLQueryGenerator {
       this._collectRequiredJoins(select.having, havingJoins);
       for (const node of havingJoins.values()) this._addJoin(node);
       // HAVING filters the grouped result, which Legend does not guard: it is a filter on projected columns
-      this._guardOptional = false;
-      try {
-        this._having = this.buildFilter(select.having);
-      } finally {
-        this._guardOptional = true;
-      }
+      this._having = this.buildFilter(select.having);
     }
     this._orderByParts = select.orderBy.map(s =>
       this._sortExpression(s.column) + this._dialect.orderDirection(s.direction),
@@ -751,6 +745,23 @@ class SQLQueryGenerator {
     return { column, parent };
   }
 
+  /**
+   * The condition with an explicit `IS NOT NULL` before each ordering or pattern comparison on a value that can be
+   * missing, as Legend writes it for what a query asks of a class. The guard changes no row. It is not added to a
+   * join's own filter (its milestoning dates and property values) or to HAVING, which are not that, so they are
+   * never passed through here.
+   */
+  private _guarded(op: RelationalOperationElement): RelationalOperationElement {
+    if (op instanceof LogicalOperation) {
+      return new LogicalOperation(this._guarded(op.left), op.operator, this._guarded(op.right));
+    }
+    if (op instanceof ComparisonOperation && GUARDED_COMPARISONS.has(op.operator) && op.left instanceof ColumnWithJoin
+      && this._resolveOptional(op.left)) {
+      return new LogicalOperation(new IsNotNullOperation(op.left), LogicalOperator.AND, op);
+    }
+    return op;
+  }
+
   /** Whether the value `op` reads can be missing, in the join or embedded form that is used for it. */
   private _resolveOptional(op: ColumnWithJoin): boolean {
     if (op.parent !== undefined && this._elidableNodes.has(op.parent) && op.embedded !== undefined) {
@@ -814,7 +825,7 @@ class SQLQueryGenerator {
   private _caseSql(op: CaseOperation): string {
     const branch = (value: RelationalOperationElement): string =>
       value instanceof ConstantOperation ? constantValueString(value, this._dialect) : sqlOperationToString(this._rewriteOperation(value), this._dialect);
-    let sql = 'CASE WHEN ' + this.buildFilter(op.condition) + ' THEN ' + branch(op.then);
+    let sql = 'CASE WHEN ' + this.buildFilter(this._guarded(op.condition)) + ' THEN ' + branch(op.then);
     if (op.fallback !== undefined) sql += ' ELSE ' + branch(op.fallback);
     return sql + ' END';
   }
@@ -913,7 +924,7 @@ class SQLQueryGenerator {
     } else if (col instanceof DateTruncOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? findColumn(col).column.name));
     } else if (isCondition(col)) {
-      this._select.push(new Alias(new RenderedSql(this.buildFilter(col)), 'Expression'));
+      this._select.push(new Alias(new RenderedSql(this.buildFilter(this._guarded(col))), 'Expression'));
     } else if (col instanceof ConstantOperation) {
       this._select.push(new Alias(col, 'Constant'));
     } else if (col instanceof CountAllOperation) {
@@ -980,11 +991,6 @@ class SQLQueryGenerator {
         // the pattern has a literal %, _ or escape character in it, or a backslash, which Postgres and Databricks
         // would otherwise take as LIKE's own escape
         sql += " ESCAPE '" + LIKE_ESCAPE + "'";
-      }
-      if (this._guardOptional && GUARDED_COMPARISONS.has(op.operator) && op.left instanceof ColumnWithJoin
-        && this._resolveOptional(op.left)) {
-        // as in Legend, an ordering or pattern comparison on an optional property says it needs a value
-        sql = '(' + this.buildFilter(op.left) + ' IS NOT NULL AND ' + sql + ')';
       }
       return sql;
     }
