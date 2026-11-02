@@ -64,7 +64,7 @@ describe('findForDateRange (business date + processing)', () => {
   it('rejects missing arguments', () => {
     expect(() => cpf.findForDateRange(null as never, '2023-01-16', AT, [cpf.quantity()])).toThrow(/businessDateFrom/);
     expect(() => cpf.findForDateRange('2023-01-15', null as never, AT, [cpf.quantity()])).toThrow(/businessDateTo/);
-    expect(() => cpf.findForDateRange('2023-01-15', '2023-01-16', null as never, [cpf.quantity()])).toThrow(/processingValidAt/);
+    expect(() => cpf.findForDateRange('2023-01-15', '2023-01-16', null as never, [cpf.quantity()])).toThrow(/processingTime/);
   });
 });
 

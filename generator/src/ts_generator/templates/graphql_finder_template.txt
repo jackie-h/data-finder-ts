@@ -109,21 +109,21 @@ export class {{cm.clazz.name}}Finder {
   /** Returns data matching the optional filter. */
   findAll(
     businessDate: Date | string | null,
-    processingValidAt: Date | string | null,
+    processingTime: Date | string | null,
     displayColumns: (Attribute | RelationalOperationElement)[],
     filterOp: Operation = new NoOperation(),
   ): FinderResult {
-    return convertInputsAndSelect(businessDate, processingValidAt, displayColumns, this._query, filterOp);
+    return convertInputsAndSelect(businessDate, processingTime, displayColumns, this._query, filterOp);
   }
 
   /** Returns data for all records whose business date falls within the given range. */
   findForDateRange(
     businessDateFrom: Date | string,
     businessDateTo: Date | string,
-    processingValidAt: Date | string,
+    processingTime: Date | string,
     displayColumns: (Attribute | RelationalOperationElement)[],
     filterOp: Operation = new NoOperation(),
   ): FinderResult {
-    return convertInputsAndSelectForDateRange(businessDateFrom, businessDateTo, processingValidAt, displayColumns, this._query, filterOp);
+    return convertInputsAndSelectForDateRange(businessDateFrom, businessDateTo, processingTime, displayColumns, this._query, filterOp);
   }
 }
