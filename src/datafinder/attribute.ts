@@ -1,5 +1,7 @@
 import {
   Column,
+  ComparisonOperation,
+  ComparisonOperator,
   AggregateOperation,
   AggregateOperator,
   ColumnWithJoin,
@@ -23,6 +25,16 @@ import {
 
 /** A value an attribute can be compared with in `isIn` / `isNotIn`. */
 export type AttributeValue = string | number | boolean | Date;
+
+/** What a column can be compared with besides a value: another column, or an expression. */
+export type Comparand = Attribute | RelationalOperationElement;
+
+/** A column as the column it reads, an expression as the operand it stands for. */
+export function comparandOperand(value: Comparand): RelationalOperationElement {
+  if (value instanceof Attribute) return value.cwj();
+  const operand = (value as { arithmeticOperand?: () => RelationalOperationElement }).arithmeticOperand;
+  return typeof operand === 'function' ? operand.call(value) : value;
+}
 
 export abstract class Attribute implements Aliasable {
   private readonly _displayName: string;
@@ -122,6 +134,12 @@ export abstract class Attribute implements Aliasable {
   /** Filter to rows where this attribute has a value. */
   isNotNull(): IsNotNullOperation {
     return new IsNotNullOperation(this.cwj());
+  }
+
+  /** A comparison of this column with a value, or with another column or an expression: `f.price().gt(f.cost().times(1.075))`. */
+  protected compared(operator: ComparisonOperator, value: unknown, constant: () => ConstantOperation): ComparisonOperation {
+    const other = value instanceof Attribute || value instanceof RelationalOperationElement;
+    return new ComparisonOperation(this.cwj(), operator, other ? comparandOperand(value as Comparand) : constant());
   }
 
   /** Wrap a value as a constant of this attribute's type. Overridden by the typed attributes. */

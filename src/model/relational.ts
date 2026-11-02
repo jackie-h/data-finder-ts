@@ -380,7 +380,8 @@ export class DateDiffOperation extends UnaryOperation implements Sortable {
 
   constructor(
     element: RelationalOperationElement,
-    readonly other: Date,
+    /** What the element is measured against: a date or timestamp, or a column or expression. */
+    readonly other: Date | RelationalOperationElement,
     readonly unit: DatePart,
     readonly displayName?: string,
   ) { super(element); }

@@ -292,7 +292,10 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
     return sqlOperationToString(operation.element, d) + ' ' + op + " INTERVAL '" + operation.n + "' " + operation.unit;
   }
   if (operation instanceof DateDiffOperation) {
-    return d.dateDiff(operation.unit, sqlOperationToString(operation.element, d), 'TIMESTAMP ' + sqlFormatDatetime(operation.other));
+    const other = operation.other instanceof RelationalOperationElement
+      ? sqlOperationToString(operation.other, d)
+      : 'TIMESTAMP ' + sqlFormatDatetime(operation.other);
+    return d.dateDiff(operation.unit, sqlOperationToString(operation.element, d), other);
   }
   if (operation instanceof CountAllOperation) return 'COUNT(*)';
   if (operation instanceof ConstantOperation) return selectedConstantString(operation, d);
@@ -453,8 +456,11 @@ function walkRefs(
   } else if (op instanceof WindowFunctionOperation) {
     if (op.element) walkRefs(op.element, visit, visitExists);
     if (op.window) walkWindowSpec(op.window, visit, visitExists);
+  } else if (op instanceof DateDiffOperation) {
+    walkRefs(op.element, visit, visitExists);
+    if (op.other instanceof RelationalOperationElement) walkRefs(op.other, visit, visitExists);
   } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation || op instanceof DateTruncOperation ||
-             op instanceof DateArithmeticOperation || op instanceof DateDiffOperation ||
+             op instanceof DateArithmeticOperation ||
              op instanceof IsNullOperation || op instanceof IsNotNullOperation ||
              op instanceof InOperation || op instanceof NotInOperation) {
     walkRefs((op as UnaryOperation).element, visit, visitExists);
@@ -805,7 +811,8 @@ class SQLQueryGenerator {
       return new DateArithmeticOperation(this._rewriteOperation(op.element), op.n, op.unit, op.isAdd, op.displayName);
     }
     if (op instanceof DateDiffOperation) {
-      return new DateDiffOperation(this._rewriteOperation(op.element), (op as DateDiffOperation).other, (op as DateDiffOperation).unit, op.displayName);
+      const other = op.other instanceof RelationalOperationElement ? this._rewriteOperation(op.other) : op.other;
+      return new DateDiffOperation(this._rewriteOperation(op.element), other, op.unit, op.displayName);
     }
     return op;
   }
@@ -884,7 +891,14 @@ class SQLQueryGenerator {
     } else if (col instanceof ScalarFunctionOperation) {
       // rewritten as a whole, so a function of a function keeps every step
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? col.func + ' ' + findColumn(col).column.name));
-    } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation || col instanceof DateDiffOperation) {
+    } else if (col instanceof DateDiffOperation) {
+      // rewritten as a whole: either side may be a column or an expression
+      this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? findColumn(col).column.name));
+    } else if (col instanceof Column) {
+      const ta = this._tableAliasForTable(col.owner!, col.owner!);
+      this._from.add(ta);
+      this._select.push(new Alias(new TableAliasColumn(col, ta), col.name));
+    } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation) {
       const colNested = this._resolve(findColumn(col as RelationalOperationElement));
       const node = colNested.parent;
       let ta: TableAlias;
@@ -901,7 +915,7 @@ class SQLQueryGenerator {
       } else if (col instanceof DateArithmeticOperation) {
         aliasedOp = new DateArithmeticOperation(new TableAliasColumn(colNested.column, ta), col.n, col.unit, col.isAdd);
       } else {
-        aliasedOp = new DateDiffOperation(new TableAliasColumn(colNested.column, ta), (col as DateDiffOperation).other, (col as DateDiffOperation).unit);
+        throw new Error('unreachable');
       }
       this._select.push(new Alias(aliasedOp, alias));
     } else if (col instanceof CaseOperation) {
