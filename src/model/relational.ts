@@ -62,6 +62,15 @@ export enum ScalarFunction {
   REPLACE = 'REPLACE',
   SUBSTRING = 'SUBSTRING',
   COALESCE = 'COALESCE',
+  SIN = 'SIN',
+  COS = 'COS',
+  TAN = 'TAN',
+  ASIN = 'ASIN',
+  ACOS = 'ACOS',
+  ATAN = 'ATAN',
+  ATAN2 = 'ATAN2',
+  EXP = 'EXP',
+  LOG = 'LOG',
 }
 
 export enum DatePart {
@@ -322,6 +331,8 @@ export class ScalarFunctionOperation extends UnaryOperation implements Sortable 
 export const NUMERIC_FUNCTIONS: ReadonlySet<ScalarFunction> = new Set([
   ScalarFunction.ABS, ScalarFunction.CEILING, ScalarFunction.FLOOR, ScalarFunction.MOD,
   ScalarFunction.POWER, ScalarFunction.SQRT, ScalarFunction.ROUND, ScalarFunction.LENGTH,
+  ScalarFunction.SIN, ScalarFunction.COS, ScalarFunction.TAN, ScalarFunction.ASIN, ScalarFunction.ACOS,
+  ScalarFunction.ATAN, ScalarFunction.ATAN2, ScalarFunction.EXP, ScalarFunction.LOG,
 ]);
 
 export class DateExtractOperation extends UnaryOperation implements Sortable {
