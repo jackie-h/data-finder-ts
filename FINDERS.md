@@ -33,21 +33,33 @@ const rows: unknown[][]  = await result.toRows();
 
 Pass dates to `findAll` to snapshot data at a point in time. Temporal WHERE clauses are injected automatically.
 
-| Type | `businessDate` | `processingDate` |
+| Type | `businessDate` | `processingTime` |
 |---|---|---|
-| None | `null` | `null` |
+| None | optional | optional |
 | Processing temporal | `null` | required |
-| Single business date | required | `null` |
+| Processing snapshot (one datetime column) | `null` | required, equal to the time a row was taken |
+| Single business date | required | optional |
+| Business date range (`from`/`to` columns) | required | optional |
 | Business date + processing | required | required |
 | Bi-temporal | required | required |
 
+A class with no milestoning of its own passes the dates it is given on to the milestoned tables it reaches. A business date range holds a row from its `from` date up to, but not including, its `to` date; a `NULL` end is open.
+
 ### Date ranges
 
-Finders for tables with a business date (single business date, business date + processing, bi-temporal) also have `findForDateRange(from, to, processingValidAt, columns, filter?)`. It returns every record whose business date falls in the inclusive range; for bi-temporal tables, records whose business-date interval overlaps it. The processing time is still a point-in-time filter.
+Finders for tables with a business date (single business date, business date range, business date + processing, bi-temporal) also have `findForDateRange(from, to, processingTime, columns, filter?)`. It returns every record whose business date falls in the inclusive range; for tables with a business date range, records whose business-date interval overlaps it. The processing time is still a point-in-time filter, and `null` for a table that has no processing columns.
 
 ```ts
 cpf.findForDateRange('2023-01-15', '2023-01-16', new Date(), [cpf.quantity()])
 ```
+
+### Processing ranges
+
+A processing snapshot finder also has `findForProcessingRange(from, to, businessDate, columns, filter?)`: the rows taken at any processing time from `from` up to and including `to`. A table joined from it with a processing range is read over the same range.
+
+### Dates for a navigation
+
+A related-finder accessor takes the dates it is read at as a second argument, when they are not the query's: `tf.account(undefined, { processingTime: '2023-12-01 12:00:00' }).name()`. The first argument is the property values to filter by (see Filtering a join by property). The dates are used for the milestoned table the navigation reaches and for every step below it unless that step is given its own. A date given to a navigation is a point in time, so it ends a range the query asked for. `businessDate` and `processingTime` take a `Date` or a string.
 
 ## SQL dialects
 
@@ -126,6 +138,14 @@ To group differently, build the part that should bind first and combine it on th
 
 The result of a function has the functions of its type, so they chain: `cf.name().toUpperCase().length()` is labelled "Length Upper Name", and `price().sqrt().floor()` works the same way. An expression can be compared like a column, with a value or with another expression: `cf.name().toUpperCase().eq('ACME CORP')`, `cf.name().length().gt(cf.category().length())`. The GraphQL runner does not compute either on the client.
 
+### Trigonometric and exponential functions
+
+A numeric column or expression has `.sin()`, `.cos()`, `.tan()`, `.asin()`, `.acos()`, `.atan()`, `.atan2(x)`, `.exp()` and `.log()` (the natural logarithm, `LN` in SQL). Angles are in radians. They are named "Sin Price" and so on, and chain like any other function.
+
+### Comparing with another column
+
+A column's comparisons (`eq`, `ne`, `gt`, `lt`, `gte`, `lte`) take another column or an expression as well as a value: `tf.price().gt(tf.cost().times(1.075))`, `tf.commitDate().lt(tf.receiptDate())`. `ne` is on every type. The date differences (`diffDays`, `diffMonths`, `diffYears`, and `diffHours`, `diffMinutes` and `diffSeconds` on a timestamp) take a column too: `tf.startDate().diffDays(tf.endDate())`.
+
 ### Arithmetic
 
 A numeric column, aggregate, number function or another calculation has `.plus()`, `.minus()`, `.times()` and `.dividedBy()`, with a number or another numeric expression on the other side: `tf.price().times(tf.quantity())`, `tf.price().plus(1.5)`. A number on the left is a constant: `constant(100).minus(tf.price())`. Parentheses are written only where the meaning needs them, so `tf.price().plus(1).times(2)` is `(t0.price + 1) * 2` and `a.minus(b.minus(1))` keeps its brackets. A result is named "Expression" unless `.alias()` names it, and can be compared (`tf.price().times(2).gte(8)`), sorted and aliased. A query that holds an aggregate in a calculation is grouped like any other aggregate. The GraphQL runner does not compute it on the client.
@@ -179,6 +199,8 @@ tf.findAll(null, new Date(),
 
 Chains are arbitrarily deep: `tf.account().address().city().eq('London')`.
 
+A property can be mapped through other tables: a table with no class of its own turns a number in the row into a code, and the class that has the code is reached from there. The generated finders join through each table in turn, so `ef.citizenship().name()` needs nothing more than the mapping.
+
 ### Embedded (denormalized) columns
 
 If the mapping declares flat columns on the table that duplicate a related property (e.g. `acct_name` for `account.name`, see `finance_mapping_embedded.md`), the generated finders carry them as join-less alternates. When every property taken from a related table has one, whether projected, filtered, grouped, ordered or partitioned on, the JOIN is left out of the SQL. If any property from that table lacks one (e.g. `account().id()`), the real join is used for all of them.
@@ -198,7 +220,7 @@ ef.findAll(null, null, [ef.firstName(), ef.projects({ code: 'ALPHA' }).name()])
 ef.findAll(null, null, [ef.firstName()], ef.manager().notExists())   // employees with no manager
 ```
 
-They compile to a LEFT JOIN checked for NULL, so a to-many join repeats the row once per match.
+They compile to a LEFT JOIN checked for NULL. For a to-many join that is only asked whether a row exists, the join is to a sub-select of the distinct join column, so the row is not repeated once per match; if the query also reads a value through that join, it stays a plain join and the row repeats for each child.
 
 ## Count
 

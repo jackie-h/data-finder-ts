@@ -24,6 +24,9 @@ _MAPPINGS = [
     'diamond_mapping.md',
     'null_end_milestoning_mapping.md',
     'people_denormalised_mapping.md',
+    'business_range_mapping.md',
+    'processing_snapshot_mapping.md',
+    'joins_through_tables_mapping.md',
 ]
 
 if __name__ == '__main__':

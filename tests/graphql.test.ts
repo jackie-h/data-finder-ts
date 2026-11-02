@@ -25,8 +25,8 @@ class AccountGraphQLFinder {
   id(): IntegerAttribute { return this._id; }
   name(): StringAttribute { return this._name; }
 
-  findAll(businessDate: Date | null, processingValidAt: Date | null, displayColumns: Parameters<typeof convertInputsAndSelect>[2], filterOp = new NoOperation()) {
-    return convertInputsAndSelect(businessDate, processingValidAt, displayColumns, this._query, filterOp);
+  findAll(businessDate: Date | null, processingTime: Date | null, displayColumns: Parameters<typeof convertInputsAndSelect>[2], filterOp = new NoOperation()) {
+    return convertInputsAndSelect(businessDate, processingTime, displayColumns, this._query, filterOp);
   }
 }
 
@@ -40,8 +40,8 @@ class InstrumentGraphQLFinder {
   symbol(): StringAttribute { return this._symbol; }
   price(): FloatAttribute { return this._price; }
 
-  findAll(businessDate: Date | null, processingValidAt: Date | null, displayColumns: Parameters<typeof convertInputsAndSelect>[2], filterOp = new NoOperation()) {
-    return convertInputsAndSelect(businessDate, processingValidAt, displayColumns, this._query, filterOp);
+  findAll(businessDate: Date | null, processingTime: Date | null, displayColumns: Parameters<typeof convertInputsAndSelect>[2], filterOp = new NoOperation()) {
+    return convertInputsAndSelect(businessDate, processingTime, displayColumns, this._query, filterOp);
   }
 }
 
@@ -55,8 +55,8 @@ class TradeGraphQLFinder {
   symbol(): StringAttribute { return this._symbol; }
   price(): FloatAttribute { return this._price; }
 
-  findAll(businessDate: Date | null, processingValidAt: Date | null, displayColumns: Parameters<typeof convertInputsAndSelect>[2], filterOp = new NoOperation()) {
-    return convertInputsAndSelect(businessDate, processingValidAt, displayColumns, this._query, filterOp);
+  findAll(businessDate: Date | null, processingTime: Date | null, displayColumns: Parameters<typeof convertInputsAndSelect>[2], filterOp = new NoOperation()) {
+    return convertInputsAndSelect(businessDate, processingTime, displayColumns, this._query, filterOp);
   }
 }
 
@@ -74,8 +74,8 @@ class ContractualPositionGraphQLFinder {
   counterparty(): IntegerAttribute { return this._counterparty; }
   quantity(): FloatAttribute { return this._quantity; }
 
-  findAll(businessDate: Date | null, processingValidAt: Date | null, displayColumns: Parameters<typeof convertInputsAndSelect>[2], filterOp = new NoOperation()) {
-    return convertInputsAndSelect(businessDate, processingValidAt, displayColumns, this._query, filterOp);
+  findAll(businessDate: Date | null, processingTime: Date | null, displayColumns: Parameters<typeof convertInputsAndSelect>[2], filterOp = new NoOperation()) {
+    return convertInputsAndSelect(businessDate, processingTime, displayColumns, this._query, filterOp);
   }
 }
 

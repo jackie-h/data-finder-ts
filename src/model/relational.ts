@@ -62,6 +62,15 @@ export enum ScalarFunction {
   REPLACE = 'REPLACE',
   SUBSTRING = 'SUBSTRING',
   COALESCE = 'COALESCE',
+  SIN = 'SIN',
+  COS = 'COS',
+  TAN = 'TAN',
+  ASIN = 'ASIN',
+  ACOS = 'ACOS',
+  ATAN = 'ATAN',
+  ATAN2 = 'ATAN2',
+  EXP = 'EXP',
+  LOG = 'LOG',
 }
 
 export enum DatePart {
@@ -322,6 +331,8 @@ export class ScalarFunctionOperation extends UnaryOperation implements Sortable 
 export const NUMERIC_FUNCTIONS: ReadonlySet<ScalarFunction> = new Set([
   ScalarFunction.ABS, ScalarFunction.CEILING, ScalarFunction.FLOOR, ScalarFunction.MOD,
   ScalarFunction.POWER, ScalarFunction.SQRT, ScalarFunction.ROUND, ScalarFunction.LENGTH,
+  ScalarFunction.SIN, ScalarFunction.COS, ScalarFunction.TAN, ScalarFunction.ASIN, ScalarFunction.ACOS,
+  ScalarFunction.ATAN, ScalarFunction.ATAN2, ScalarFunction.EXP, ScalarFunction.LOG,
 ]);
 
 export class DateExtractOperation extends UnaryOperation implements Sortable {
@@ -380,7 +391,8 @@ export class DateDiffOperation extends UnaryOperation implements Sortable {
 
   constructor(
     element: RelationalOperationElement,
-    readonly other: Date,
+    /** What the element is measured against: a date or timestamp, or a column or expression. */
+    readonly other: Date | RelationalOperationElement,
     readonly unit: DatePart,
     readonly displayName?: string,
   ) { super(element); }
@@ -490,6 +502,13 @@ export class JoinTreeNodeOperation {
     readonly many: boolean = false,
     /** True when the property this step follows can be missing (its lower bound is 0). */
     readonly optional: boolean = false,
+    /**
+     * The dates this step was given for the milestoned table it reaches, if any. They are the ones it uses, and the
+     * ones every step below it uses unless it is given its own; a step with none uses those of the step above it,
+     * and at the top the query's.
+     */
+    readonly businessDate: Date | null = null,
+    readonly processingDatetime: Date | null = null,
   ) {}
 }
 
@@ -615,6 +634,11 @@ export class SelectOperation {
     readonly offset?: number,
     /** Keeps the groups that satisfy it (`HAVING`). */
     readonly having?: Operation,
+    /**
+     * Steps the query only asks the existence of, each as the query that stands for its table: the query joins to
+     * that instead of to the table, so a parent is not repeated for each row that matches.
+     */
+    readonly subSelects: ReadonlyMap<JoinTreeNodeOperation, SelectOperation> = new Map(),
   ) {}
 }
 

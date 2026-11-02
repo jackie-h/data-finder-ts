@@ -3,12 +3,15 @@ import {
   Operation, RelationalOperationElement,
 } from '@model/relational';
 import {
-  ProcessingTemporalColumns, SingleBusinessDateColumn,
-  BusinessDateAndProcessingTemporalColumns, BiTemporalColumns, MilestonedTable,
+  ProcessingTemporalColumns, SingleBusinessDateColumn, SingleProcessingDatetimeColumn,
+  BusinessDateAndProcessingTemporalColumns, BiTemporalColumns, BusinessDateRangeColumns, MilestonedTable,
 } from '@model/milestoning';
-import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
+import {
+  convertInputsAndSelect, convertInputsAndSelectForDateRange, convertInputsAndSelectForProcessingRange,
+  convertDate, convertProcessingDate, FinderResult,
+} from '@datafinder/runner';
 import { ExistsOperation, NotExistsOperation } from '@model/relational';
-import { displayPrefix } from '@datafinder/finder';
+import { displayPrefix, viaJoins, type NavigationDates } from '@datafinder/finder';
 import type { Attribute } from '@datafinder/attribute';
 import { EmbeddedAttributes, embeddedUnder } from '@datafinder/embedded';
 import { titleCase } from '@datafinder/naming';
@@ -56,6 +59,15 @@ function embeddedFor_{{to_ts_name(rpm.property)}}(incoming: EmbeddedAttributes |
 
 {% endif %}
 {% endfor %}
+{% set ns3 = namespace(seen_ec=[]) %}
+{% for ec in embedded_classes(rcm) %}
+{% for prop, join in ec.joins %}
+{% if prop.type.name != rcm.clazz.name and prop.type.name not in ns3.seen_ec and prop.type.name not in ns.seen %}
+import { {{prop.type.name}}RelatedFinder } from '{{class_module_map[prop.type.name]}}';
+{% set ns3.seen_ec = ns3.seen_ec + [prop.type.name] %}
+{% endif %}
+{% endfor %}
+{% endfor %}
 {% for ec in embedded_classes(rcm) %}
 /** {{ec.label}}: held in the columns of the owning row, so reading it needs no join. */
 export class {{ec.name}} {
@@ -65,6 +77,9 @@ export class {{ec.name}} {
 {% for prop, child in ec.children %}
   private readonly _{{to_ts_name(prop)}}: {{child}};
 {% endfor %}
+{% for prop, join in ec.joins %}
+  private readonly _{{to_ts_name(prop)}}: {{prop.type.name}}RelatedFinder;
+{% endfor %}
 
   constructor(parent?: JoinTreeNodeOperation, prefix: string = '') {
 {% for prop, col in ec.columns %}
@@ -72,6 +87,9 @@ export class {{ec.name}} {
 {% endfor %}
 {% for prop, child in ec.children %}
     this._{{to_ts_name(prop)}} = new {{child}}(parent, prefix);
+{% endfor %}
+{% for prop, join in ec.joins %}
+    this._{{to_ts_name(prop)}} = new {{prop.type.name}}RelatedFinder('{{ec.label}} {{prop.name}}', {{column_code(join.lhs)}}, {{column_code(join.rhs)}}, {{ 'true' if prop.multiplicity.is_many() else 'false' }}, {{ 'true' if ec.optional or prop.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(join, 'parent') }});
 {% endfor %}
   }
 {% for prop, col in ec.columns %}
@@ -85,6 +103,13 @@ export class {{ec.name}} {
 
   {{prop_jsdoc(prop)}}
   {{to_ts_name(prop)}}(): {{child}} {
+    return this._{{to_ts_name(prop)}};
+  }
+{% endfor %}
+{% for prop, join in ec.joins %}
+
+  {{prop_jsdoc(prop)}}
+  {{to_ts_name(prop)}}(): {{prop.type.name}}RelatedFinder {
     return this._{{to_ts_name(prop)}};
   }
 {% endfor %}
@@ -118,6 +143,16 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
     new Column('{{rcm.milestone_mapping._in.target.name}}', '{{rcm.milestone_mapping._in.target.type}}'),
     new Column('{{rcm.milestone_mapping._out.target.name}}', '{{rcm.milestone_mapping._out.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
     '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_business_date_range(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new BusinessDateRangeColumns(
+    new Column('{{rcm.milestone_mapping._date_from.target.name}}', '{{rcm.milestone_mapping._date_from.target.type}}'),
+    new Column('{{rcm.milestone_mapping._date_to.target.name}}', '{{rcm.milestone_mapping._date_to.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
+    '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_processing_snapshot(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new SingleProcessingDatetimeColumn(
+    new Column('{{rcm.milestone_mapping._datetime.target.name}}', '{{rcm.milestone_mapping._datetime.target.type}}'),
   );
 {% elif has_uni_business_temporal(rcm.milestone_mapping) %}
   private static readonly _milestoningColumns = new SingleBusinessDateColumn(
@@ -155,19 +190,23 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   private _{{reverse_name}}?: {{source_rcm.clazz.name}}RelatedFinder;
 {% endfor %}
 
-  constructor(relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{rcm.clazz.name}}Filter) {
+  constructor(relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{rcm.clazz.name}}Filter, dates?: NavigationDates) {
     super();
     const join = new JoinOperation(relationName, {{rcm.clazz.name}}RelatedFinder._table, source, target);
     if (filter) {
       join.filterKwargs = filter as Record<string, unknown>;
       join.filterColumnMap = {{rcm.clazz.name}}RelatedFinder._filterColumns;
     }
-    this._node = new JoinTreeNodeOperation(join, parentJoin, many, optional);
+    this._node = new JoinTreeNodeOperation(
+      join, parentJoin, many, optional,
+      dates?.businessDate == null ? null : convertDate(dates.businessDate),
+      dates?.processingTime == null ? null : convertProcessingDate(dates.processingTime),
+    );
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
     this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(displayPrefix(relationName, parentJoin) + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', this._node, embedded?.['{{rpm.property.id}}'], {{ 'true' if rpm.target.nullable else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }});
 {% elif rpm.property.type.name != rcm.clazz.name %}
-    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, this._node, {% if flatten_embedded(rpm.target) %}embeddedFor_{{to_ts_name(rpm.property)}}(embedded, this._node, '{{rpm.property.name}}'){% else %}embeddedUnder(embedded, '{{rpm.property.id}}.'){% endif %});
+    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'this._node') }}, {% if flatten_embedded(rpm.target) %}embeddedFor_{{to_ts_name(rpm.property)}}(embedded, this._node, '{{rpm.property.name}}'){% else %}embeddedUnder(embedded, '{{rpm.property.id}}.'){% endif %});
 {% endif %}
 {% endfor %}
 {% for pm in rcm.embedded_mappings %}
@@ -184,8 +223,8 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 
 {% elif rpm.property.type.name == rcm.clazz.name %}
   {{prop_jsdoc(rpm.property)}}
-  {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinder {
-    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, this._node, undefined, filter);
+  {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinder {
+    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'this._node') }}, undefined, filter, dates);
     if (!this._{{to_ts_name(rpm.property)}}) {
       this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, this._node);
     }
@@ -194,8 +233,8 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 
 {% else %}
   {{prop_jsdoc(rpm.property)}}
-  {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinder {
-    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, this._node, undefined, filter);
+  {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinder {
+    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'this._node') }}, undefined, filter, dates);
     return this._{{to_ts_name(rpm.property)}};
   }
 
@@ -209,10 +248,10 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
-  {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter): {{source_rcm.clazz.name}}RelatedFinder {
-    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter) => {{source_rcm.clazz.name}}RelatedFinder;
+  {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinder {
+    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates) => {{source_rcm.clazz.name}}RelatedFinder;
     if (!_Cls) throw new Error('{{source_rcm.clazz.name}}RelatedFinder not registered. Import {{source_rcm.clazz.name}}Finder before calling {{reverse_name}}().');
-    if (filter) return new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, this._node, undefined, filter);
+    if (filter || dates) return new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, this._node, undefined, filter, dates);
     if (!this._{{reverse_name}}) {
       this._{{reverse_name}} = new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, this._node);
     }
@@ -259,6 +298,16 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
     new Column('{{rcm.milestone_mapping._out.target.name}}', '{{rcm.milestone_mapping._out.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
     '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
   );
+{% elif has_business_date_range(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new BusinessDateRangeColumns(
+    new Column('{{rcm.milestone_mapping._date_from.target.name}}', '{{rcm.milestone_mapping._date_from.target.type}}'),
+    new Column('{{rcm.milestone_mapping._date_to.target.name}}', '{{rcm.milestone_mapping._date_to.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
+    '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_processing_snapshot(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new SingleProcessingDatetimeColumn(
+    new Column('{{rcm.milestone_mapping._datetime.target.name}}', '{{rcm.milestone_mapping._datetime.target.type}}'),
+  );
 {% elif has_uni_business_temporal(rcm.milestone_mapping) %}
   private static readonly _milestoningColumns = new SingleBusinessDateColumn(
     new Column('{{rcm.milestone_mapping._date.target.name}}', '{{rcm.milestone_mapping._date.target.type}}'),
@@ -273,7 +322,7 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% if is_primitive(rpm.property) %}
   private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute('{{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', '{{table_qualified_name(rpm.target.table)}}', undefined, undefined, {{ 'true' if rpm.target.nullable else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }});
 {% elif rpm.property.type.name != rcm.clazz.name %}
-  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}{% if flatten_embedded(rpm.target) %}, undefined, embeddedFor_{{to_ts_name(rpm.property)}}(undefined, undefined, '{{rpm.property.name}}'){% endif %});
+  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}{% if rpm.target.via or flatten_embedded(rpm.target) %}, {{ parent_expr(rpm.target, 'undefined') }}{% endif %}{% if flatten_embedded(rpm.target) %}, embeddedFor_{{to_ts_name(rpm.property)}}(undefined, undefined, '{{rpm.property.name}}'){% endif %});
 {% endif %}
 {% endfor %}
 {% for pm in rcm.embedded_mappings %}
@@ -297,8 +346,8 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 
 {% elif rpm.property.type.name == rcm.clazz.name %}
   {{prop_jsdoc(rpm.property)}}
-  {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinder {
-    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, undefined, undefined, filter);
+  {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinder {
+    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'undefined') }}, undefined, filter, dates);
     if (!this._{{to_ts_name(rpm.property)}}) {
       this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }});
     }
@@ -307,8 +356,8 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 
 {% else %}
   {{prop_jsdoc(rpm.property)}}
-  {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinder {
-    if (filter) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, undefined, undefined, filter);
+  {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinder {
+    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'undefined') }}, undefined, filter, dates);
     return {{rcm.clazz.name}}Finder._{{to_ts_name(rpm.property)}};
   }
 
@@ -322,10 +371,10 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
-  {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter): {{source_rcm.clazz.name}}RelatedFinder {
-    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter) => {{source_rcm.clazz.name}}RelatedFinder;
+  {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinder {
+    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates) => {{source_rcm.clazz.name}}RelatedFinder;
     if (!_Cls) throw new Error('{{source_rcm.clazz.name}}RelatedFinder not registered. Import {{source_rcm.clazz.name}}Finder before calling {{reverse_name}}().');
-    if (filter) return new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, undefined, undefined, filter);
+    if (filter || dates) return new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, undefined, undefined, filter, dates);
     if (!this._{{reverse_name}}) {
       this._{{reverse_name}} = new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', '{{table_qualified_name(rpm.target.rhs.table)}}'{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', '{{table_qualified_name(rpm.target.lhs.table)}}'{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }});
     }
@@ -339,41 +388,53 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 
   findAll(
     businessDate: Date | string | null,
-    processingValidAt: Date | string | null,
+    processingTime: Date | string | null,
     displayColumns: (Attribute | RelationalOperationElement)[],
     filterOp: Operation = new NoOperation(),
   ): FinderResult {
-{% if rcm.milestone_mapping %}
-{% if has_processing_temporal(rcm.milestone_mapping) and not has_uni_business_temporal(rcm.milestone_mapping) and not has_business_date_and_processing(rcm.milestone_mapping) and not has_bitemporal(rcm.milestone_mapping) %}
-    return convertInputsAndSelect(null, processingValidAt, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
-{% elif has_uni_business_temporal(rcm.milestone_mapping) and not has_business_date_and_processing(rcm.milestone_mapping) %}
-    return convertInputsAndSelect(businessDate, null, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+{% if rcm.milestone_mapping and (has_processing_temporal(rcm.milestone_mapping) or has_processing_snapshot(rcm.milestone_mapping)) and not has_uni_business_temporal(rcm.milestone_mapping) and not has_business_date_and_processing(rcm.milestone_mapping) and not has_bitemporal(rcm.milestone_mapping) %}
+    return convertInputsAndSelect(null, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
 {% else %}
-    return convertInputsAndSelect(businessDate, processingValidAt, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
-{% endif %}
-{% else %}
-    return convertInputsAndSelect(null, null, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+    return convertInputsAndSelect(businessDate, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
 {% endif %}
   }
-{% if rcm.milestone_mapping and (has_bitemporal(rcm.milestone_mapping) or has_business_date_and_processing(rcm.milestone_mapping) or has_uni_business_temporal(rcm.milestone_mapping)) %}
+{% if rcm.milestone_mapping and (has_bitemporal(rcm.milestone_mapping) or has_business_date_and_processing(rcm.milestone_mapping) or has_business_date_range(rcm.milestone_mapping) or has_uni_business_temporal(rcm.milestone_mapping)) %}
 
   /**
    * Returns data for all records whose business date overlaps the given range.
    *
-   * For bitemporal tables the range uses interval overlap:
+   * For tables with a business date range (bitemporal ones too) the range uses interval overlap:
    *   business_date_from_col <= businessDateTo AND business_date_to_col > businessDateFrom
    * For single-date tables:
    *   business_date >= businessDateFrom AND business_date <= businessDateTo
-   * Processing-time filtering is point-in-time at processingValidAt.
+   * Processing-time filtering is point-in-time at processingTime; a table with no processing columns has none to give.
    */
   findForDateRange(
     businessDateFrom: Date | string,
     businessDateTo: Date | string,
-    processingValidAt: Date | string,
+    processingTime: Date | string | null,
     displayColumns: (Attribute | RelationalOperationElement)[],
     filterOp: Operation = new NoOperation(),
   ): FinderResult {
-    return convertInputsAndSelectForDateRange(businessDateFrom, businessDateTo, processingValidAt, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+    return convertInputsAndSelectForDateRange(businessDateFrom, businessDateTo, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+  }
+{% endif %}
+{% if rcm.milestone_mapping and has_processing_snapshot(rcm.milestone_mapping) %}
+
+  /**
+   * Returns the rows taken at any processing time from `processingFrom` up to and including `processingTo`.
+   *
+   * The processing snapshot column is compared with both ends of the range. A table joined from this one with a
+   * processing range is read over the same range, and one with a single snapshot column is read within it.
+   */
+  findForProcessingRange(
+    processingFrom: Date | string,
+    processingTo: Date | string,
+    businessDate: Date | string | null,
+    displayColumns: (Attribute | RelationalOperationElement)[],
+    filterOp: Operation = new NoOperation(),
+  ): FinderResult {
+    return convertInputsAndSelectForProcessingRange(businessDate, processingFrom, processingTo, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
   }
 {% endif %}
 }

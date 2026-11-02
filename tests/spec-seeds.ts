@@ -12,6 +12,8 @@ const TRADES_DDL =
   'CREATE TABLE trading.trades (sym VARCHAR, price DOUBLE, is_settled BOOLEAN, account_id INT, in_z TIMESTAMP, out_z TIMESTAMP)';
 const ACCOUNTS_DDL =
   'CREATE TABLE ref_data.account_master (ID INT, ACCT_NAME VARCHAR, BRANCH_ID INT, in_z TIMESTAMP, out_z TIMESTAMP)';
+const ACCOUNTS_WITH_DESK_DDL =
+  'CREATE TABLE ref_data.account_master (ID INT, ACCT_NAME VARCHAR, BRANCH_ID INT, DESK_ID INT, in_z TIMESTAMP, out_z TIMESTAMP)';
 const PRICE_DDL = 'CREATE TABLE ref_data.price (SYM VARCHAR, PRICE DOUBLE, in_z TIMESTAMP, out_z TIMESTAMP)';
 
 async function run(conn: DuckDBConnection, ...statements: string[]): Promise<void> {
@@ -19,18 +21,22 @@ async function run(conn: DuckDBConnection, ...statements: string[]): Promise<voi
 }
 
 /** Finance variants that share the account/branch/trade tables but load different CSVs. */
-function finance(accounts: string, trades: string, opts: { prices?: string; positions?: string } = {}): Seed {
+function finance(accounts: string, trades: string, opts: { prices?: string; positions?: string; desks?: string } = {}): Seed {
   return async conn => {
-    await run(conn, 'CREATE SCHEMA trading', 'CREATE SCHEMA ref_data', ACCOUNTS_DDL);
+    await run(conn, 'CREATE SCHEMA trading', 'CREATE SCHEMA ref_data', opts.desks ? ACCOUNTS_WITH_DESK_DDL : ACCOUNTS_DDL);
     await loadCsv(conn, 'ref_data.account_master', accounts);
     await run(conn, 'CREATE TABLE ref_data.branch (ID INT, CITY VARCHAR)');
     await loadCsv(conn, 'ref_data.branch', 'finance_branches.csv');
+    if (opts.desks) {
+      await run(conn, 'CREATE TABLE ref_data.desk (ID INT, NAME VARCHAR)');
+      await loadCsv(conn, 'ref_data.desk', opts.desks);
+    }
     await run(conn, PRICE_DDL);
     if (opts.prices) await loadCsv(conn, 'ref_data.price', opts.prices);
     await run(conn, TRADES_DDL);
     await loadCsv(conn, 'trading.trades', trades);
     if (opts.positions) {
-      await run(conn, 'CREATE TABLE trading.contractualposition (DATE DATE, QUANTITY DOUBLE, NPV DOUBLE, in_z TIMESTAMP, out_z TIMESTAMP)');
+      await run(conn, 'CREATE TABLE trading.contractualposition (DATE DATE, QUANTITY DOUBLE, NPV DOUBLE, ACCOUNT_ID INT, in_z TIMESTAMP, out_z TIMESTAMP)');
       await loadCsv(conn, 'trading.contractualposition', opts.positions);
     }
   };
@@ -40,6 +46,7 @@ export const seeds: Record<string, Seed> = {
   finance: finance('finance_accounts.csv', 'finance_trades.csv', {
     prices: 'finance_prices.csv',
     positions: 'finance_positions.csv',
+    desks: 'finance_desks.csv',
   }),
   finance_group_by: finance('finance_accounts_group_by.csv', 'finance_trades_group_by.csv'),
   finance_numeric: finance('finance_accounts_numeric.csv', 'finance_trades_numeric.csv'),
@@ -96,5 +103,28 @@ export const seeds: Record<string, Seed> = {
   positions: async conn => {
     await run(conn, 'CREATE TABLE positions (id INT, trade_date DATE, npv DOUBLE)');
     await loadCsv(conn, 'positions', 'positions_date.csv');
+  },
+
+  business_range: async conn => {
+    await run(conn, 'CREATE SCHEMA mkt', 'CREATE TABLE mkt.rates (code VARCHAR, amount DOUBLE, from_z DATE, thru_z DATE)');
+    await loadCsv(conn, 'mkt.rates', 'business_range_rates.csv');
+  },
+
+  processing_snapshot: async conn => {
+    await run(conn, 'CREATE SCHEMA mkt',
+      'CREATE TABLE mkt.quotes (id INT, symbol VARCHAR, price DOUBLE, taken_at TIMESTAMP)',
+      'CREATE TABLE mkt.positions (id INT, symbol VARCHAR)');
+    await loadCsv(conn, 'mkt.quotes', 'processing_snapshot_quotes.csv');
+    await loadCsv(conn, 'mkt.positions', 'processing_snapshot_positions.csv');
+  },
+
+  joins_through_tables: async conn => {
+    await run(conn, 'CREATE SCHEMA hr',
+      'CREATE TABLE hr.employees (id INT, name VARCHAR, street VARCHAR, home_country INT, citizen_ref INT)',
+      'CREATE TABLE hr.country_refs (ref INT, code VARCHAR)',
+      'CREATE TABLE hr.countries (code VARCHAR, name VARCHAR)');
+    await loadCsv(conn, 'hr.employees', 'joins_through_tables_employees.csv');
+    await loadCsv(conn, 'hr.country_refs', 'joins_through_tables_country_refs.csv');
+    await loadCsv(conn, 'hr.countries', 'joins_through_tables_countries.csv');
   },
 };

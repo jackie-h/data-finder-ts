@@ -2,6 +2,7 @@ import type { Operation } from '@model/relational';
 import type { CountAllOperation, NoOperation } from '@model/relational';
 import type { Attribute } from '@datafinder/attribute';
 import type { FinderResult } from '@datafinder/runner';
+import type { NavigationDates } from '@datafinder/finder';
 import type { ExistsOperation, NotExistsOperation } from '@model/relational';
 {% set attr_types = get_used_attr_types(rcm) %}
 {% if attr_types %}
@@ -42,11 +43,11 @@ export abstract class {{rcm.clazz.name}}RelatedFinderBase {
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
 {% else %}
   {{prop_jsdoc(rpm.property)}}
-  abstract {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinderBase;
+  abstract {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinderBase;
 {% endif %}
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
-  abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter): {{source_rcm.clazz.name}}RelatedFinderBase;
+  abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinderBase;
 {% endfor %}
   /** Filter to rows that have a matching {{rcm.clazz.name}} through this join. */
   abstract exists(): ExistsOperation;
@@ -64,24 +65,33 @@ export abstract class {{rcm.clazz.name}}FinderBase {
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
 {% else %}
   {{prop_jsdoc(rpm.property)}}
-  abstract {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinderBase;
+  abstract {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinderBase;
 {% endif %}
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
-  abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter): {{source_rcm.clazz.name}}RelatedFinderBase;
+  abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinderBase;
 {% endfor %}
   abstract count(): CountAllOperation;
   abstract findAll(
     businessDate: Date | string | null,
-    processingValidAt: Date | string | null,
+    processingTime: Date | string | null,
     displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
     filterOp?: Operation,
   ): FinderResult;
-{% if rcm.milestone_mapping and (has_bitemporal(rcm.milestone_mapping) or has_business_date_and_processing(rcm.milestone_mapping) or has_uni_business_temporal(rcm.milestone_mapping)) %}
+{% if rcm.milestone_mapping and (has_bitemporal(rcm.milestone_mapping) or has_business_date_and_processing(rcm.milestone_mapping) or has_business_date_range(rcm.milestone_mapping) or has_uni_business_temporal(rcm.milestone_mapping)) %}
   abstract findForDateRange(
     businessDateFrom: Date | string,
     businessDateTo: Date | string,
-    processingValidAt: Date | string,
+    processingTime: Date | string | null,
+    displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
+    filterOp?: Operation,
+  ): FinderResult;
+{% endif %}
+{% if rcm.milestone_mapping and has_processing_snapshot(rcm.milestone_mapping) %}
+  abstract findForProcessingRange(
+    processingFrom: Date | string,
+    processingTo: Date | string,
+    businessDate: Date | string | null,
     displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
     filterOp?: Operation,
   ): FinderResult;

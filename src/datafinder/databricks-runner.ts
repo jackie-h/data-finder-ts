@@ -105,10 +105,11 @@ export class DatabricksConnect implements QueryRunner {
     distinct: boolean = false,
     offset?: number,
     having?: Operation,
+    processingDatetimeTo: Date | null = null,
   ): Promise<Row[]> {
     const statement = toSql(
       businessDate, processingDatetime, columns, table as Table, op, orderBy, groupBy, limit,
-      businessDateTo, distinct, offset, having, this.dialect,
+      businessDateTo, distinct, offset, having, this.dialect, processingDatetimeTo,
     );
     const deadline = Date.now() + timeoutMs;
     const controller = new AbortController();

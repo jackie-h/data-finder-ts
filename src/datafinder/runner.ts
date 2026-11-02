@@ -1,5 +1,6 @@
 import { Attribute } from './attribute';
 import { toSql } from './sql-generator';
+import { MilestonedTable, hasProcessingRange } from '../model/milestoning';
 import { DialectName, SqlDialect } from './dialect';
 import {
   Table,
@@ -47,6 +48,7 @@ export interface QueryRunner {
     distinct?: boolean,
     offset?: number,
     having?: Operation,
+    processingDatetimeTo?: Date | null,
   ): Promise<Row[]>;
 }
 
@@ -93,6 +95,7 @@ export class FinderResult {
     private readonly _table: QueryTarget,
     private readonly _op: RelationalOperationElement,
     private readonly _businessDateTo: Date | null = null,
+    private readonly _processingDatetimeTo: Date | null = null,
   ) {}
 
   /**
@@ -168,6 +171,7 @@ export class FinderResult {
       this._offset,
       this._having,
       dialect,
+      this._processingDatetimeTo,
     );
   }
 
@@ -186,17 +190,18 @@ export class FinderResult {
       this._distinct,
       this._offset,
       this._having,
+      this._processingDatetimeTo,
     );
   }
 }
 
 /** A processing date input keeps the precision it was given: a date stays a date, a timestamp a timestamp. */
-function convertProcessingDate(value: Date | string | null): Date | null {
+export function convertProcessingDate(value: Date | string | null): Date | null {
   if (typeof value === 'string' && DATE_ONLY_PATTERN.test(value)) return new DateOnly(value + 'T00:00:00Z');
   return convertDate(value);
 }
 
-function convertDate(value: Date | string | null): Date | null {
+export function convertDate(value: Date | string | null): Date | null {
   if (value === null) return null;
   if (value instanceof Date) return value;
   // Zone-less strings (YYYY-MM-DD, or YYYY-MM-DD HH:MM[:SS]) are read as UTC, matching how
@@ -228,14 +233,17 @@ export function convertInputsAndSelect(
 export function convertInputsAndSelectForDateRange(
   businessDateFrom: Date | string,
   businessDateTo: Date | string,
-  processingDatetime: Date | string,
+  processingDatetime: Date | string | null,
   columns: (Attribute | RelationalOperationElement)[],
   table: QueryTarget,
   op: RelationalOperationElement = new NoOperation(),
 ): FinderResult {
   if (businessDateFrom == null) throw new Error('businessDateFrom is required for findForDateRange');
   if (businessDateTo == null) throw new Error('businessDateTo is required for findForDateRange');
-  if (processingDatetime == null) throw new Error('processingValidAt is required for findForDateRange');
+  // a table with no processing columns, such as a single business date, has no processing time to give
+  if (processingDatetime == null && table instanceof MilestonedTable && hasProcessingRange(table.milestoningColumns)) {
+    throw new Error('processingTime is required for findForDateRange');
+  }
   return new FinderResult(
     convertDate(businessDateFrom),
     convertProcessingDate(processingDatetime),
@@ -243,5 +251,26 @@ export function convertInputsAndSelectForDateRange(
     table,
     op,
     convertDate(businessDateTo),
+  );
+}
+
+export function convertInputsAndSelectForProcessingRange(
+  businessDate: Date | string | null,
+  processingFrom: Date | string,
+  processingTo: Date | string,
+  columns: (Attribute | RelationalOperationElement)[],
+  table: QueryTarget,
+  op: RelationalOperationElement = new NoOperation(),
+): FinderResult {
+  if (processingFrom == null) throw new Error('processingFrom is required for findForProcessingRange');
+  if (processingTo == null) throw new Error('processingTo is required for findForProcessingRange');
+  return new FinderResult(
+    convertDate(businessDate),
+    convertProcessingDate(processingFrom),
+    columns,
+    table,
+    op,
+    null,
+    convertProcessingDate(processingTo),
   );
 }

@@ -1,4 +1,4 @@
-import { Attribute, AttributeValue } from './attribute';
+import { Attribute, AttributeValue, Comparand, comparandOperand } from './attribute';
 import { NumericFunctions, StringFunctions } from './scalar-functions';
 import {
   ComparisonOperation,
@@ -29,7 +29,13 @@ import {
   JoinTreeNodeOperation,
   ColumnWithJoin,
   sample,
+  RelationalOperationElement,
 } from '../model/relational';
+
+/** The other side of a date difference: a value stays as it is, a column or expression becomes its operand. */
+function diffOther(other: Date | Comparand): Date | RelationalOperationElement {
+  return other instanceof Date ? other : comparandOperand(other);
+}
 
 /** The smallest and largest value of a group, for a column that can be ordered but not summed. */
 abstract class MinMax {
@@ -71,12 +77,12 @@ export class StringAttribute extends Attribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new StringConstantOperation(value));
+  eq(value: string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.EQUAL, value, () => new StringConstantOperation((value as string)));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new StringConstantOperation(value));
+  ne(value: string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new StringConstantOperation((value as string)));
   }
   /** Filter to rows where this attribute contains `value` as a substring. */
   contains(value: string): ComparisonOperation {
@@ -151,28 +157,28 @@ export class DoubleAttribute extends NumericAttribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new FloatConstantOperation(value));
+  eq(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.EQUAL, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new FloatConstantOperation(value));
+  ne(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than `value`. */
-  gt(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, new FloatConstantOperation(value));
+  gt(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than `value`. */
-  lt(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, new FloatConstantOperation(value));
+  lt(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than or equal to `value`. */
-  gte(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, new FloatConstantOperation(value));
+  gte(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than or equal to `value`. */
-  lte(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, new FloatConstantOperation(value));
+  lte(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new FloatConstantOperation((value as number)));
   }
 }
 
@@ -196,28 +202,28 @@ export class DecimalAttribute extends NumericAttribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new DecimalConstantOperation(value));
+  eq(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.EQUAL, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new DecimalConstantOperation(value));
+  ne(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than `value`. */
-  gt(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, new DecimalConstantOperation(value));
+  gt(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than `value`. */
-  lt(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, new DecimalConstantOperation(value));
+  lt(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than or equal to `value`. */
-  gte(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, new DecimalConstantOperation(value));
+  gte(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than or equal to `value`. */
-  lte(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, new DecimalConstantOperation(value));
+  lte(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new DecimalConstantOperation((value as number)));
   }
 }
 
@@ -238,28 +244,28 @@ export class IntegerAttribute extends NumericAttribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new IntegerConstantOperation(value));
+  eq(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.EQUAL, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new IntegerConstantOperation(value));
+  ne(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than `value`. */
-  gt(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, new IntegerConstantOperation(value));
+  gt(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than `value`. */
-  lt(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, new IntegerConstantOperation(value));
+  lt(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than or equal to `value`. */
-  gte(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, new IntegerConstantOperation(value));
+  gte(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than or equal to `value`. */
-  lte(value: number): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, new IntegerConstantOperation(value));
+  lte(value: number | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new IntegerConstantOperation((value as number)));
   }
 }
 
@@ -280,8 +286,12 @@ export class BooleanAttribute extends Attribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: boolean): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new BooleanConstantOperation(value));
+  eq(value: boolean | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.EQUAL, value, () => new BooleanConstantOperation((value as boolean)));
+  }
+  /** Filter to rows where this attribute does not equal `value`. */
+  ne(value: boolean | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new BooleanConstantOperation((value as boolean) as boolean));
   }
   /** Filter to rows where this attribute is true. */
   isTrue(): ComparisonOperation {
@@ -327,28 +337,28 @@ export class DateAttribute extends Attribute {
   }
 
   /** Filter to rows where this date equals `value`. */
-  eq(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, new DateConstantOperation(parseDate(value)));
+  eq(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.EQUAL, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date does not equal `value`. */
-  ne(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, new DateConstantOperation(parseDate(value)));
+  ne(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date is after `value`. */
-  gt(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, new DateConstantOperation(parseDate(value)));
+  gt(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date is before `value`. */
-  lt(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, new DateConstantOperation(parseDate(value)));
+  lt(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date is on or after `value`. */
-  gte(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, new DateConstantOperation(parseDate(value)));
+  gte(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date is on or before `value`. */
-  lte(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, new DateConstantOperation(parseDate(value)));
+  lte(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
 
   /** Extract the four-digit calendar year. */
@@ -386,11 +396,11 @@ export class DateAttribute extends Attribute {
   subtractYears(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.YEAR, false, 'Subtract Years ' + this.displayName()); }
 
   /** Number of whole days between this date and `other`. */
-  diffDays(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.DAY, 'Diff Days ' + this.displayName()); }
+  diffDays(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.DAY, 'Diff Days ' + this.displayName()); }
   /** Number of whole months between this date and `other`. */
-  diffMonths(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.MONTH, 'Diff Months ' + this.displayName()); }
+  diffMonths(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.MONTH, 'Diff Months ' + this.displayName()); }
   /** Number of whole years between this date and `other`. */
-  diffYears(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.YEAR, 'Diff Years ' + this.displayName()); }
+  diffYears(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.YEAR, 'Diff Years ' + this.displayName()); }
 }
 
 export class DateTimeAttribute extends Attribute {
@@ -410,28 +420,28 @@ export class DateTimeAttribute extends Attribute {
   }
 
   /** Filter to rows where this timestamp equals `value`. */
-  eq(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.EQUAL, temporalConstant(value));
+  eq(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.EQUAL, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp does not equal `value`. */
-  ne(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.NOT_EQUAL, temporalConstant(value));
+  ne(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.NOT_EQUAL, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp is after `value`. */
-  gt(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN, temporalConstant(value));
+  gt(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp is before `value`. */
-  lt(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN, temporalConstant(value));
+  lt(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp is on or after `value`. */
-  gte(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, temporalConstant(value));
+  gte(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp is on or before `value`. */
-  lte(value: Date | string): ComparisonOperation {
-    return new ComparisonOperation(this.cwj(), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, temporalConstant(value));
+  lte(value: Date | string | Comparand): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => temporalConstant((value as Date | string)));
   }
 
   /** Extract the four-digit calendar year. */
@@ -487,17 +497,17 @@ export class DateTimeAttribute extends Attribute {
   subtractSeconds(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.SECOND, false, 'Subtract Seconds ' + this.displayName()); }
 
   /** Number of whole days between this timestamp and `other`. */
-  diffDays(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.DAY, 'Diff Days ' + this.displayName()); }
+  diffDays(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.DAY, 'Diff Days ' + this.displayName()); }
   /** Number of whole months between this timestamp and `other`. */
-  diffMonths(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.MONTH, 'Diff Months ' + this.displayName()); }
+  diffMonths(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.MONTH, 'Diff Months ' + this.displayName()); }
   /** Number of whole years between this timestamp and `other`. */
-  diffYears(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.YEAR, 'Diff Years ' + this.displayName()); }
+  diffYears(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.YEAR, 'Diff Years ' + this.displayName()); }
   /** Number of whole hours between this timestamp and `other`. */
-  diffHours(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.HOUR, 'Diff Hours ' + this.displayName()); }
+  diffHours(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.HOUR, 'Diff Hours ' + this.displayName()); }
   /** Number of whole minutes between this timestamp and `other`. */
-  diffMinutes(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.MINUTE, 'Diff Minutes ' + this.displayName()); }
+  diffMinutes(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.MINUTE, 'Diff Minutes ' + this.displayName()); }
   /** Number of whole seconds between this timestamp and `other`. */
-  diffSeconds(other: Date): DateDiffOperation { return new DateDiffOperation(this.cwj(), other, DatePart.SECOND, 'Diff Seconds ' + this.displayName()); }
+  diffSeconds(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.SECOND, 'Diff Seconds ' + this.displayName()); }
 }
 
 export interface DateAttribute extends MinMax {}
