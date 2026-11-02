@@ -339,17 +339,17 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 
   findAll(
     businessDate: Date | string | null,
-    processingValidAt: Date | string | null,
+    processingTime: Date | string | null,
     displayColumns: (Attribute | RelationalOperationElement)[],
     filterOp: Operation = new NoOperation(),
   ): FinderResult {
 {% if rcm.milestone_mapping %}
 {% if has_processing_temporal(rcm.milestone_mapping) and not has_uni_business_temporal(rcm.milestone_mapping) and not has_business_date_and_processing(rcm.milestone_mapping) and not has_bitemporal(rcm.milestone_mapping) %}
-    return convertInputsAndSelect(null, processingValidAt, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+    return convertInputsAndSelect(null, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
 {% elif has_uni_business_temporal(rcm.milestone_mapping) and not has_business_date_and_processing(rcm.milestone_mapping) %}
     return convertInputsAndSelect(businessDate, null, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
 {% else %}
-    return convertInputsAndSelect(businessDate, processingValidAt, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+    return convertInputsAndSelect(businessDate, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
 {% endif %}
 {% else %}
     return convertInputsAndSelect(null, null, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
@@ -364,16 +364,16 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
    *   business_date_from_col <= businessDateTo AND business_date_to_col > businessDateFrom
    * For single-date tables:
    *   business_date >= businessDateFrom AND business_date <= businessDateTo
-   * Processing-time filtering is point-in-time at processingValidAt.
+   * Processing-time filtering is point-in-time at processingTime.
    */
   findForDateRange(
     businessDateFrom: Date | string,
     businessDateTo: Date | string,
-    processingValidAt: Date | string,
+    processingTime: Date | string,
     displayColumns: (Attribute | RelationalOperationElement)[],
     filterOp: Operation = new NoOperation(),
   ): FinderResult {
-    return convertInputsAndSelectForDateRange(businessDateFrom, businessDateTo, processingValidAt, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+    return convertInputsAndSelectForDateRange(businessDateFrom, businessDateTo, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
   }
 {% endif %}
 }

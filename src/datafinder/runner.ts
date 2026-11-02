@@ -235,7 +235,7 @@ export function convertInputsAndSelectForDateRange(
 ): FinderResult {
   if (businessDateFrom == null) throw new Error('businessDateFrom is required for findForDateRange');
   if (businessDateTo == null) throw new Error('businessDateTo is required for findForDateRange');
-  if (processingDatetime == null) throw new Error('processingValidAt is required for findForDateRange');
+  if (processingDatetime == null) throw new Error('processingTime is required for findForDateRange');
   return new FinderResult(
     convertDate(businessDateFrom),
     convertProcessingDate(processingDatetime),
