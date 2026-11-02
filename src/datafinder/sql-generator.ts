@@ -57,15 +57,19 @@ import {
   MilestonedTable,
   BiTemporalColumns,
   BusinessDateAndProcessingTemporalColumns,
+  BusinessDateRangeColumns,
   MilestoningColumns,
   ProcessingTemporalColumns,
   SingleBusinessDateColumn,
+  SingleProcessingDatetimeColumn,
+  hasProcessingRange,
 } from '../model/milestoning';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
 import { DialectName, SqlDialect, dialectOf } from './dialect';
 
+/** A name for a relation in a query: a table's name, or the query that stands for it, written `(SELECT ...)`. */
 class TableAlias {
-  constructor(readonly table: string, readonly alias: string) {}
+  constructor(readonly table: string | SelectOperation, readonly alias: string) {}
 }
 
 class TableAliasColumn extends RelationalOperationElement {
@@ -160,6 +164,15 @@ const SCALAR_SQL_NAMES: Record<ScalarFunction, string> = {
   [ScalarFunction.REPLACE]: 'REPLACE',
   [ScalarFunction.SUBSTRING]: 'SUBSTRING',
   [ScalarFunction.COALESCE]: 'COALESCE',
+  [ScalarFunction.SIN]: 'SIN',
+  [ScalarFunction.COS]: 'COS',
+  [ScalarFunction.TAN]: 'TAN',
+  [ScalarFunction.ASIN]: 'ASIN',
+  [ScalarFunction.ACOS]: 'ACOS',
+  [ScalarFunction.ATAN]: 'ATAN',
+  [ScalarFunction.ATAN2]: 'ATAN2',
+  [ScalarFunction.EXP]: 'EXP',
+  [ScalarFunction.LOG]: 'LN',
 };
 
 function constantValueString(op: ConstantOperation, d: SqlDialect): string {
@@ -292,7 +305,10 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
     return sqlOperationToString(operation.element, d) + ' ' + op + " INTERVAL '" + operation.n + "' " + operation.unit;
   }
   if (operation instanceof DateDiffOperation) {
-    return d.dateDiff(operation.unit, sqlOperationToString(operation.element, d), 'TIMESTAMP ' + sqlFormatDatetime(operation.other));
+    const other = operation.other instanceof RelationalOperationElement
+      ? sqlOperationToString(operation.other, d)
+      : 'TIMESTAMP ' + sqlFormatDatetime(operation.other);
+    return d.dateDiff(operation.unit, sqlOperationToString(operation.element, d), other);
   }
   if (operation instanceof CountAllOperation) return 'COUNT(*)';
   if (operation instanceof ConstantOperation) return selectedConstantString(operation, d);
@@ -341,17 +357,42 @@ function andAll(ops: (Operation | null)[]): Operation | null {
   return present.slice(1).reduce<Operation>((left, right) => new LogicalOperation(left, LogicalOperator.AND, right), present[0]);
 }
 
-/** The table's processing range contains the processing date. */
+/** The table's processing range contains the processing time, or its processing snapshot column equals it. */
 function processingPredicate(
   mc: MilestoningColumns,
   processingDatetime: Date | null,
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
-  if (!(mc instanceof ProcessingTemporalColumns || mc instanceof BusinessDateAndProcessingTemporalColumns || mc instanceof BiTemporalColumns)
-    || processingDatetime === null) return null;
+  if (processingDatetime === null) return null;
+  if (mc instanceof SingleProcessingDatetimeColumn) {
+    return snapshotAttribute(mc, joinNode).eq(processingDatetime);
+  }
+  if (!hasProcessingRange(mc)) return null;
   const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
   const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
   return new LogicalOperation(startAt.lte(processingDatetime), LogicalOperator.AND, openEndClause(endAt, processingDatetime, mc.infiniteDatetime));
+}
+
+function snapshotAttribute(mc: SingleProcessingDatetimeColumn, joinNode?: JoinTreeNodeOperation): DateTimeAttribute {
+  const column = mc.processingDatetimeColumn;
+  return new DateTimeAttribute('processing_datetime', column.name, column.type, column.table!.qualifiedName, joinNode);
+}
+
+/** The table's processing range overlaps the processing range, or its processing snapshot column is within it. */
+function processingRangePredicate(
+  mc: MilestoningColumns,
+  processingFrom: Date,
+  processingTo: Date,
+  joinNode?: JoinTreeNodeOperation,
+): Operation | null {
+  if (mc instanceof SingleProcessingDatetimeColumn) {
+    const snapshot = snapshotAttribute(mc, joinNode);
+    return new LogicalOperation(snapshot.gte(processingFrom), LogicalOperator.AND, snapshot.lte(processingTo));
+  }
+  if (!hasProcessingRange(mc)) return null;
+  const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
+  const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
+  return new LogicalOperation(startAt.lte(processingTo), LogicalOperator.AND, openEndClause(endAt, processingFrom, mc.infiniteDatetime));
 }
 
 /** The table's business range contains the business date, or its business date column equals it. */
@@ -361,7 +402,7 @@ function businessPredicate(
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
   if (businessDate === null) return null;
-  if (mc instanceof BiTemporalColumns) {
+  if (mc instanceof BusinessDateRangeColumns) {
     const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
     const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
     return new LogicalOperation(dateFrom.lte(businessDate), LogicalOperator.AND, openEndClause(dateTo, businessDate, mc.infiniteDatetime));
@@ -381,7 +422,7 @@ function businessRangePredicate(
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
   if (businessDateFrom === null || businessDateTo === null) return null;
-  if (mc instanceof BiTemporalColumns) {
+  if (mc instanceof BusinessDateRangeColumns) {
     const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
     const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
     return new LogicalOperation(dateFrom.lte(businessDateTo), LogicalOperator.AND, openEndClause(dateTo, businessDateFrom, mc.infiniteDatetime));
@@ -411,7 +452,9 @@ function buildMilestoningFilterOperation(
  *   business_date_from_col <= businessDateTo AND business_date_to_col > businessDateFrom
  * Single-date tables:
  *   business_date >= businessDateFrom AND business_date <= businessDateTo
- * Processing-date filtering is point-in-time, as in the normal path.
+ * Processing-date filtering is point-in-time, as in the normal path, unless `processingDatetimeTo` is given: then
+ * `processingDatetime` to `processingDatetimeTo` is a range, which a processing range overlaps and a processing
+ * snapshot column is within.
  */
 function buildMilestoningFilterOperationForDateRange(
   businessDateFrom: Date | null,
@@ -419,10 +462,14 @@ function buildMilestoningFilterOperationForDateRange(
   processingDatetime: Date | null,
   table: MilestonedTable,
   joinNode?: JoinTreeNodeOperation,
+  processingDatetimeTo: Date | null = null,
 ): Operation | null {
   const mc = table.milestoningColumns;
+  const processing = processingDatetime !== null && processingDatetimeTo !== null
+    ? processingRangePredicate(mc, processingDatetime, processingDatetimeTo, joinNode)
+    : processingPredicate(mc, processingDatetime, joinNode);
   return andAll([
-    processingPredicate(mc, processingDatetime, joinNode),
+    processing,
     businessRangePredicate(mc, businessDateFrom, businessDateTo, joinNode),
   ]);
 }
@@ -453,8 +500,11 @@ function walkRefs(
   } else if (op instanceof WindowFunctionOperation) {
     if (op.element) walkRefs(op.element, visit, visitExists);
     if (op.window) walkWindowSpec(op.window, visit, visitExists);
+  } else if (op instanceof DateDiffOperation) {
+    walkRefs(op.element, visit, visitExists);
+    if (op.other instanceof RelationalOperationElement) walkRefs(op.other, visit, visitExists);
   } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation || op instanceof DateTruncOperation ||
-             op instanceof DateArithmeticOperation || op instanceof DateDiffOperation ||
+             op instanceof DateArithmeticOperation ||
              op instanceof IsNullOperation || op instanceof IsNotNullOperation ||
              op instanceof InOperation || op instanceof NotInOperation) {
     walkRefs((op as UnaryOperation).element, visit, visitExists);
@@ -487,7 +537,7 @@ function walkWindowSpec(window: WindowSpecification, visit: RefVisitor, visitExi
  * into a relational filter on the join node. `columnMap` maps property ids to [column, type, table].
  */
 function buildJoinFilterFromProperties(
-  node: JoinTreeNodeOperation,
+  node: JoinTreeNodeOperation | undefined,
   filter: Record<string, unknown>,
   columnMap: Record<string, [string, string, string]>,
 ): Operation {
@@ -501,7 +551,11 @@ function buildJoinFilterFromProperties(
     const col = new ColumnWithJoin(new Column(name, type, table), node);
     let constant: ConstantOperation;
     if (typeof value === 'boolean') constant = new BooleanConstantOperation(value);
-    else if (typeof value === 'number') constant = Number.isInteger(value) ? new IntegerConstantOperation(value) : new FloatConstantOperation(value);
+    else if (typeof value === 'number') {
+      // 100 for a DOUBLE column is the float 100.0, which JavaScript cannot tell from the integer 100
+      const floating = /^(DOUBLE|FLOAT|REAL)/i.test(type);
+      constant = Number.isInteger(value) && !floating ? new IntegerConstantOperation(value) : new FloatConstantOperation(value);
+    }
     else if (value instanceof Date) constant = type.toUpperCase() === 'DATE' ? new DateConstantOperation(value) : new DateTimeConstantOperation(value);
     else constant = new StringConstantOperation(String(value));
     ops.push(new ComparisonOperation(col, ComparisonOperator.EQUAL, constant));
@@ -525,6 +579,57 @@ function withAncestors(nodes: Iterable<JoinTreeNodeOperation>): JoinTreeNodeOper
   return [...ordered];
 }
 
+/**
+ * The steps the query reaches only to ask whether a row exists (`exists` or `notExists`).
+ *
+ * Joining such a step repeats the parent once per matching row. A step the query also reads a value through is left
+ * as a join: those values are one row per child, and the existence then holds for a child with those values. Nor can
+ * a step stand for a query when a step below it is reached through it, or when its join has a filter object of its
+ * own, whose columns are not known to be the table's. A step given property values, as in `product({ id: 2 })`, can:
+ * they are conditions on the table. A to-one step cannot repeat a row, so it stays a join.
+ */
+function existsOnlyNodes(expressions: (RelationalOperationElement | undefined)[]): JoinTreeNodeOperation[] {
+  const required = new Set<JoinTreeNodeOperation>();
+  const referenced = new Set<JoinTreeNodeOperation>();
+  const collect: RefVisitor = ref => {
+    const parent = ref instanceof Attribute ? ref.parent() : ref.parent;
+    if (parent !== undefined) { required.add(parent); referenced.add(parent); }
+  };
+  const collectNode: NodeVisitor = node => required.add(node);
+  for (const expression of expressions) walkRefs(expression, collect, collectNode);
+  const ancestors = new Set<JoinTreeNodeOperation>();
+  for (const node of required) {
+    for (let parent = node.parent; parent !== undefined; parent = parent.parent) ancestors.add(parent);
+  }
+  return [...required].filter(node =>
+    node.many && !referenced.has(node) && !ancestors.has(node) && node.join.filter === undefined);
+}
+
+/**
+ * The business date, its range end, the processing time and its range end for the table a step reaches.
+ *
+ * A step uses the dates it was given, else those of the nearest step above it that was given any, else the query's.
+ * Each axis is taken separately, and a date given to a step is a point in time, so it ends any range the query asked
+ * for on that axis.
+ */
+function datesForNode(
+  node: JoinTreeNodeOperation,
+  businessDate: Date | null,
+  businessDateTo: Date | null,
+  processingDatetime: Date | null,
+  processingDatetimeTo: Date | null,
+): { businessDate: Date | null; businessDateTo: Date | null; processingDatetime: Date | null; processingDatetimeTo: Date | null } {
+  let explicitBusiness: Date | null = null;
+  let explicitProcessing: Date | null = null;
+  for (let step: JoinTreeNodeOperation | undefined = node; step !== undefined; step = step.parent) {
+    if (explicitBusiness === null) explicitBusiness = step.businessDate;
+    if (explicitProcessing === null) explicitProcessing = step.processingDatetime;
+  }
+  if (explicitBusiness !== null) { businessDate = explicitBusiness; businessDateTo = null; }
+  if (explicitProcessing !== null) { processingDatetime = explicitProcessing; processingDatetimeTo = null; }
+  return { businessDate, businessDateTo, processingDatetime, processingDatetimeTo };
+}
+
 function buildQueryOperation(
   businessDate: Date | null,
   processingDatetime: Date | null,
@@ -538,12 +643,17 @@ function buildQueryOperation(
   distinct: boolean = false,
   offset?: number,
   having?: Operation,
+  processingDatetimeTo: Date | null = null,
 ): SelectOperation {
   let filter = op;
-  const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) =>
-    businessDateTo !== null
-      ? buildMilestoningFilterOperationForDateRange(businessDate, businessDateTo, processingDatetime, t, node)
-      : buildMilestoningFilterOperation(businessDate, processingDatetime, t, node);
+  const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) => {
+    const dates = node === undefined
+      ? { businessDate, businessDateTo, processingDatetime, processingDatetimeTo }
+      : datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
+    return dates.businessDateTo !== null || dates.processingDatetimeTo !== null
+      ? buildMilestoningFilterOperationForDateRange(dates.businessDate, dates.businessDateTo, dates.processingDatetime, t, node, dates.processingDatetimeTo)
+      : buildMilestoningFilterOperation(dates.businessDate, dates.processingDatetime, t, node);
+  };
 
   if (table instanceof MilestonedTable) {
     const milestonedOp = milestoningFor(table);
@@ -580,7 +690,23 @@ function buildQueryOperation(
     if (combined !== undefined) joinFilters.set(node, combined);
   }
 
-  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having);
+  // for each step only asked the existence of: `SELECT DISTINCT <join column> FROM <its table>`, with the table's
+  // milestoning at the dates the step uses. Distinct on the join column makes it at most one row for a parent, however
+  // many rows of the table match. Property values the step was given are conditions of the query, on the table's own columns.
+  const subSelects = new Map<JoinTreeNodeOperation, SelectOperation>();
+  for (const node of existsOnlyNodes([...columns, ...groupBy, ...orderBy, op, having])) {
+    const right = node.join.right;
+    const dates = datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
+    const values = node.join.filterKwargs;
+    const condition = Object.keys(values).length > 0
+      ? buildJoinFilterFromProperties(undefined, values, node.join.filterColumnMap)
+      : new NoOperation();
+    subSelects.set(node, buildQueryOperation(
+      dates.businessDate, dates.processingDatetime, [new Alias(right, right.name)], node.join.target, condition,
+      [], [], undefined, dates.businessDateTo, true, undefined, undefined, dates.processingDatetimeTo));
+  }
+
+  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having, subSelects);
 }
 
 /**
@@ -611,7 +737,9 @@ function unaliased(op: unknown): unknown {
 }
 
 class SQLQueryGenerator {
-  constructor(private readonly _dialect: SqlDialect) {}
+  constructor(private readonly _dialect: SqlDialect, firstAlias: number = 0) {
+    this._tableAliasIncr = firstAlias;
+  }
 
   private _select: Alias[] = [];
   private _from: Set<TableAlias> = new Set();
@@ -623,23 +751,24 @@ class SQLQueryGenerator {
   private _limit?: number;
   private _distinct = false;
   private _offset?: number;
-  private _tableAliasIncr = 0;
+  private _tableAliasIncr: number;
   private _tableAliasesByTable = new Map<unknown, TableAlias>();
   private _addedJoinIds = new Set<JoinTreeNodeOperation>();
   private _rootTable?: Table;
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
-  private _guardOptional = true;
+  private _subSelects: ReadonlyMap<JoinTreeNodeOperation, SelectOperation> = new Map();
 
   generate(select: SelectOperation): void {
     this._rootTable = select.table;
     this._elidableNodes = this._computeElidableNodes(select);
     this._joinFilters = select.joinFilters;
+    this._subSelects = select.subSelects;
     if (this._rootTable !== undefined) {
       this._from.add(this._tableAliasForTable(this._rootTable.qualifiedName, this._rootTable.qualifiedName));
     }
     this.processSelect(select.display);
-    this._where = this.buildFilter(select.filter);
+    this._where = this.buildFilter(this._guarded(select.filter));
     const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
     for (const expr of select.groupBy) {
       this._collectRequiredJoins(expr, groupByJoins);
@@ -654,12 +783,7 @@ class SQLQueryGenerator {
       this._collectRequiredJoins(select.having, havingJoins);
       for (const node of havingJoins.values()) this._addJoin(node);
       // HAVING filters the grouped result, which Legend does not guard: it is a filter on projected columns
-      this._guardOptional = false;
-      try {
-        this._having = this.buildFilter(select.having);
-      } finally {
-        this._guardOptional = true;
-      }
+      this._having = this.buildFilter(select.having);
     }
     this._orderByParts = select.orderBy.map(s =>
       this._sortExpression(s.column) + this._dialect.orderDirection(s.direction),
@@ -751,6 +875,23 @@ class SQLQueryGenerator {
     return { column, parent };
   }
 
+  /**
+   * The condition with an explicit `IS NOT NULL` before each ordering or pattern comparison on a value that can be
+   * missing, as Legend writes it for what a query asks of a class. The guard changes no row. It is not added to a
+   * join's own filter (its milestoning dates and property values) or to HAVING, which are not that, so they are
+   * never passed through here.
+   */
+  private _guarded(op: RelationalOperationElement): RelationalOperationElement {
+    if (op instanceof LogicalOperation) {
+      return new LogicalOperation(this._guarded(op.left), op.operator, this._guarded(op.right));
+    }
+    if (op instanceof ComparisonOperation && GUARDED_COMPARISONS.has(op.operator) && op.left instanceof ColumnWithJoin
+      && this._resolveOptional(op.left)) {
+      return new LogicalOperation(new IsNotNullOperation(op.left), LogicalOperator.AND, op);
+    }
+    return op;
+  }
+
   /** Whether the value `op` reads can be missing, in the join or embedded form that is used for it. */
   private _resolveOptional(op: ColumnWithJoin): boolean {
     if (op.parent !== undefined && this._elidableNodes.has(op.parent) && op.embedded !== undefined) {
@@ -805,7 +946,8 @@ class SQLQueryGenerator {
       return new DateArithmeticOperation(this._rewriteOperation(op.element), op.n, op.unit, op.isAdd, op.displayName);
     }
     if (op instanceof DateDiffOperation) {
-      return new DateDiffOperation(this._rewriteOperation(op.element), (op as DateDiffOperation).other, (op as DateDiffOperation).unit, op.displayName);
+      const other = op.other instanceof RelationalOperationElement ? this._rewriteOperation(op.other) : op.other;
+      return new DateDiffOperation(this._rewriteOperation(op.element), other, op.unit, op.displayName);
     }
     return op;
   }
@@ -814,7 +956,7 @@ class SQLQueryGenerator {
   private _caseSql(op: CaseOperation): string {
     const branch = (value: RelationalOperationElement): string =>
       value instanceof ConstantOperation ? constantValueString(value, this._dialect) : sqlOperationToString(this._rewriteOperation(value), this._dialect);
-    let sql = 'CASE WHEN ' + this.buildFilter(op.condition) + ' THEN ' + branch(op.then);
+    let sql = 'CASE WHEN ' + this.buildFilter(this._guarded(op.condition)) + ' THEN ' + branch(op.then);
     if (op.fallback !== undefined) sql += ' ELSE ' + branch(op.fallback);
     return sql + ' END';
   }
@@ -822,14 +964,15 @@ class SQLQueryGenerator {
   private processSelect(cols: (Attribute | RelationalOperationElement)[]): void {
     const requiredJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
 
+    // each column is read before any join is added, so the table a column is read from is named before the tables
+    // the join to it passes through
     for (const col of cols) {
       this._collectRequiredJoins(col, requiredJoins);
+      this._selectColumn(col);
     }
     for (const node of requiredJoins.values()) {
       this._addJoin(node);
     }
-
-    for (const col of cols) this._selectColumn(col);
   }
 
   /** Add one column to the select list. An alias reads the column it wraps, then names the entry. */
@@ -884,7 +1027,14 @@ class SQLQueryGenerator {
     } else if (col instanceof ScalarFunctionOperation) {
       // rewritten as a whole, so a function of a function keeps every step
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? col.func + ' ' + findColumn(col).column.name));
-    } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation || col instanceof DateDiffOperation) {
+    } else if (col instanceof DateDiffOperation) {
+      // rewritten as a whole: either side may be a column or an expression
+      this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? findColumn(col).column.name));
+    } else if (col instanceof Column) {
+      const ta = this._tableAliasForTable(col.owner!, col.owner!);
+      this._from.add(ta);
+      this._select.push(new Alias(new TableAliasColumn(col, ta), col.name));
+    } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation) {
       const colNested = this._resolve(findColumn(col as RelationalOperationElement));
       const node = colNested.parent;
       let ta: TableAlias;
@@ -901,7 +1051,7 @@ class SQLQueryGenerator {
       } else if (col instanceof DateArithmeticOperation) {
         aliasedOp = new DateArithmeticOperation(new TableAliasColumn(colNested.column, ta), col.n, col.unit, col.isAdd);
       } else {
-        aliasedOp = new DateDiffOperation(new TableAliasColumn(colNested.column, ta), (col as DateDiffOperation).other, (col as DateDiffOperation).unit);
+        throw new Error('unreachable');
       }
       this._select.push(new Alias(aliasedOp, alias));
     } else if (col instanceof CaseOperation) {
@@ -913,7 +1063,7 @@ class SQLQueryGenerator {
     } else if (col instanceof DateTruncOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? findColumn(col).column.name));
     } else if (isCondition(col)) {
-      this._select.push(new Alias(new RenderedSql(this.buildFilter(col)), 'Expression'));
+      this._select.push(new Alias(new RenderedSql(this.buildFilter(this._guarded(col))), 'Expression'));
     } else if (col instanceof ConstantOperation) {
       this._select.push(new Alias(col, 'Constant'));
     } else if (col instanceof CountAllOperation) {
@@ -934,7 +1084,8 @@ class SQLQueryGenerator {
     const sc = new TableAliasColumn(left, srcTa);
     const right = join.right;
     const tc = new TableAliasColumn(right, this._tableAliasForTable(right.owner!, node));
-    const queryFilter = this._joinFilters.get(node);
+    // a sub-select carries the step's filter itself, so it is not repeated in the ON clause
+    const queryFilter = tc.tableAlias.table instanceof SelectOperation ? undefined : this._joinFilters.get(node);
     const filterOp = join.filter !== undefined && queryFilter !== undefined
       ? new LogicalOperation(join.filter as Operation, LogicalOperator.AND, queryFilter)
       : join.filter ?? queryFilter;
@@ -981,11 +1132,6 @@ class SQLQueryGenerator {
         // would otherwise take as LIKE's own escape
         sql += " ESCAPE '" + LIKE_ESCAPE + "'";
       }
-      if (this._guardOptional && GUARDED_COMPARISONS.has(op.operator) && op.left instanceof ColumnWithJoin
-        && this._resolveOptional(op.left)) {
-        // as in Legend, an ordering or pattern comparison on an optional property says it needs a value
-        sql = '(' + this.buildFilter(op.left) + ' IS NOT NULL AND ' + sql + ')';
-      }
       return sql;
     }
     if (op instanceof ConstantOperation) return constantValueString(op, this._dialect);
@@ -1019,20 +1165,31 @@ class SQLQueryGenerator {
     if (this._tableAliasesByTable.has(key)) {
       return this._tableAliasesByTable.get(key)!;
     }
-    const ta = new TableAlias(table, 't' + this._tableAliasIncr++);
+    const subSelect = key instanceof JoinTreeNodeOperation ? this._subSelects.get(key) : undefined;
+    const ta = new TableAlias(subSelect ?? table, 't' + this._tableAliasIncr++);
     this._tableAliasesByTable.set(key, ta);
     return ta;
   }
 
+  /** What follows FROM or JOIN: the table's name, or the query in parentheses, written by a generator of its own that numbers its aliases after this one's. */
+  private _relationSql(alias: TableAlias): string {
+    const relation = alias.table;
+    if (typeof relation === 'string') return relation;
+    const nested = new SQLQueryGenerator(this._dialect, this._tableAliasIncr);
+    nested.generate(relation);
+    this._tableAliasIncr = nested._tableAliasIncr;
+    return '(' + nested.buildQueryString() + ')';
+  }
+
   buildQueryString(): string {
     const joins = this._join.map(j =>
-      ' LEFT OUTER JOIN ' + j.target.tableAlias.table + ' AS ' + j.target.tableAlias.alias +
+      ' LEFT OUTER JOIN ' + this._relationSql(j.target.tableAlias) + ' AS ' + j.target.tableAlias.alias +
       ' ON (' + j.condition() +
       (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
     return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca, this._dialect)).join(',') +
-      ' FROM ' + Array.from(this._from).map(ta => ta.table + ' AS ' + ta.alias).join(',') +
+      ' FROM ' + Array.from(this._from).map(ta => this._relationSql(ta) + ' AS ' + ta.alias).join(',') +
       joins.join('') +
       this._buildWhere() +
       this._buildGroupBy() +
@@ -1083,8 +1240,9 @@ export function toSql(
   offset?: number,
   having?: Operation,
   dialect: DialectName | SqlDialect = 'postgres',
+  processingDatetimeTo: Date | null = null,
 ): string {
-  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having);
+  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having, processingDatetimeTo);
   return selectSqlToString(selectOp, dialect);
 }
 

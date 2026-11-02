@@ -46,12 +46,16 @@ SEEDS = {
     'diamond_specs': 'diamond',
     'positions_specs': 'positions',
     'people_denormalised_specs': 'people_denormalised',
+    'business_range_specs': 'business_range',
+    'processing_snapshot_specs': 'processing_snapshot',
+    'joins_through_tables_specs': 'joins_through_tables',
 }
 
 # Python finder/attribute methods whose TypeScript names aren't a plain snake -> camel conversion.
 METHOD_NAMES = {
     'find_all': 'findAll',
     'find_for_date_range': 'findForDateRange',
+    'find_for_processing_range': 'findForProcessingRange',
     'and_op': 'and',
     'and_': 'and',
     'or_': 'or',
@@ -82,12 +86,20 @@ SKIPPED_SPECS = {
     'TRADE_VIEW_FINDER_SPECS': 'SQL views are not ported',
 }
 
+# Whole spec modules that are not ported.
+SKIPPED_MODULES = {
+    'tpch_bih_specs': 'the TPC-BiH benchmark is not ported',
+}
+
 # Spec groups whose expectations must also pass when run in a different order, and when every query is built
 # before any is run (the Python project's test_trade_specs_do_not_depend_on_order). They share one finder.
 ORDER_INDEPENDENT = {
     'finance_specs': ['TRADE_FINDER_SPECS', 'TRADE_MULTI_HOP_FINDER_SPECS', 'TRADE_EXISTS_FINDER_SPECS',
                       'TRADE_IS_NONE_FINDER_SPECS'],
 }
+
+# Keyword arguments that give a navigation the dates it is read at, not property values to filter on.
+NAVIGATION_DATES = {'business_date': 'businessDate', 'processing_time': 'processingTime'}
 
 COMPARE_METHODS = {ast.Eq: 'eq', ast.NotEq: 'ne', ast.Gt: 'gt', ast.Lt: 'lt', ast.GtE: 'gte', ast.LtE: 'lte'}
 TIMEDELTA_UNITS = {'days': 'Days', 'hours': 'Hours', 'minutes': 'Minutes', 'seconds': 'Seconds'}
@@ -129,6 +141,7 @@ class Translator:
 
     def __init__(self) -> None:
         self.properties: dict[str, str] = {}   # finder method -> type name, of the spec's mapping
+        self.helpers: set[str] = set()         # module-level helper functions the queries call
         self.used: set[str] = set()            # free functions the translated queries call
         self.model_used: set[str] = set()      # model classes the translated queries use
 
@@ -242,6 +255,8 @@ class Translator:
 
     def visit_Call(self, node: ast.Call) -> str:
         func = node.func
+        if isinstance(func, ast.Name) and func.id in self.helpers:
+            return f'{func.id}({", ".join(self.expr(a) for a in node.args)})'
         if isinstance(func, ast.Name):
             self.used.add(FREE_FUNCTIONS[func.id])
             return f'{FREE_FUNCTIONS[func.id]}({", ".join(self.expr(a) for a in node.args)})'
@@ -276,9 +291,13 @@ class Translator:
             opts = ', '.join(f'{OPTION_KEYS[k.arg]}: {self.expr(k.value)}' for k in node.keywords)
             args.append('{ ' + opts + ' }')
         elif node.keywords:
-            # A related-finder accessor given property filters: f.projects(code='ALPHA')
-            opts = ', '.join(f'{k.arg}: {self.expr(k.value)}' for k in node.keywords)
-            args.append('{ ' + opts + ' }')
+            # A related-finder accessor given property filters, f.projects(code='ALPHA'), and/or the dates it is read
+            # at, f.account(processing_time=...): the filters are the first argument, the dates the second.
+            dates = [k for k in node.keywords if k.arg in NAVIGATION_DATES]
+            filters = [k for k in node.keywords if k.arg not in NAVIGATION_DATES]
+            args.append('{ ' + ', '.join(f'{k.arg}: {self.expr(k.value)}' for k in filters) + ' }' if filters else 'undefined')
+            if dates:
+                args.append('{ ' + ', '.join(f'{NAVIGATION_DATES[k.arg]}: {self.expr(k.value)}' for k in dates) + ' }')
         return f'{self.expr(owner)}.{name}({", ".join(args)})'
 
 
@@ -345,6 +364,25 @@ def generate_module(module_name: str) -> tuple[str, str]:
         if isinstance(stmt, ast.Assign) and isinstance(stmt.targets[0], ast.Name) \
                 and stmt.targets[0].id.startswith('_'):
             consts.append(f'export const {stmt.targets[0].id} = {translator.expr(stmt.value)};')
+
+    # Module-level helper functions (def _name(f): ...) that a query calls; their statements are translated too.
+    for stmt in tree.body:
+        if isinstance(stmt, ast.FunctionDef) and stmt.name.startswith('_'):
+            translator.helpers.add(stmt.name)
+    for stmt in tree.body:
+        if isinstance(stmt, ast.FunctionDef) and stmt.name in translator.helpers:
+            args = ', '.join(f'{a.arg}: any' for a in stmt.args.args)
+            lines = []
+            for inner in stmt.body:
+                if isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Constant):
+                    continue   # a docstring
+                if isinstance(inner, ast.Expr):
+                    lines.append(f'  {translator.expr(inner.value)};')
+                elif isinstance(inner, ast.Return):
+                    lines.append(f'  return {translator.expr(inner.value)};')
+                else:
+                    raise NotImplementedError(ast.dump(inner))
+            consts.append(f'export function {stmt.name}({args}) {{\n' + '\n'.join(lines) + '\n}')
 
     specs = finder_spec_nodes(tree)
     imports: dict[str, str] = {}   # finder class -> import path, relative to tests/specs/
@@ -497,6 +535,9 @@ def main() -> None:
     os.makedirs(os.path.join(OUT_DIR, 'cases'), exist_ok=True)
     for path in sorted(glob.glob(os.path.join(SPEC_DIR, '*_specs.py'))):
         module_name = os.path.basename(path)[:-3]
+        if module_name in SKIPPED_MODULES:
+            print(f'... skipped {module_name}: {SKIPPED_MODULES[module_name]}')
+            continue
         cases_src, test_src = generate_module(module_name)
         name = case_module_name(module_name)
         for out, src in ((os.path.join(OUT_DIR, 'cases', name + '.ts'), cases_src),

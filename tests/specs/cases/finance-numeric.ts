@@ -35,6 +35,13 @@ export const TRADE_NUMERIC_FINDER_SPECS: SpecCase<TradeFinder>[] = [
       ] },
   },
   {
+    name: 'trigonometric_and_exponential_functions',
+    query: f => f.findAll(null, _AT, [f.price().sin(), f.price().cos(), f.price().tan(), f.price().mod(1).asin(), f.price().mod(1).acos(), f.price().atan(), f.price().atan2(2), f.price().exp(), f.price().log()], f.symbol().eq('TSLA')),
+    expected: { columns: ['Sin Price', 'Cos Price', 'Tan Price', 'Asin Mod Price', 'Acos Mod Price', 'Atan Price', 'Atan2 Price', 'Exp Price', 'Log Price'], rows: [
+        [0.4121184852417566, -0.9111302618846769, -0.4523156594418099, 0.0, 1.5707963267948966, 1.460139105621001, 1.3521273809209546, 8103.083927575384, 2.1972245773362196],
+      ] },
+  },
+  {
     name: 'mod_price_by_10',
     query: f => f.findAll(null, _AT, [f.symbol(), f.price().mod(10)], f.symbol().eq('GOOG')),
     expected: { columns: ['Symbol', 'Mod Price'], rows: [
