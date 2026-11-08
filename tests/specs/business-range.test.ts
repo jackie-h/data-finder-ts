@@ -27,6 +27,6 @@ describe('BUSINESS_RANGE_RATE_FINDER_SPECS', () => {
   const f = new RateFinder();
 
   for (const c of BUSINESS_RANGE_RATE_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

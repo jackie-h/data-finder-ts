@@ -32,7 +32,7 @@ describe('TRADE_NUMERIC_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_NUMERIC_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -40,6 +40,6 @@ describe('TRADE_ARITHMETIC_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_ARITHMETIC_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

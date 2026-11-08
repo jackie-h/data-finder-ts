@@ -32,7 +32,7 @@ describe('ACCOUNT_FINDER_SPECS', () => {
   const f = new AccountFinder();
 
   for (const c of ACCOUNT_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -40,7 +40,7 @@ describe('TRADE_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -48,7 +48,7 @@ describe('TRADE_MULTI_HOP_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_MULTI_HOP_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -56,7 +56,7 @@ describe('TRADE_EXISTS_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_EXISTS_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -64,7 +64,7 @@ describe('TRADE_OR_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_OR_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -72,7 +72,7 @@ describe('TRADE_IS_NONE_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_IS_NONE_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -80,7 +80,7 @@ describe('TRADE_ONE_WAY_ASSOCIATION_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_ONE_WAY_ASSOCIATION_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -88,7 +88,7 @@ describe('TRADE_NAVIGATION_DATE_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_NAVIGATION_DATE_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -96,7 +96,7 @@ describe('BRANCH_FINDER_SPECS', () => {
   const f = new BranchFinder();
 
   for (const c of BRANCH_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -104,7 +104,7 @@ describe('BRANCH_EXISTS_FINDER_SPECS', () => {
   const f = new BranchFinder();
 
   for (const c of BRANCH_EXISTS_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -112,7 +112,7 @@ describe('DESK_EXISTS_FINDER_SPECS', () => {
   const f = new DeskFinder();
 
   for (const c of DESK_EXISTS_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -120,7 +120,7 @@ describe('ACCOUNT_POSITION_EXISTS_FINDER_SPECS', () => {
   const f = new AccountFinder();
 
   for (const c of ACCOUNT_POSITION_EXISTS_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -128,7 +128,7 @@ describe('POSITION_DESK_EXISTS_FINDER_SPECS', () => {
   const f = new ContractualPositionFinder();
 
   for (const c of POSITION_DESK_EXISTS_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -136,7 +136,7 @@ describe('TRADE_TO_MANY_EXISTS_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_TO_MANY_EXISTS_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -144,14 +144,14 @@ describe('CONTRACTUAL_POSITION_FINDER_SPECS', () => {
   const f = new ContractualPositionFinder();
 
   for (const c of CONTRACTUAL_POSITION_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
 // Related finders, and the join nodes under them, are shared between queries. A query that is missing a join
 // condition can pass only because an earlier query left its condition on a shared node, so each spec must also
 // pass when it runs in a different order.
-const ORDER_INDEPENDENT_SPECS: SpecCase<TradeFinder>[] = [...TRADE_FINDER_SPECS, ...TRADE_MULTI_HOP_FINDER_SPECS, ...TRADE_EXISTS_FINDER_SPECS, ...TRADE_IS_NONE_FINDER_SPECS].filter(c => c.expected.pending === undefined);
+const ORDER_INDEPENDENT_SPECS: SpecCase<TradeFinder>[] = [...TRADE_FINDER_SPECS, ...TRADE_MULTI_HOP_FINDER_SPECS, ...TRADE_EXISTS_FINDER_SPECS, ...TRADE_IS_NONE_FINDER_SPECS];
 
 describe('trade specs do not depend on order', () => {
   const orders: [string, SpecCase<TradeFinder>[]][] = [
