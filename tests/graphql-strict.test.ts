@@ -156,4 +156,20 @@ describe('filtering a relation', () => {
     const columns = [filteredProjectsName({ code: 'ALPHA' }), filteredProjectsName({ code: 'BETA' })];
     expect(() => buildFieldsStr(columns, CONVENTION)).toThrow(/different filters/);
   });
+
+  it('sends the dates a relation is read at as its arguments', () => {
+    const dated = (date: string) => new StringAttribute('Account Name',
+      formatPathSegment('account', false, {}, { asOf: date }) + '.name', 'STRING', 'trades');
+    expect(buildFieldsStr([dated('2021-06-01T00:00:00')], CONVENTION)).toBe('account(asOf: "2021-06-01T00:00:00") { name }');
+    const filtered = new StringAttribute('Project Name',
+      formatPathSegment('projects', true, { code: 'ALPHA' }, { asOf: '2021-06-01' }) + '.name', 'STRING', 'employees');
+    expect(buildFieldsStr([filtered], CONVENTION))
+      .toBe('projects(asOf: "2021-06-01", where: { code: { _eq: "ALPHA" } }) { name }');
+  });
+
+  it('fails when one relation is selected at different dates', () => {
+    const dated = (date: string) => new StringAttribute('Account Name',
+      formatPathSegment('account', false, {}, { asOf: date }) + '.name', 'STRING', 'trades');
+    expect(() => buildFieldsStr([dated('2021-06-01'), dated('2022-06-01')], CONVENTION)).toThrow(/different dates/);
+  });
 });

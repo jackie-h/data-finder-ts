@@ -286,8 +286,20 @@ function applyLimit(rows: Row[], query: string): Row[] {
 
 /** A nested object resolved from a milestoned set of rows, as of the query's asOf (null if none is live). */
 export interface NestedVersions {
-  foreignKey: string; // row key holding the id of the nested object
-  versions: Row[];    // each has an "id", plus _in_z / _out_z when the nested object is milestoned
+  foreignKey: string; // row key holding the key of the nested object
+  versions: Row[];    // each has the key, plus _in_z / _out_z when the nested object is milestoned
+  key?: string;       // the versions' key, "id" if not given
+}
+
+/**
+ * A list of nested objects: the rows whose `foreignKey` holds the `key` of the row they are nested in.
+ * They are milestoned if they have _in_z / _out_z, and have a businessDate if `businessDateKey` names it.
+ */
+export interface NestedRows {
+  key: string;        // key of the row they are nested in
+  foreignKey: string; // key of each nested row that holds it
+  rows: Row[];
+  businessDateKey?: string;
 }
 
 /**
@@ -298,7 +310,7 @@ export interface GraphQLTable {
   rows: Row[];
   processingMilestoned?: boolean;   // the root query accepts asOf, filtering on the rows' _in_z / _out_z
   businessDateKey?: string;         // the root query accepts businessDate, matching this row key
-  nested?: Record<string, NestedVersions>;
+  nested?: Record<string, NestedVersions | NestedRows>;
 }
 
 /** Each field maps to its sub-selection (null for a scalar) and the text of its arguments. */
@@ -337,28 +349,44 @@ function parseSelection(s: string, pos = 0): [Selection, number] {
   return [fields, pos + 1];
 }
 
-/** Return only the requested fields, as a server does. */
-function select(value: any, selection: Selection | null): any {
+/**
+ * Return only the requested fields, as a server does. A nested relation is read at the asOf and businessDate of its
+ * own arguments, else of the field it is in.
+ */
+function select(value: any, selection: Selection | null, nested?: Record<string, NestedVersions | NestedRows>,
+  asOf: number | null = null, businessDate: string | null = null): any {
   if (selection === null) return value;
-  if (Array.isArray(value)) return value.map(item => select(item, selection));
+  if (Array.isArray(value)) return value.map(item => select(item, selection, nested, asOf, businessDate));
   if (value === null || value === undefined) return null;
-  return Object.fromEntries(Object.entries(selection).map(([name, { sub, args }]) => [name, selectField(value[name], sub, args)]));
+  return Object.fromEntries(Object.entries(selection).map(([name, { sub, args }]) =>
+    [name, selectField(value, name, sub, args, nested, asOf, businessDate)]));
 }
 
-function selectField(value: any, selection: Selection | null, args: string): any {
-  if (args) {
+function selectField(row: Row, name: string, selection: Selection | null, args: string,
+  nested: Record<string, NestedVersions | NestedRows> | undefined, asOf: number | null, businessDate: string | null): any {
+  const ownAsOf = extractArg(args, 'asOf');
+  const ownBusinessDate = extractArg(args, 'businessDate');
+  if (ownAsOf) asOf = parseDt(ownAsOf);
+  businessDate = ownBusinessDate ?? businessDate;
+  let value: any;
+  if (nested && name in nested) {
+    value = resolveRelation(nested[name], row, asOf, businessDate);
+  } else {
+    value = row[name];
+    if (ownAsOf || ownBusinessDate) throw new GraphQLServerError('field does not accept a date');
+  }
+  if (args && (extractBalanced(args, 'where', '{') || args.includes('order_by') || /\blimit:/.test(args))) {
     // a list relationship takes where, order_by and limit; an object relationship takes no arguments
     if (!Array.isArray(value)) throw new GraphQLServerError('field does not accept arguments');
     value = applyLimit(applyOrderBy(applyWhere(value, args), args), args);
   }
-  return select(value, selection);
+  return select(value, selection, undefined, asOf, businessDate);
 }
 
-function resolveNested(rows: Row[], nested: Record<string, NestedVersions>, asOfStr: string | null): Row[] {
-  const asOf = asOfStr ? parseDt(asOfStr) : null;
-
-  const resolve = (spec: NestedVersions, row: Row): Row | null => {
-    let candidates = spec.versions.filter(v => v.id === row[spec.foreignKey]);
+/** A nested object (the latest version live at asOf, null if none) or a list of them. */
+function resolveRelation(spec: NestedVersions | NestedRows, row: Row, asOf: number | null, businessDate: string | null): any {
+  if ('versions' in spec) {
+    let candidates = spec.versions.filter(v => v[spec.key ?? 'id'] === row[spec.foreignKey]);
     if (asOf !== null) {
       candidates = [
         ...candidates.filter(v => !('_in_z' in v)),
@@ -367,12 +395,16 @@ function resolveNested(rows: Row[], nested: Record<string, NestedVersions>, asOf
     }
     if (candidates.length === 0) return null;
     return candidates.reduce((best, v) => ((v._in_z ?? '') > (best._in_z ?? '') ? v : best));
-  };
-
-  return rows.map(row => ({
-    ...row,
-    ...Object.fromEntries(Object.entries(nested).map(([name, spec]) => [name, resolve(spec, row)])),
-  }));
+  }
+  let rows = spec.rows.filter(r => r[spec.foreignKey] === row[spec.key]);
+  if (asOf !== null) {
+    rows = [
+      ...rows.filter(r => !('_in_z' in r)),
+      ...filterProcessing(rows.filter(r => '_in_z' in r), asOf, '_in_z', '_out_z'),
+    ];
+  }
+  if (businessDate && spec.businessDateKey) rows = rows.filter(r => r[spec.businessDateKey!] === businessDate);
+  return rows;
 }
 
 function serveQuery(tables: Record<string, GraphQLTable>, query: string): Row {
@@ -392,11 +424,24 @@ function serveQuery(tables: Record<string, GraphQLTable>, query: string): Row {
     const asOf = extractArg(args, 'asOf');
     if (asOf) rows = filterProcessing(rows, parseDt(asOf), '_in_z', '_out_z');
   }
-  if (table.nested) rows = resolveNested(rows, table.nested, extractArg(args, 'asOf'));
-  rows = applyWhere(rows, args);
-  rows = applyOrderBy(rows, args);
-  rows = applyLimit(rows, args);
-  return { [name]: select(rows, sub) };
+  // a nested relation is read at the root's asOf and businessDate unless it is given its own
+  const asOfText = table.processingMilestoned ? extractArg(args, 'asOf') : null;
+  const asOf = asOfText ? parseDt(asOfText) : null;
+  const businessDate = table.businessDateKey ? extractArg(args, 'businessDate') : null;
+  if (table.nested) {
+    // the root's where and order_by can name a nested field, which they see as of the root's dates
+    const nested = table.nested;
+    let seen: Row[] = rows.map(row => ({
+      ...row,
+      ...Object.fromEntries(Object.entries(nested).map(([key, spec]) => [key, resolveRelation(spec, row, asOf, businessDate)])),
+      __row: row,
+    }));
+    seen = applyLimit(applyOrderBy(applyWhere(seen, args), args), args);
+    rows = seen.map(row => row.__row);
+  } else {
+    rows = applyLimit(applyOrderBy(applyWhere(rows, args), args), args);
+  }
+  return { [name]: select(rows, sub, table.nested, asOf, businessDate) };
 }
 
 export async function startGraphQLServer(tables: Record<string, GraphQLTable>): Promise<{ server: http.Server; url: string }> {
@@ -459,20 +504,24 @@ export function financeTables(
   accountsCsv = 'finance_accounts.csv',
   tradesCsv = 'finance_trades.csv',
   branchesCsv = 'finance_branches.csv',
+  desksCsv = 'finance_desks.csv',
+  pricesCsv = 'finance_prices.csv',
 ): Record<string, GraphQLTable> {
   const branches = readCsv(branchesCsv).map(r => ({ id: Number(r.ID), city: r.CITY }));
   const branchIndex = new Map(branches.map(b => [b.id, b]));
+  const desks = readCsv(desksCsv).map(r => ({ id: Number(r.ID), name: r.NAME }));
+  const deskIndex = new Map(desks.map(d => [d.id, d]));
+  // an account is milestoned in processing time: every version is served, as of the query's asOf
   const versions = readCsv(accountsCsv).map(r => ({
     id: Number(r.ID),
     name: r.ACCT_NAME,
     branch: branchIndex.get(Number(r.BRANCH_ID)),
+    desk: r.DESK_ID ? deskIndex.get(Number(r.DESK_ID)) ?? null : null,
+    _branch_id: Number(r.BRANCH_ID),
+    _desk_id: r.DESK_ID ? Number(r.DESK_ID) : null,
     _in_z: r.in_z ?? '1900-01-01 00:00:00',
     _out_z: r.out_z ?? '9999-12-31 23:59:59',
   }));
-  // the account query is not milestoned: GraphQL serves only the current (latest) version of each
-  const current = new Map<number, Row>();
-  for (const v of [...versions].sort((a, b) => (a._in_z < b._in_z ? -1 : a._in_z > b._in_z ? 1 : 0))) current.set(v.id, v);
-  const accounts = [...current.values()].map(v => ({ id: v.id, name: v.name, branch: v.branch }));
 
   const trades = readCsv(tradesCsv).map(r => ({
     symbol: r.sym,
@@ -481,6 +530,15 @@ export function financeTables(
     validFrom: r.in_z,
     validTo: r.out_z,
     _account_id: Number(r.account_id),
+    _symbol: r.sym,
+    _in_z: r.in_z,
+    _out_z: r.out_z,
+  }));
+
+  // an instrument is milestoned in processing time, and its key is its symbol
+  const instruments = readCsv(pricesCsv).map(r => ({
+    symbol: r.SYM,
+    price: Number(r.PRICE),
     _in_z: r.in_z,
     _out_z: r.out_z,
   }));
@@ -489,14 +547,33 @@ export function financeTables(
     businessDate: r.DATE,
     quantity: Number(r.QUANTITY),
     npv: Number(r.NPV),
+    _account_id: Number(r.ACCOUNT_ID),
     _in_z: r.in_z,
     _out_z: r.out_z,
   }));
 
   return {
-    accounts: { rows: accounts },
-    branches: { rows: branches },
-    trades: { rows: trades, processingMilestoned: true, nested: { account: { foreignKey: '_account_id', versions } } },
-    contractualPositions: { rows: positions, processingMilestoned: true, businessDateKey: 'businessDate' },
+    accounts: {
+      rows: versions,
+      processingMilestoned: true,
+      nested: { positions: { key: 'id', foreignKey: '_account_id', rows: positions, businessDateKey: 'businessDate' } },
+    },
+    branches: { rows: branches, nested: { accounts: { key: 'id', foreignKey: '_branch_id', rows: versions } } },
+    desks: { rows: desks, nested: { accounts: { key: 'id', foreignKey: '_desk_id', rows: versions } } },
+    instruments: { rows: instruments, processingMilestoned: true },
+    trades: {
+      rows: trades,
+      processingMilestoned: true,
+      nested: {
+        account: { foreignKey: '_account_id', versions },
+        instrument: { foreignKey: '_symbol', versions: instruments, key: 'symbol' },
+      },
+    },
+    contractualPositions: {
+      rows: positions,
+      processingMilestoned: true,
+      businessDateKey: 'businessDate',
+      nested: { account: { foreignKey: '_account_id', versions } },
+    },
   };
 }
