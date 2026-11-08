@@ -8,28 +8,28 @@ export const _THEN = '2005-01-01';
 export const JOINS_THROUGH_TABLES_EMPLOYEE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'a_property_of_an_embedded_address_that_reaches_another_table',
-    query: (f: any) => f.findAll([f.name(), f.home().street(), f.home().country(undefined, { businessDate: _NOW }).name()]).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name(), f.home().street(), f.home().country(undefined, { businessDate: _NOW }).name()]).orderBy(f.name().ascending()),
     expected: { columns: ['Name', 'Home Street', 'Home Country Name'], rows: [
         ['Ada', '1 Analytical Way', 'United Kingdom'],
         ['Grace', '2 Compiler Court', 'United States'],
         ['Linus', '3 Kernel Road', 'Sweden'],
-      ], sql: 'LEFT OUTER JOIN hr.country_refs AS t2 ON (t0.home_country = t2.ref AND t2.valid_from <= \'2024-01-01\' AND t2.valid_to > \'2024-01-01\') LEFT OUTER JOIN hr.countries AS t1 ON (t1.code = t2.code)', pending: 'dates through the tables a property passes are not ported yet' },
+      ], sql: 'LEFT OUTER JOIN hr.country_refs AS t2 ON (t0.home_country = t2.ref AND t2.valid_from <= \'2024-01-01\' AND t2.valid_to > \'2024-01-01\') LEFT OUTER JOIN hr.countries AS t1 ON (t1.code = t2.code)' },
   },
   {
     name: 'a_filter_on_a_property_of_the_embedded_address_that_reaches_another_table',
-    query: (f: any) => f.findAll([f.name()], f.home().country(undefined, { businessDate: _NOW }).name().eq('United States')),
+    query: f => f.findAll([f.name()], f.home().country(undefined, { businessDate: _NOW }).name().eq('United States')),
     expected: { columns: ['Name'], rows: [
         ['Grace'],
-      ], pending: 'dates through the tables a property passes are not ported yet' },
+      ] },
   },
   {
     name: 'a_property_mapped_through_another_table',
-    query: (f: any) => f.findAll([f.name(), f.citizenship(undefined, { businessDate: _NOW }).name()]).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name(), f.citizenship(undefined, { businessDate: _NOW }).name()]).orderBy(f.name().ascending()),
     expected: { columns: ['Name', 'Citizenship Name'], rows: [
         ['Ada', 'United Kingdom'],
         ['Grace', 'United Kingdom'],
         ['Linus', 'Sweden'],
-      ], sql: 'LEFT OUTER JOIN hr.country_refs AS t2 ON (t0.citizen_ref = t2.ref AND t2.valid_from <= \'2024-01-01\' AND t2.valid_to > \'2024-01-01\') LEFT OUTER JOIN hr.countries AS t1 ON (t1.code = t2.code)', pending: 'dates through the tables a property passes are not ported yet' },
+      ], sql: 'LEFT OUTER JOIN hr.country_refs AS t2 ON (t0.citizen_ref = t2.ref AND t2.valid_from <= \'2024-01-01\' AND t2.valid_to > \'2024-01-01\') LEFT OUTER JOIN hr.countries AS t1 ON (t1.code = t2.code)' },
   },
   {
     name: 'a_filter_on_a_property_mapped_through_another_table',
@@ -41,30 +41,30 @@ export const JOINS_THROUGH_TABLES_EMPLOYEE_FINDER_SPECS: SpecCase<EmployeeFinder
   },
   {
     name: 'the_country_of_the_home_and_of_citizenship_are_read_through_the_same_tables_separately',
-    query: (f: any) => f.findAll([f.name(), f.home().country(undefined, { businessDate: _NOW }).name(), f.citizenship(undefined, { businessDate: _NOW }).name()]).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name(), f.home().country(undefined, { businessDate: _NOW }).name(), f.citizenship(undefined, { businessDate: _NOW }).name()]).orderBy(f.name().ascending()),
     expected: { columns: ['Name', 'Home Country Name', 'Citizenship Name'], rows: [
         ['Ada', 'United Kingdom', 'United Kingdom'],
         ['Grace', 'United States', 'United Kingdom'],
         ['Linus', 'Sweden', 'Sweden'],
-      ], pending: 'dates through the tables a property passes are not ported yet' },
+      ] },
   },
   {
     name: 'a_date_given_to_the_property_reaches_the_table_on_the_way',
-    query: (f: any) => f.findAll([f.name(), f.citizenship(undefined, { businessDate: _THEN }).name()]).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name(), f.citizenship(undefined, { businessDate: _THEN }).name()]).orderBy(f.name().ascending()),
     expected: { columns: ['Name', 'Citizenship Name'], rows: [
         ['Ada', 'United Kingdom'],
         ['Grace', 'United Kingdom'],
         ['Linus', 'Finland'],
-      ], sql: 't2.valid_from <= \'2005-01-01\' AND t2.valid_to > \'2005-01-01\'', pending: 'dates through the tables a property passes are not ported yet' },
+      ], sql: 't2.valid_from <= \'2005-01-01\' AND t2.valid_to > \'2005-01-01\'' },
   },
   {
     name: 'a_date_given_to_a_property_of_the_embedded_address_reaches_the_table_on_the_way',
-    query: (f: any) => f.findAll([f.name(), f.home().country(undefined, { businessDate: _THEN }).name()]).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name(), f.home().country(undefined, { businessDate: _THEN }).name()]).orderBy(f.name().ascending()),
     expected: { columns: ['Name', 'Home Country Name'], rows: [
         ['Ada', 'United Kingdom'],
         ['Grace', 'United States'],
         ['Linus', 'Finland'],
-      ], sql: 't2.valid_from <= \'2005-01-01\' AND t2.valid_to > \'2005-01-01\'', pending: 'dates through the tables a property passes are not ported yet' },
+      ], sql: 't2.valid_from <= \'2005-01-01\' AND t2.valid_to > \'2005-01-01\'' },
   },
   {
     name: 'without_a_date_every_version_of_the_table_on_the_way_is_read',
@@ -76,12 +76,12 @@ export const JOINS_THROUGH_TABLES_EMPLOYEE_FINDER_SPECS: SpecCase<EmployeeFinder
   },
   {
     name: 'a_date_before_any_row_of_the_table_on_the_way_finds_no_country',
-    query: (f: any) => f.findAll([f.name(), f.citizenship(undefined, { businessDate: '1990-01-01' }).name()]).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name(), f.citizenship(undefined, { businessDate: '1990-01-01' }).name()]).orderBy(f.name().ascending()),
     expected: { columns: ['Name', 'Citizenship Name'], rows: [
         ['Ada', null],
         ['Grace', null],
         ['Linus', null],
-      ], pending: 'dates through the tables a property passes are not ported yet' },
+      ] },
   },
 ];
 

@@ -34,12 +34,18 @@ export interface NavigationDates {
 
 /**
  * The step a property mapped through other tables hangs from: `parent` followed by a step through each hop, a
- * [from column, table, to column] triple, in order. The tables carry no class, so the steps have no name.
+ * [from column, table, to column] triple, in order. The tables carry no class, so the steps have no name. The dates the
+ * property was given are those of each step through a table on the way, as they are of the step that follows.
  */
-export function viaJoins(parent: JoinTreeNodeOperation | undefined, hops: [Column, Table, Column][]): JoinTreeNodeOperation | undefined {
+export function viaJoins(
+  parent: JoinTreeNodeOperation | undefined,
+  hops: [Column, Table, Column][],
+  businessDate: Date | null = null,
+  processingDatetime: Date | null = null,
+): JoinTreeNodeOperation | undefined {
   let node = parent;
   for (const [source, table, target] of hops) {
-    node = new JoinTreeNodeOperation(new JoinOperation('', table, source, target), node, false, true);
+    node = new JoinTreeNodeOperation(new JoinOperation('', table, source, target), node, false, true, businessDate, processingDatetime);
   }
   return node;
 }

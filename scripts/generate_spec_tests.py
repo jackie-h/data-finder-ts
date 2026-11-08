@@ -84,13 +84,6 @@ COLUMN_LABELS = {
 # Expectations of features the port does not have yet: generated, but skipped, with the reason.
 # Each is removed with the change that ports its feature.
 PENDING: dict[str, str] = {
-    'a_date_given_to_the_property_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
-    'a_date_given_to_a_property_of_the_embedded_address_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
-    'a_date_before_any_row_of_the_table_on_the_way_finds_no_country': 'dates through the tables a property passes are not ported yet',
-    'a_filter_on_a_property_of_the_embedded_address_that_reaches_another_table': 'dates through the tables a property passes are not ported yet',
-    'a_property_of_an_embedded_address_that_reaches_another_table': 'dates through the tables a property passes are not ported yet',
-    'a_property_mapped_through_another_table': 'dates through the tables a property passes are not ported yet',
-    'the_country_of_the_home_and_of_citizenship_are_read_through_the_same_tables_separately': 'dates through the tables a property passes are not ported yet',
 }
 
 # Specs that exercise Python features the TypeScript port doesn't have (SQL views: View / to_view).
