@@ -262,7 +262,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
     name: 'npv_average',
     query: f => f.findAll(null, null, [f.npv().average()]),
     expected: { columns: ['Average Npv'], rows: [
-        [833.3333333333334],
+        [833.333333333333],
       ] },
   },
   {
