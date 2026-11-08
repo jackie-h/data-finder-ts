@@ -92,14 +92,9 @@ PENDING_MODULES = {
 # Expectations of features the port does not have yet: generated, but skipped, with the reason.
 # Each is removed with the change that ports its feature.
 PENDING: dict[str, str] = {
-    'navigation_given_its_own_processing_time_uses_it': 'navigation dates are not ported yet',
-    'sibling_navigation_keeps_the_querys_time': 'navigation dates are not ported yet',
-    'navigation_time_given_as_a_datetime': 'navigation dates are not ported yet',
-    'non_milestoned_root_reads_a_milestoned_navigation_as_of_the_query_time': 'navigation dates are not ported yet',
-    'non_milestoned_root_reads_the_earlier_version_at_an_earlier_time': 'navigation dates are not ported yet',
-    'a_step_with_its_own_processing_time_uses_it_inside_the_sub_select': 'navigation dates and exists() as a sub-select are not ported yet',
-    'a_step_with_its_own_business_date_uses_it_inside_the_sub_select': 'navigation dates and exists() as a sub-select are not ported yet',
-    'a_step_with_a_business_date_with_no_position_is_no_row': 'navigation dates and exists() as a sub-select are not ported yet',
+    'a_step_with_its_own_processing_time_uses_it_inside_the_sub_select': 'exists() as a sub-select is not ported yet',
+    'a_step_with_its_own_business_date_uses_it_inside_the_sub_select': 'exists() as a sub-select is not ported yet',
+    'a_step_with_a_business_date_with_no_position_is_no_row': 'exists() as a sub-select is not ported yet',
     'exists_to_many_is_one_row_however_many_rows_match': 'exists() as a sub-select is not ported yet',
     'exists_to_many_counts_a_row_once': 'exists() as a sub-select is not ported yet',
     'not_exists_to_many_is_a_row_with_no_match': 'exists() as a sub-select is not ported yet',

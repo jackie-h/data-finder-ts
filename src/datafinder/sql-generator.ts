@@ -540,6 +540,30 @@ function withAncestors(nodes: Iterable<JoinTreeNodeOperation>): JoinTreeNodeOper
   return [...ordered];
 }
 
+/**
+ * The business date, its range end and the processing time for the table a step reaches.
+ *
+ * A step uses the dates it was given, else those of the nearest step above it that was given any, else the query's.
+ * Each axis is taken separately, and a date given to a step is a point in time, so it ends a range the query asked
+ * for on that axis.
+ */
+function datesForNode(
+  node: JoinTreeNodeOperation,
+  businessDate: Date | null,
+  businessDateTo: Date | null,
+  processingDatetime: Date | null,
+): { businessDate: Date | null; businessDateTo: Date | null; processingDatetime: Date | null } {
+  let explicitBusiness: Date | null = null;
+  let explicitProcessing: Date | null = null;
+  for (let step: JoinTreeNodeOperation | undefined = node; step !== undefined; step = step.parent) {
+    if (explicitBusiness === null) explicitBusiness = step.businessDate;
+    if (explicitProcessing === null) explicitProcessing = step.processingDatetime;
+  }
+  if (explicitBusiness !== null) { businessDate = explicitBusiness; businessDateTo = null; }
+  if (explicitProcessing !== null) processingDatetime = explicitProcessing;
+  return { businessDate, businessDateTo, processingDatetime };
+}
+
 function buildQueryOperation(
   businessDate: Date | null,
   processingDatetime: Date | null,
@@ -555,10 +579,14 @@ function buildQueryOperation(
   having?: Operation,
 ): SelectOperation {
   let filter = op;
-  const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) =>
-    businessDateTo !== null
-      ? buildMilestoningFilterOperationForDateRange(businessDate, businessDateTo, processingDatetime, t, node)
-      : buildMilestoningFilterOperation(businessDate, processingDatetime, t, node);
+  const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) => {
+    const dates = node === undefined
+      ? { businessDate, businessDateTo, processingDatetime }
+      : datesForNode(node, businessDate, businessDateTo, processingDatetime);
+    return dates.businessDateTo !== null
+      ? buildMilestoningFilterOperationForDateRange(dates.businessDate, dates.businessDateTo, dates.processingDatetime, t, node)
+      : buildMilestoningFilterOperation(dates.businessDate, dates.processingDatetime, t, node);
+  };
 
   if (table instanceof MilestonedTable) {
     const milestonedOp = milestoningFor(table);

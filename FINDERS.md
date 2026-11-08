@@ -41,6 +41,8 @@ Pass dates to `findAll` to snapshot data at a point in time. Temporal WHERE clau
 | Business date + processing | required | required |
 | Bi-temporal | required | required |
 
+A class with no milestoning of its own passes the dates it is given on to the milestoned tables it reaches: `findAll(businessDate, processingTime, ...)` on `BranchFinder` reads the accounts of a branch as of those dates.
+
 ### Date ranges
 
 Finders for tables with a business date (single business date, business date + processing, bi-temporal) also have `findForDateRange(from, to, processingTime, columns, filter?)`. It returns every record whose business date falls in the inclusive range; for bi-temporal tables, records whose business-date interval overlaps it. The processing time is still a point-in-time filter.
@@ -189,6 +191,10 @@ A related-finder accessor accepts property values to restrict the joined rows (a
 ```ts
 ef.findAll(null, null, [ef.firstName(), ef.projects({ code: 'ALPHA' }).name()])
 ```
+
+### Dates for a navigation
+
+A related-finder accessor takes the dates it is read at as a second argument, when they are not the query's: `tf.account(undefined, { processingTime: '2023-12-01 12:00:00' }).name()`. The first argument is the property values to filter by (see Filtering a join by property). The dates are used for the milestoned table the navigation reaches and for every step below it unless that step is given its own. A date given to a navigation is a point in time, so it ends a range the query asked for. `businessDate` and `processingTime` take a `Date` or a string.
 
 ### Existence filters
 

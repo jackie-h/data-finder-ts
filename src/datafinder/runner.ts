@@ -191,12 +191,12 @@ export class FinderResult {
 }
 
 /** A processing date input keeps the precision it was given: a date stays a date, a timestamp a timestamp. */
-function convertProcessingDate(value: Date | string | null): Date | null {
+export function convertProcessingDate(value: Date | string | null): Date | null {
   if (typeof value === 'string' && DATE_ONLY_PATTERN.test(value)) return new DateOnly(value + 'T00:00:00Z');
   return convertDate(value);
 }
 
-function convertDate(value: Date | string | null): Date | null {
+export function convertDate(value: Date | string | null): Date | null {
   if (value === null) return null;
   if (value instanceof Date) return value;
   // Zone-less strings (YYYY-MM-DD, or YYYY-MM-DD HH:MM[:SS]) are read as UTC, matching how
