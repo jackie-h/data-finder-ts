@@ -33,19 +33,22 @@ const rows: unknown[][]  = await result.toRows();
 
 Pass dates to `findAll` to snapshot data at a point in time. Temporal WHERE clauses are injected automatically.
 
-| Type | `businessDate` | `processingDate` |
+| Type | `businessDate` | `processingTime` |
 |---|---|---|
-| None | `null` | `null` |
+| None | optional | optional |
 | Processing temporal | `null` | required |
-| Single business date | required | `null` |
+| Single business date | required | optional |
+| Business date range (`from`/`to` columns) | required | optional |
 | Business date + processing | required | required |
 | Bi-temporal | required | required |
 
 A class with no milestoning of its own passes the dates it is given on to the milestoned tables it reaches: `findAll(businessDate, processingTime, ...)` on `BranchFinder` reads the accounts of a branch as of those dates.
 
+A business date range holds a row from its `from` date up to, but not including, its `to` date; a `NULL` end is open.
+
 ### Date ranges
 
-Finders for tables with a business date (single business date, business date + processing, bi-temporal) also have `findForDateRange(from, to, processingTime, columns, filter?)`. It returns every record whose business date falls in the inclusive range; for bi-temporal tables, records whose business-date interval overlaps it. The processing time is still a point-in-time filter.
+Finders for tables with a business date (single business date, business date range, business date + processing, bi-temporal) also have `findForDateRange(from, to, processingTime, columns, filter?)`. It returns every record whose business date falls in the inclusive range; for tables with a business date range, records whose business-date interval overlaps it. The processing time is still a point-in-time filter, and `null` for a table that has no processing columns.
 
 ```ts
 cpf.findForDateRange('2023-01-15', '2023-01-16', new Date(), [cpf.quantity()])

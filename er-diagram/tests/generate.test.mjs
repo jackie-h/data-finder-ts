@@ -113,7 +113,7 @@ const dir = execFileSync("uv", ["run", "python", "-c", `import importlib, os; pr
 const key = m => m.replace(/\.md$/, "");
 
 // Examples of data-finder features the port does not have yet; each is added to the config with the change that ports it.
-const PENDING_EXAMPLES = ["business_range_", "joins_through_tables_", "processing_snapshot_"];
+const PENDING_EXAMPLES = ["joins_through_tables_", "processing_snapshot_"];
 
 test("config covers every e2e model and database mapping file", () => {
   const listed = new Set([...config.models, ...config.mappings]);
@@ -261,5 +261,5 @@ test("e2e: column hover shows the logical property description", () => {
 });
 
 test("e2e: every foreign key is drawn and every association resolved", () => {
-  assert.match(gen.stdout, /9 mappings, 10 foreign keys \(0 associations unresolved\)/);
+  assert.match(gen.stdout, /10 mappings, 10 foreign keys \(0 associations unresolved\)/);
 });

@@ -104,4 +104,9 @@ export const seeds: Record<string, Seed> = {
     await run(conn, 'CREATE TABLE positions (id INT, trade_date DATE, npv DOUBLE)');
     await loadCsv(conn, 'positions', 'positions_date.csv');
   },
+
+  business_range: async conn => {
+    await run(conn, 'CREATE SCHEMA mkt', 'CREATE TABLE mkt.rates (code VARCHAR, amount DOUBLE, from_z DATE, thru_z DATE)');
+    await loadCsv(conn, 'mkt.rates', 'business_range_rates.csv');
+  },
 };

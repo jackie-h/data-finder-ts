@@ -57,6 +57,7 @@ import {
   MilestonedTable,
   BiTemporalColumns,
   BusinessDateAndProcessingTemporalColumns,
+  BusinessDateRangeColumns,
   MilestoningColumns,
   ProcessingTemporalColumns,
   SingleBusinessDateColumn,
@@ -374,7 +375,7 @@ function businessPredicate(
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
   if (businessDate === null) return null;
-  if (mc instanceof BiTemporalColumns) {
+  if (mc instanceof BusinessDateRangeColumns) {
     const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
     const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
     return new LogicalOperation(dateFrom.lte(businessDate), LogicalOperator.AND, openEndClause(dateTo, businessDate, mc.infiniteDatetime));
@@ -394,7 +395,7 @@ function businessRangePredicate(
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
   if (businessDateFrom === null || businessDateTo === null) return null;
-  if (mc instanceof BiTemporalColumns) {
+  if (mc instanceof BusinessDateRangeColumns) {
     const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
     const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
     return new LogicalOperation(dateFrom.lte(businessDateTo), LogicalOperator.AND, openEndClause(dateTo, businessDateFrom, mc.infiniteDatetime));
