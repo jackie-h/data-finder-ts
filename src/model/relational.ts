@@ -502,6 +502,13 @@ export class JoinTreeNodeOperation {
     readonly many: boolean = false,
     /** True when the property this step follows can be missing (its lower bound is 0). */
     readonly optional: boolean = false,
+    /**
+     * The dates this step was given for the milestoned table it reaches, if any. They are the ones it uses, and the
+     * ones every step below it uses unless it is given its own; a step with none uses those of the step above it,
+     * and at the top the query's.
+     */
+    readonly businessDate: Date | null = null,
+    readonly processingDatetime: Date | null = null,
   ) {}
 }
 

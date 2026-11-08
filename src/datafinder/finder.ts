@@ -22,3 +22,12 @@ export class RelatedFinder {
     return new NotExistsOperation(this._node);
   }
 }
+
+/**
+ * The dates a navigation is read at, when they are not the query's: `f.account(undefined, { processingTime: ... })`.
+ * They are the ones used for the milestoned table it reaches and for every step below it unless it is given its own.
+ */
+export interface NavigationDates {
+  businessDate?: Date | string | null;
+  processingTime?: Date | string | null;
+}

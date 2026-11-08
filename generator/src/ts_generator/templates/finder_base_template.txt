@@ -2,6 +2,7 @@ import type { Operation } from '@model/relational';
 import type { CountAllOperation, NoOperation } from '@model/relational';
 import type { Attribute } from '@datafinder/attribute';
 import type { FinderResult } from '@datafinder/runner';
+import type { NavigationDates } from '@datafinder/finder';
 import type { ExistsOperation, NotExistsOperation } from '@model/relational';
 {% set attr_types = get_used_attr_types(rcm) %}
 {% if attr_types %}
@@ -42,11 +43,11 @@ export abstract class {{rcm.clazz.name}}RelatedFinderBase {
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
 {% else %}
   {{prop_jsdoc(rpm.property)}}
-  abstract {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinderBase;
+  abstract {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinderBase;
 {% endif %}
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
-  abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter): {{source_rcm.clazz.name}}RelatedFinderBase;
+  abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinderBase;
 {% endfor %}
   /** Filter to rows that have a matching {{rcm.clazz.name}} through this join. */
   abstract exists(): ExistsOperation;
@@ -64,11 +65,11 @@ export abstract class {{rcm.clazz.name}}FinderBase {
   abstract {{to_ts_name(rpm.property)}}(): {{rpm.property.type.name}}Attribute;
 {% else %}
   {{prop_jsdoc(rpm.property)}}
-  abstract {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter): {{rpm.property.type.name}}RelatedFinderBase;
+  abstract {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinderBase;
 {% endif %}
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
-  abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter): {{source_rcm.clazz.name}}RelatedFinderBase;
+  abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinderBase;
 {% endfor %}
   abstract count(): CountAllOperation;
   abstract findAll(

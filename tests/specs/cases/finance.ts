@@ -635,11 +635,11 @@ export const TRADE_ONE_WAY_ASSOCIATION_FINDER_SPECS: SpecCase<TradeFinder>[] = [
 export const TRADE_NAVIGATION_DATE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
     name: 'navigation_given_its_own_processing_time_uses_it',
-    query: (f: any) => f.findAll(null, _BOTH_AT, [f.symbol(), f.account(undefined, { processingTime: _AT }).name()]).orderBy(f.symbol().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account(undefined, { processingTime: _AT }).name()]).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol', 'Account Name'], rows: [
         ['AAPL', 'Acme Corp'],
         ['GOOG', 'Acme Corp'],
-      ], sql: '2023-12-01', skipGraphql: 'The GraphQL finders do not take a date on a navigation', pending: 'navigation dates are not ported yet' },
+      ], sql: '2023-12-01', skipGraphql: 'The GraphQL finders do not take a date on a navigation' },
   },
   {
     name: 'navigation_without_a_time_of_its_own_uses_the_querys',
@@ -651,11 +651,11 @@ export const TRADE_NAVIGATION_DATE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'sibling_navigation_keeps_the_querys_time',
-    query: (f: any) => f.findAll(null, _BOTH_AT, [f.symbol(), f.account(undefined, { processingTime: _AT }).name(), f.instrument().price()]).orderBy(f.symbol().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account(undefined, { processingTime: _AT }).name(), f.instrument().price()]).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol', 'Account Name', 'Instrument Price'], rows: [
         ['AAPL', 'Acme Corp', 150.0],
         ['GOOG', 'Acme Corp', 2800.0],
-      ], skipGraphql: 'The GraphQL finders do not take a date on a navigation', pending: 'navigation dates are not ported yet' },
+      ], skipGraphql: 'The GraphQL finders do not take a date on a navigation' },
   },
   {
     name: 'a_call_with_a_time_does_not_change_the_plain_accessor',
@@ -667,30 +667,30 @@ export const TRADE_NAVIGATION_DATE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'navigation_time_given_as_a_datetime',
-    query: (f: any) => f.findAll(null, _BOTH_AT, [f.symbol(), f.account(undefined, { processingTime: new Date(Date.UTC(2023, 11, 1, 12, 0, 0)) }).name()]).orderBy(f.symbol().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account(undefined, { processingTime: new Date(Date.UTC(2023, 11, 1, 12, 0, 0)) }).name()]).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol', 'Account Name'], rows: [
         ['AAPL', 'Acme Corp'],
         ['GOOG', 'Acme Corp'],
-      ], skipGraphql: 'The GraphQL finders do not take a date on a navigation', pending: 'navigation dates are not ported yet' },
+      ], skipGraphql: 'The GraphQL finders do not take a date on a navigation' },
   },
 ];
 
 export const BRANCH_FINDER_SPECS: SpecCase<BranchFinder>[] = [
   {
     name: 'non_milestoned_root_reads_a_milestoned_navigation_as_of_the_query_time',
-    query: (f: any) => f.findAll(null, _AT, [f.city(), f.accounts().name()]).orderBy(f.city().ascending()),
+    query: f => f.findAll(null, _AT, [f.city(), f.accounts().name()]).orderBy(f.city().ascending()),
     expected: { columns: ['City', 'Accounts Name'], rows: [
         ['London', null],
         ['New York', 'Acme Corp'],
-      ], sql: 'in_z <=', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'navigation dates are not ported yet' },
+      ], sql: 'in_z <=', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
   {
     name: 'non_milestoned_root_reads_the_earlier_version_at_an_earlier_time',
-    query: (f: any) => f.findAll(null, _BOTH_AT, [f.city(), f.accounts().name()]).orderBy(f.city().ascending()),
+    query: f => f.findAll(null, _BOTH_AT, [f.city(), f.accounts().name()]).orderBy(f.city().ascending()),
     expected: { columns: ['City', 'Accounts Name'], rows: [
         ['London', 'Acme Ltd'],
         ['New York', null],
-      ], skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'navigation dates are not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
 ];
 
@@ -736,7 +736,7 @@ export const BRANCH_EXISTS_FINDER_SPECS: SpecCase<BranchFinder>[] = [
     query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city()], f.accounts(undefined, { processingTime: _BOTH_AT }).exists()),
     expected: { columns: ['City'], rows: [
         ['London'],
-      ], sql: '2021-06-01', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'navigation dates and exists() as a sub-select are not ported yet' },
+      ], sql: '2021-06-01', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'exists() as a sub-select is not ported yet' },
   },
   {
     name: 'reading_a_value_through_the_step_keeps_a_row_for_each_match',
@@ -841,19 +841,19 @@ export const ACCOUNT_POSITION_EXISTS_FINDER_SPECS: SpecCase<AccountFinder>[] = [
     query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions(undefined, { businessDate: new DateOnly('2023-01-16T00:00:00Z') }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
-      ], sql: '2023-01-16', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'navigation dates and exists() as a sub-select are not ported yet' },
+      ], sql: '2023-01-16', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
   },
   {
     name: 'a_step_with_a_business_date_with_no_position_is_no_row',
     query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions(undefined, { businessDate: new DateOnly('2023-02-01T00:00:00Z') }).exists()),
-    expected: { columns: ['Name'], rows: [], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'navigation dates and exists() as a sub-select are not ported yet' },
+    expected: { columns: ['Name'], rows: [], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
   },
   {
     name: 'a_step_with_its_own_processing_time_uses_it_inside_the_sub_select',
     query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions(undefined, { processingTime: '2023-01-12 12:00:00' }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
-      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'navigation dates and exists() as a sub-select are not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
   },
   {
     name: 'two_to_many_steps_do_not_multiply_each_other',
