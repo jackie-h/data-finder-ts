@@ -964,14 +964,15 @@ class SQLQueryGenerator {
   private processSelect(cols: (Attribute | RelationalOperationElement)[]): void {
     const requiredJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
 
+    // each column is read before any join is added, so the table a column is read from is named before the tables
+    // the join to it passes through
     for (const col of cols) {
       this._collectRequiredJoins(col, requiredJoins);
+      this._selectColumn(col);
     }
     for (const node of requiredJoins.values()) {
       this._addJoin(node);
     }
-
-    for (const col of cols) this._selectColumn(col);
   }
 
   /** Add one column to the select list. An alias reads the column it wraps, then names the entry. */

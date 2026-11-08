@@ -189,6 +189,8 @@ tf.findAll(null, new Date(),
 
 Chains are arbitrarily deep: `tf.account().address().city().eq('London')`.
 
+A property can be mapped through other tables: a table with no class of its own turns a number in the row into a code, and the class that has the code is reached from there. The generated finders join through each table in turn, so `ef.citizenship().name()` needs nothing more than the mapping. The same goes for a property of an embedded object that reaches another table (`ef.home().country().name()`).
+
 ### Embedded (denormalized) columns
 
 If the mapping declares flat columns on the table that duplicate a related property (e.g. `acct_name` for `account.name`, see `finance_mapping_embedded.md`), the generated finders carry them as join-less alternates. When every property taken from a related table has one, whether projected, filtered, grouped, ordered or partitioned on, the JOIN is left out of the SQL. If any property from that table lacks one (e.g. `account().id()`), the real join is used for all of them.

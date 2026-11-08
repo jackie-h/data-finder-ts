@@ -26,6 +26,7 @@ _MAPPINGS = [
     'people_denormalised_mapping.md',
     'business_range_mapping.md',
     'processing_snapshot_mapping.md',
+    'joins_through_tables_mapping.md',
 ]
 
 if __name__ == '__main__':

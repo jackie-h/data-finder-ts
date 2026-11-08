@@ -261,5 +261,5 @@ test("e2e: column hover shows the logical property description", () => {
 });
 
 test("e2e: every foreign key is drawn and every association resolved", () => {
-  assert.match(gen.stdout, /11 mappings, 11 foreign keys \(0 associations unresolved\)/);
+  assert.match(gen.stdout, /12 mappings, 15 foreign keys \(0 associations unresolved\)/);
 });
