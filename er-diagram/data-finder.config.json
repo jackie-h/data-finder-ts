@@ -11,7 +11,8 @@
     "orgchart.md",
     "orgchart_inheritance.md",
     "people_denormalised_model.md",
-    "positions_model.md"
+    "positions_model.md",
+    "business_range_model.md"
   ],
   "mappings": [
     "companies_mapping.md",
@@ -22,6 +23,7 @@
     "orgchart_mapping.md",
     "orgchart_inheritance_mapping.md",
     "people_denormalised_mapping.md",
-    "positions_mapping.md"
+    "positions_mapping.md",
+    "business_range_mapping.md"
   ]
 }

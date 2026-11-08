@@ -11,6 +11,7 @@ from model.mapping import (
     SingleBusinessDateMilestonePropertyMapping,
     BusinessDateAndProcessingMilestonePropertyMapping,
     BiTemporalMilestonePropertyMapping,
+    BusinessDateRangeMilestonePropertyMapping,
 )
 from model.relational import Column
 from model.relational_mapping import Join, EmbeddedSetMapping
@@ -45,6 +46,10 @@ def has_business_date_and_processing(mapping: MilestonePropertyMapping) -> bool:
 
 def has_bitemporal(mapping: MilestonePropertyMapping) -> bool:
     return isinstance(mapping, BiTemporalMilestonePropertyMapping)
+
+
+def has_business_date_range(mapping: MilestonePropertyMapping) -> bool:
+    return isinstance(mapping, BusinessDateRangeMilestonePropertyMapping) and not isinstance(mapping, BiTemporalMilestonePropertyMapping)
 
 
 def display_name(prop: Property) -> str:
@@ -274,6 +279,7 @@ def generate(mapping: Mapping, output_directory: str):
         has_uni_business_temporal=has_uni_business_temporal,
         has_business_date_and_processing=has_business_date_and_processing,
         has_bitemporal=has_bitemporal,
+        has_business_date_range=has_business_date_range,
         display_name=display_name,
         to_ts_name=to_ts_name,
         to_camel_case=to_camel_case,

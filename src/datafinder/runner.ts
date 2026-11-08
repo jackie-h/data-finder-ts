@@ -1,5 +1,6 @@
 import { Attribute } from './attribute';
 import { toSql } from './sql-generator';
+import { MilestonedTable, hasProcessingRange } from '../model/milestoning';
 import { DialectName, SqlDialect } from './dialect';
 import {
   Table,
@@ -228,14 +229,17 @@ export function convertInputsAndSelect(
 export function convertInputsAndSelectForDateRange(
   businessDateFrom: Date | string,
   businessDateTo: Date | string,
-  processingDatetime: Date | string,
+  processingDatetime: Date | string | null,
   columns: (Attribute | RelationalOperationElement)[],
   table: QueryTarget,
   op: RelationalOperationElement = new NoOperation(),
 ): FinderResult {
   if (businessDateFrom == null) throw new Error('businessDateFrom is required for findForDateRange');
   if (businessDateTo == null) throw new Error('businessDateTo is required for findForDateRange');
-  if (processingDatetime == null) throw new Error('processingTime is required for findForDateRange');
+  // a table with no processing columns, such as a single business date, has no processing time to give
+  if (processingDatetime == null && table instanceof MilestonedTable && hasProcessingRange(table.milestoningColumns)) {
+    throw new Error('processingTime is required for findForDateRange');
+  }
   return new FinderResult(
     convertDate(businessDateFrom),
     convertProcessingDate(processingDatetime),
