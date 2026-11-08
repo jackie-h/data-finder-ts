@@ -14,7 +14,7 @@ from model.mapping import (
     BusinessDateRangeMilestonePropertyMapping,
     SingleProcessingDatetimeMilestonePropertyMapping,
 )
-from model.relational import Column
+from model.relational import Column, Table
 from model.relational_mapping import Join, EmbeddedSetMapping
 
 _TS_RESERVED = {
@@ -215,11 +215,14 @@ class _ClassView:
 class EmbeddedClass:
     """A class embedded in its owner's row: its properties are columns of the owner's table, so it needs no join."""
 
-    def __init__(self, name: str, label: str, columns: list, children: list, optional: bool = False):
+    def __init__(self, name: str, label: str, columns: list, children: list, optional: bool = False,
+                 joins: list | None = None):
         self.name = name
         self.label = label
         self.columns = columns
         self.children = children
+        # the properties of this class that reach another table, each with the join that does
+        self.joins = joins or []
         # whether the embedded property that holds this class, or one above it, is optional
         self.optional = optional
 
@@ -229,15 +232,17 @@ def embedded_classes(rcm: _ClassView) -> list[EmbeddedClass]:
     found: list[EmbeddedClass] = []
 
     def _walk(esm: EmbeddedSetMapping, stem: str, label: str, optional: bool) -> str:
-        columns, children = [], []
+        columns, children, joins = [], [], []
         for pm in esm.property_mappings:
             if isinstance(pm.target, Column):
                 columns.append((pm.property, pm.target))
+            elif isinstance(pm.target, Join):
+                joins.append((pm.property, pm.target))
             elif isinstance(pm.target, EmbeddedSetMapping):
                 child = _walk(pm.target, stem + pm.property.id[:1].upper() + pm.property.id[1:], f"{label} {pm.property.name}",
                               optional or pm.property.multiplicity.lower == 0)
                 children.append((pm.property, child))
-        found.append(EmbeddedClass(stem + "Embedded", label, columns, children, optional))
+        found.append(EmbeddedClass(stem + "Embedded", label, columns, children, optional, joins))
         return stem + "Embedded"
 
     for pm in rcm.embedded_mappings:
@@ -306,7 +311,7 @@ def _build_reverse_assoc_map(mapping: Mapping, assoc_lookup: dict) -> dict:
     reverse_map = {}
     for rcm in mapping.mappings:
         for rpm in rcm.property_mappings:
-            if is_primitive(rpm.property) or not isinstance(rpm.target, Join):
+            if is_primitive(rpm.property) or not isinstance(rpm.target, Join) or rpm.target.via:
                 continue
             target_cls = rpm.property.type
             assoc = assoc_lookup.get((rcm.clazz.name, target_cls.name, rpm.property.id))
@@ -351,6 +356,8 @@ def generate(mapping: Mapping, output_directory: str):
         has_bitemporal=has_bitemporal,
         has_business_date_range=has_business_date_range,
         has_processing_snapshot=has_processing_snapshot,
+        parent_expr=parent_expr,
+        column_code=column_code,
         display_name=display_name,
         to_ts_name=to_ts_name,
         to_camel_case=to_camel_case,

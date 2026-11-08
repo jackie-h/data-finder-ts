@@ -13,7 +13,8 @@
     "people_denormalised_model.md",
     "positions_model.md",
     "business_range_model.md",
-    "processing_snapshot_model.md"
+    "processing_snapshot_model.md",
+    "joins_through_tables_model.md"
   ],
   "mappings": [
     "companies_mapping.md",
@@ -26,6 +27,7 @@
     "people_denormalised_mapping.md",
     "positions_mapping.md",
     "business_range_mapping.md",
-    "processing_snapshot_mapping.md"
+    "processing_snapshot_mapping.md",
+    "joins_through_tables_mapping.md"
   ]
 }
