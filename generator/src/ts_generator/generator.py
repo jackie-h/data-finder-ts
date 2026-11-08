@@ -12,6 +12,7 @@ from model.mapping import (
     BusinessDateAndProcessingMilestonePropertyMapping,
     BiTemporalMilestonePropertyMapping,
     BusinessDateRangeMilestonePropertyMapping,
+    SingleProcessingDatetimeMilestonePropertyMapping,
 )
 from model.relational import Column
 from model.relational_mapping import Join, EmbeddedSetMapping
@@ -50,6 +51,75 @@ def has_bitemporal(mapping: MilestonePropertyMapping) -> bool:
 
 def has_business_date_range(mapping: MilestonePropertyMapping) -> bool:
     return isinstance(mapping, BusinessDateRangeMilestonePropertyMapping) and not isinstance(mapping, BiTemporalMilestonePropertyMapping)
+
+
+def has_processing_snapshot(mapping: MilestonePropertyMapping) -> bool:
+    return isinstance(mapping, SingleProcessingDatetimeMilestonePropertyMapping)
+
+
+def column_code(column: Column, keyed: bool = True) -> str:
+    """TypeScript source that builds ``column`` in a generated finder. ``keyed`` False leaves out its primary key flag."""
+    key = ", true" if column.primary_key and keyed else ""
+    return f"new Column('{column.name}', '{column.type}', '{table_qualified_name(column.table)}'{key})"
+
+
+def _scheme_columns_code(table: Table) -> str:
+    """TypeScript source for the milestoning columns of a table a join passes through, from its milestoning scheme."""
+    scheme = table.milestoning_scheme
+    assert scheme is not None
+    by_name = {c.name: c for c in table.columns}
+
+    def col(name: str | None) -> str:
+        column = by_name.get(name or "")
+        if column is None:
+            raise ValueError(f"Table '{table.name}': milestoning column '{name}' of scheme '{scheme.name}' is not a column")
+        return f"new Column('{column.name}', '{column.type}')"
+
+    infinite = f", '{scheme.infinite_datetime}'" if scheme.infinite_datetime else ""
+    if scheme.processing_datetime:
+        return f"new SingleProcessingDatetimeColumn({col(scheme.processing_datetime)})"
+    if scheme.processing_start and (scheme.business_date_from or scheme.business_date_to):
+        return (f"new BiTemporalColumns({col(scheme.business_date_from)}, {col(scheme.business_date_to)}, "
+                f"{col(scheme.processing_start)}, {col(scheme.processing_end)}{infinite})")
+    if scheme.processing_start and scheme.business_date:
+        return (f"new BusinessDateAndProcessingTemporalColumns({col(scheme.business_date)}, {col(scheme.processing_start)}, "
+                f"{col(scheme.processing_end)}{infinite})")
+    if scheme.processing_start:
+        return f"new ProcessingTemporalColumns({col(scheme.processing_start)}, {col(scheme.processing_end)}{infinite})"
+    if scheme.business_date_from or scheme.business_date_to:
+        return f"new BusinessDateRangeColumns({col(scheme.business_date_from)}, {col(scheme.business_date_to)}{infinite})"
+    if scheme.business_date:
+        return f"new SingleBusinessDateColumn({col(scheme.business_date)})"
+    raise ValueError(f"Milestoning scheme '{scheme.name}' has no columns")
+
+
+def table_code(table: Table) -> str:
+    """TypeScript source that builds ``table`` in a generated finder."""
+    qualified = table_qualified_name(table)
+    if table.milestoning_scheme is not None:
+        milestoned = {c.name for c in _scheme_milestoning_columns(table)}
+        columns = ", ".join(column_code(c) for c in table.columns if c.name not in milestoned)
+        return f"new MilestonedTable('{qualified}', [{columns}], {_scheme_columns_code(table)})"
+    columns = ", ".join(column_code(c) for c in table.columns)
+    return f"new Table('{qualified}', [{columns}])"
+
+
+def _scheme_milestoning_columns(table: Table) -> list:
+    scheme = table.milestoning_scheme
+    names = {scheme.processing_start, scheme.processing_end, scheme.business_date, scheme.business_date_from,
+             scheme.business_date_to, scheme.processing_datetime} - {None}
+    return [c for c in table.columns if c.name in names]
+
+
+def parent_expr(join: Join, parent: str) -> str:
+    """The parent step of the join to a property's class: ``parent`` itself, or, when the property is mapped through
+    other tables first, ``parent`` followed by a step through each of them."""
+    if not join.via:
+        return parent
+    # The columns of a step through a class-less table are written without key flags, as the data-finder specs run them
+    # (their expected SQL has the join's own order, not the key-first order the flags would give).
+    hops = ", ".join(f"[{column_code(lhs, False)}, {table_code(rhs.table)}, {column_code(rhs, False)}]" for lhs, rhs in join.via)
+    return f"viaJoins({parent}, [{hops}])"
 
 
 def display_name(prop: Property) -> str:
@@ -280,6 +350,7 @@ def generate(mapping: Mapping, output_directory: str):
         has_business_date_and_processing=has_business_date_and_processing,
         has_bitemporal=has_bitemporal,
         has_business_date_range=has_business_date_range,
+        has_processing_snapshot=has_processing_snapshot,
         display_name=display_name,
         to_ts_name=to_ts_name,
         to_camel_case=to_camel_case,

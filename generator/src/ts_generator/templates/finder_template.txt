@@ -3,10 +3,13 @@ import {
   Operation, RelationalOperationElement,
 } from '@model/relational';
 import {
-  ProcessingTemporalColumns, SingleBusinessDateColumn,
+  ProcessingTemporalColumns, SingleBusinessDateColumn, SingleProcessingDatetimeColumn,
   BusinessDateAndProcessingTemporalColumns, BiTemporalColumns, BusinessDateRangeColumns, MilestonedTable,
 } from '@model/milestoning';
-import { convertInputsAndSelect, convertInputsAndSelectForDateRange, convertDate, convertProcessingDate, FinderResult } from '@datafinder/runner';
+import {
+  convertInputsAndSelect, convertInputsAndSelectForDateRange, convertInputsAndSelectForProcessingRange,
+  convertDate, convertProcessingDate, FinderResult,
+} from '@datafinder/runner';
 import { ExistsOperation, NotExistsOperation } from '@model/relational';
 import { displayPrefix, type NavigationDates } from '@datafinder/finder';
 import type { Attribute } from '@datafinder/attribute';
@@ -124,6 +127,10 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
     new Column('{{rcm.milestone_mapping._date_from.target.name}}', '{{rcm.milestone_mapping._date_from.target.type}}'),
     new Column('{{rcm.milestone_mapping._date_to.target.name}}', '{{rcm.milestone_mapping._date_to.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
     '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
+  );
+{% elif has_processing_snapshot(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new SingleProcessingDatetimeColumn(
+    new Column('{{rcm.milestone_mapping._datetime.target.name}}', '{{rcm.milestone_mapping._datetime.target.type}}'),
   );
 {% elif has_uni_business_temporal(rcm.milestone_mapping) %}
   private static readonly _milestoningColumns = new SingleBusinessDateColumn(
@@ -275,6 +282,10 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
     new Column('{{rcm.milestone_mapping._date_to.target.name}}', '{{rcm.milestone_mapping._date_to.target.type}}'){% if rcm.milestone_mapping.infinite_datetime %},
     '{{rcm.milestone_mapping.infinite_datetime}}'{% endif %},
   );
+{% elif has_processing_snapshot(rcm.milestone_mapping) %}
+  private static readonly _milestoningColumns = new SingleProcessingDatetimeColumn(
+    new Column('{{rcm.milestone_mapping._datetime.target.name}}', '{{rcm.milestone_mapping._datetime.target.type}}'),
+  );
 {% elif has_uni_business_temporal(rcm.milestone_mapping) %}
   private static readonly _milestoningColumns = new SingleBusinessDateColumn(
     new Column('{{rcm.milestone_mapping._date.target.name}}', '{{rcm.milestone_mapping._date.target.type}}'),
@@ -359,7 +370,7 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
     displayColumns: (Attribute | RelationalOperationElement)[],
     filterOp: Operation = new NoOperation(),
   ): FinderResult {
-{% if rcm.milestone_mapping and has_processing_temporal(rcm.milestone_mapping) and not has_uni_business_temporal(rcm.milestone_mapping) and not has_business_date_and_processing(rcm.milestone_mapping) and not has_bitemporal(rcm.milestone_mapping) %}
+{% if rcm.milestone_mapping and (has_processing_temporal(rcm.milestone_mapping) or has_processing_snapshot(rcm.milestone_mapping)) and not has_uni_business_temporal(rcm.milestone_mapping) and not has_business_date_and_processing(rcm.milestone_mapping) and not has_bitemporal(rcm.milestone_mapping) %}
     return convertInputsAndSelect(null, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
 {% else %}
     return convertInputsAndSelect(businessDate, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
@@ -384,6 +395,24 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
     filterOp: Operation = new NoOperation(),
   ): FinderResult {
     return convertInputsAndSelectForDateRange(businessDateFrom, businessDateTo, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+  }
+{% endif %}
+{% if rcm.milestone_mapping and has_processing_snapshot(rcm.milestone_mapping) %}
+
+  /**
+   * Returns the rows taken at any processing time from `processingFrom` up to and including `processingTo`.
+   *
+   * The processing snapshot column is compared with both ends of the range. A table joined from this one with a
+   * processing range is read over the same range, and one with a single snapshot column is read within it.
+   */
+  findForProcessingRange(
+    processingFrom: Date | string,
+    processingTo: Date | string,
+    businessDate: Date | string | null,
+    displayColumns: (Attribute | RelationalOperationElement)[],
+    filterOp: Operation = new NoOperation(),
+  ): FinderResult {
+    return convertInputsAndSelectForProcessingRange(businessDate, processingFrom, processingTo, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
   }
 {% endif %}
 }

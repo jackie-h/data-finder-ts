@@ -37,6 +37,7 @@ Pass dates to `findAll` to snapshot data at a point in time. Temporal WHERE clau
 |---|---|---|
 | None | optional | optional |
 | Processing temporal | `null` | required |
+| Processing snapshot (one datetime column) | `null` | required, equal to the time a row was taken |
 | Single business date | required | optional |
 | Business date range (`from`/`to` columns) | required | optional |
 | Business date + processing | required | required |
@@ -53,6 +54,10 @@ Finders for tables with a business date (single business date, business date ran
 ```ts
 cpf.findForDateRange('2023-01-15', '2023-01-16', new Date(), [cpf.quantity()])
 ```
+
+### Processing ranges
+
+A processing snapshot finder also has `findForProcessingRange(from, to, businessDate, columns, filter?)`: the rows taken at any processing time from `from` up to and including `to`. A table joined from it with a processing range is read over the same range. The GraphQL runner has no processing range.
 
 ## SQL dialects
 

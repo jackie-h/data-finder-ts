@@ -48,6 +48,7 @@ export interface QueryRunner {
     distinct?: boolean,
     offset?: number,
     having?: Operation,
+    processingDatetimeTo?: Date | null,
   ): Promise<Row[]>;
 }
 
@@ -94,6 +95,7 @@ export class FinderResult {
     private readonly _table: QueryTarget,
     private readonly _op: RelationalOperationElement,
     private readonly _businessDateTo: Date | null = null,
+    private readonly _processingDatetimeTo: Date | null = null,
   ) {}
 
   /**
@@ -169,6 +171,7 @@ export class FinderResult {
       this._offset,
       this._having,
       dialect,
+      this._processingDatetimeTo,
     );
   }
 
@@ -187,6 +190,7 @@ export class FinderResult {
       this._distinct,
       this._offset,
       this._having,
+      this._processingDatetimeTo,
     );
   }
 }
@@ -247,5 +251,26 @@ export function convertInputsAndSelectForDateRange(
     table,
     op,
     convertDate(businessDateTo),
+  );
+}
+
+export function convertInputsAndSelectForProcessingRange(
+  businessDate: Date | string | null,
+  processingFrom: Date | string,
+  processingTo: Date | string,
+  columns: (Attribute | RelationalOperationElement)[],
+  table: QueryTarget,
+  op: RelationalOperationElement = new NoOperation(),
+): FinderResult {
+  if (processingFrom == null) throw new Error('processingFrom is required for findForProcessingRange');
+  if (processingTo == null) throw new Error('processingTo is required for findForProcessingRange');
+  return new FinderResult(
+    convertDate(businessDate),
+    convertProcessingDate(processingFrom),
+    columns,
+    table,
+    op,
+    null,
+    convertProcessingDate(processingTo),
   );
 }

@@ -33,6 +33,13 @@ export class BusinessDateAndProcessingTemporalColumns extends MilestoningColumns
   }
 }
 
+/** A processing snapshot: one datetime column holding the processing time a row was taken at, which a query's processing time must equal. */
+export class SingleProcessingDatetimeColumn extends MilestoningColumns {
+  constructor(readonly processingDatetimeColumn: Column) { super(); }
+
+  columns(): Column[] { return [this.processingDatetimeColumn]; }
+}
+
 /** A business date range: a row applies from `businessDateFrom` up to, but not including, `businessDateTo`. */
 export class BusinessDateRangeColumns extends MilestoningColumns {
   constructor(

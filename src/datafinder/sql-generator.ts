@@ -61,6 +61,8 @@ import {
   MilestoningColumns,
   ProcessingTemporalColumns,
   SingleBusinessDateColumn,
+  SingleProcessingDatetimeColumn,
+  hasProcessingRange,
 } from '../model/milestoning';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
 import { DialectName, SqlDialect, dialectOf } from './dialect';
@@ -355,17 +357,42 @@ function andAll(ops: (Operation | null)[]): Operation | null {
   return present.slice(1).reduce<Operation>((left, right) => new LogicalOperation(left, LogicalOperator.AND, right), present[0]);
 }
 
-/** The table's processing range contains the processing date. */
+/** The table's processing range contains the processing time, or its processing snapshot column equals it. */
 function processingPredicate(
   mc: MilestoningColumns,
   processingDatetime: Date | null,
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
-  if (!(mc instanceof ProcessingTemporalColumns || mc instanceof BusinessDateAndProcessingTemporalColumns || mc instanceof BiTemporalColumns)
-    || processingDatetime === null) return null;
+  if (processingDatetime === null) return null;
+  if (mc instanceof SingleProcessingDatetimeColumn) {
+    return snapshotAttribute(mc, joinNode).eq(processingDatetime);
+  }
+  if (!hasProcessingRange(mc)) return null;
   const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
   const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
   return new LogicalOperation(startAt.lte(processingDatetime), LogicalOperator.AND, openEndClause(endAt, processingDatetime, mc.infiniteDatetime));
+}
+
+function snapshotAttribute(mc: SingleProcessingDatetimeColumn, joinNode?: JoinTreeNodeOperation): DateTimeAttribute {
+  const column = mc.processingDatetimeColumn;
+  return new DateTimeAttribute('processing_datetime', column.name, column.type, column.table!.qualifiedName, joinNode);
+}
+
+/** The table's processing range overlaps the processing range, or its processing snapshot column is within it. */
+function processingRangePredicate(
+  mc: MilestoningColumns,
+  processingFrom: Date,
+  processingTo: Date,
+  joinNode?: JoinTreeNodeOperation,
+): Operation | null {
+  if (mc instanceof SingleProcessingDatetimeColumn) {
+    const snapshot = snapshotAttribute(mc, joinNode);
+    return new LogicalOperation(snapshot.gte(processingFrom), LogicalOperator.AND, snapshot.lte(processingTo));
+  }
+  if (!hasProcessingRange(mc)) return null;
+  const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
+  const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
+  return new LogicalOperation(startAt.lte(processingTo), LogicalOperator.AND, openEndClause(endAt, processingFrom, mc.infiniteDatetime));
 }
 
 /** The table's business range contains the business date, or its business date column equals it. */
@@ -425,7 +452,9 @@ function buildMilestoningFilterOperation(
  *   business_date_from_col <= businessDateTo AND business_date_to_col > businessDateFrom
  * Single-date tables:
  *   business_date >= businessDateFrom AND business_date <= businessDateTo
- * Processing-date filtering is point-in-time, as in the normal path.
+ * Processing-date filtering is point-in-time, as in the normal path, unless `processingDatetimeTo` is given: then
+ * `processingDatetime` to `processingDatetimeTo` is a range, which a processing range overlaps and a processing
+ * snapshot column is within.
  */
 function buildMilestoningFilterOperationForDateRange(
   businessDateFrom: Date | null,
@@ -433,10 +462,14 @@ function buildMilestoningFilterOperationForDateRange(
   processingDatetime: Date | null,
   table: MilestonedTable,
   joinNode?: JoinTreeNodeOperation,
+  processingDatetimeTo: Date | null = null,
 ): Operation | null {
   const mc = table.milestoningColumns;
+  const processing = processingDatetime !== null && processingDatetimeTo !== null
+    ? processingRangePredicate(mc, processingDatetime, processingDatetimeTo, joinNode)
+    : processingPredicate(mc, processingDatetime, joinNode);
   return andAll([
-    processingPredicate(mc, processingDatetime, joinNode),
+    processing,
     businessRangePredicate(mc, businessDateFrom, businessDateTo, joinNode),
   ]);
 }
@@ -573,10 +606,10 @@ function existsOnlyNodes(expressions: (RelationalOperationElement | undefined)[]
 }
 
 /**
- * The business date, its range end and the processing time for the table a step reaches.
+ * The business date, its range end, the processing time and its range end for the table a step reaches.
  *
  * A step uses the dates it was given, else those of the nearest step above it that was given any, else the query's.
- * Each axis is taken separately, and a date given to a step is a point in time, so it ends a range the query asked
+ * Each axis is taken separately, and a date given to a step is a point in time, so it ends any range the query asked
  * for on that axis.
  */
 function datesForNode(
@@ -584,7 +617,8 @@ function datesForNode(
   businessDate: Date | null,
   businessDateTo: Date | null,
   processingDatetime: Date | null,
-): { businessDate: Date | null; businessDateTo: Date | null; processingDatetime: Date | null } {
+  processingDatetimeTo: Date | null,
+): { businessDate: Date | null; businessDateTo: Date | null; processingDatetime: Date | null; processingDatetimeTo: Date | null } {
   let explicitBusiness: Date | null = null;
   let explicitProcessing: Date | null = null;
   for (let step: JoinTreeNodeOperation | undefined = node; step !== undefined; step = step.parent) {
@@ -592,8 +626,8 @@ function datesForNode(
     if (explicitProcessing === null) explicitProcessing = step.processingDatetime;
   }
   if (explicitBusiness !== null) { businessDate = explicitBusiness; businessDateTo = null; }
-  if (explicitProcessing !== null) processingDatetime = explicitProcessing;
-  return { businessDate, businessDateTo, processingDatetime };
+  if (explicitProcessing !== null) { processingDatetime = explicitProcessing; processingDatetimeTo = null; }
+  return { businessDate, businessDateTo, processingDatetime, processingDatetimeTo };
 }
 
 function buildQueryOperation(
@@ -609,14 +643,15 @@ function buildQueryOperation(
   distinct: boolean = false,
   offset?: number,
   having?: Operation,
+  processingDatetimeTo: Date | null = null,
 ): SelectOperation {
   let filter = op;
   const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) => {
     const dates = node === undefined
-      ? { businessDate, businessDateTo, processingDatetime }
-      : datesForNode(node, businessDate, businessDateTo, processingDatetime);
-    return dates.businessDateTo !== null
-      ? buildMilestoningFilterOperationForDateRange(dates.businessDate, dates.businessDateTo, dates.processingDatetime, t, node)
+      ? { businessDate, businessDateTo, processingDatetime, processingDatetimeTo }
+      : datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
+    return dates.businessDateTo !== null || dates.processingDatetimeTo !== null
+      ? buildMilestoningFilterOperationForDateRange(dates.businessDate, dates.businessDateTo, dates.processingDatetime, t, node, dates.processingDatetimeTo)
       : buildMilestoningFilterOperation(dates.businessDate, dates.processingDatetime, t, node);
   };
 
@@ -661,14 +696,14 @@ function buildQueryOperation(
   const subSelects = new Map<JoinTreeNodeOperation, SelectOperation>();
   for (const node of existsOnlyNodes([...columns, ...groupBy, ...orderBy, op, having])) {
     const right = node.join.right;
-    const dates = datesForNode(node, businessDate, businessDateTo, processingDatetime);
+    const dates = datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
     const values = node.join.filterKwargs;
     const condition = Object.keys(values).length > 0
       ? buildJoinFilterFromProperties(undefined, values, node.join.filterColumnMap)
       : new NoOperation();
     subSelects.set(node, buildQueryOperation(
       dates.businessDate, dates.processingDatetime, [new Alias(right, right.name)], node.join.target, condition,
-      [], [], undefined, dates.businessDateTo, true));
+      [], [], undefined, dates.businessDateTo, true, undefined, undefined, dates.processingDatetimeTo));
   }
 
   return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having, subSelects);
@@ -1204,8 +1239,9 @@ export function toSql(
   offset?: number,
   having?: Operation,
   dialect: DialectName | SqlDialect = 'postgres',
+  processingDatetimeTo: Date | null = null,
 ): string {
-  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having);
+  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having, processingDatetimeTo);
   return selectSqlToString(selectOp, dialect);
 }
 
