@@ -53,15 +53,15 @@ export const PROCESSING_SNAPSHOT_QUOTE_FINDER_SPECS: SpecCase<QuoteFinder>[] = [
 
 export const PROCESSING_SNAPSHOT_POSITION_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   {
-    name: 'the_query_time_reaches_the_quotes_a_position_joins',
-    query: f => f.findAll(null, _JAN_1, [f.id(), f.quotes().price()]).orderBy(f.id().ascending()),
+    name: 'a_navigation_is_read_at_the_time_it_is_given',
+    query: f => f.findAll(null, null, [f.id(), f.quotes(undefined, { processingTime: _JAN_1 }).price()]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Quotes Price'], rows: [
         [1, 150.0],
         [2, 300.0],
       ] },
   },
   {
-    name: 'a_navigation_can_be_given_its_own_time',
+    name: 'a_navigation_given_another_time_reads_the_snapshot_of_that_time',
     query: f => f.findAll(null, null, [f.id(), f.quotes(undefined, { processingTime: _JAN_2 }).price()]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Quotes Price'], rows: [
         [1, 152.0],

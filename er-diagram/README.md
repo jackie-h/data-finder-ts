@@ -44,7 +44,7 @@ markdown the e2e tests run on). Other keys: `title`, `out`, `attrs` (limit attri
 
 ## Data-finder version
 
-The export needs `mapping_markdown.export_json`, which first shipped in data-finder 0.1.18, and the root `pyproject.toml` requires `data-finder[markdown]>=0.1.19`, which also draws a property mapped through other tables.
+The export needs `mapping_markdown.export_json`, which first shipped in data-finder 0.1.18, and the root `pyproject.toml` requires `data-finder[markdown]>=0.1.20`, which also draws a property mapped through other tables.
 The JSON is defined by that package: if it changes there, update `data.mjs` and `generate.mjs` to match.
 
 CI (`.github/workflows/ci.yml`, job `er-diagram`) runs the tests, builds the diagrams and uploads `er-diagram/out` as the `er-diagrams` artifact.

@@ -121,7 +121,7 @@ export const seeds: Record<string, Seed> = {
   joins_through_tables: async conn => {
     await run(conn, 'CREATE SCHEMA hr',
       'CREATE TABLE hr.employees (id INT, name VARCHAR, street VARCHAR, home_country INT, citizen_ref INT)',
-      'CREATE TABLE hr.country_refs (ref INT, code VARCHAR)',
+      'CREATE TABLE hr.country_refs (ref INT, code VARCHAR, valid_from DATE, valid_to DATE)',
       'CREATE TABLE hr.countries (code VARCHAR, name VARCHAR)');
     await loadCsv(conn, 'hr.employees', 'joins_through_tables_employees.csv');
     await loadCsv(conn, 'hr.country_refs', 'joins_through_tables_country_refs.csv');

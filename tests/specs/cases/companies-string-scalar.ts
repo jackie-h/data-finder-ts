@@ -95,6 +95,21 @@ export const COMPANIES_STRING_SCALAR_SPECS: SpecCase<CompanyFinder>[] = [
       ] },
   },
   {
+    name: 'expression_is_in',
+    query: (f: any) => f.findAll(null, null, [f.id()], f.name().substring(0, 4).isIn(['beta', 'Hell'])).orderBy(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+      ], skipGraphql: 'The GraphQL finder cannot filter on a string function', pending: 'isIn on an expression is not ported yet' },
+  },
+  {
+    name: 'expression_is_not_in',
+    query: (f: any) => f.findAll(null, null, [f.id()], f.name().substring(0, 4).isNotIn(['beta', 'Hell'])).orderBy(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [1],
+      ], skipGraphql: 'The GraphQL finder cannot filter on a string function', pending: 'isIn on an expression is not ported yet' },
+  },
+  {
     name: 'slice_stop_only',
     query: f => f.findAll(null, null, [f.name().left(4)], f.id().eq(2)),
     expected: { columns: ['Left Name'], rows: [
