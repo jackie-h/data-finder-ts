@@ -32,6 +32,6 @@ describe('TRADE_GROUP_BY_FINDER_SPECS', () => {
   const f = new TradeFinder();
 
   for (const c of TRADE_GROUP_BY_FINDER_SPECS) {
-    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

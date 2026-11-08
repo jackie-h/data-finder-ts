@@ -14,7 +14,7 @@ supported-markers = [
 
 [[package]]
 name = "data-finder"
-version = "0.1.19"
+version = "0.1.20"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -22,9 +22,9 @@ dependencies = [
     { name = "pandas", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "sqlglot", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4e/8c/fad09fbfc73494f9b4eb70ec20e3ad0edeb739ad1921a6b41913ad9ff4a9/data_finder-0.1.19.tar.gz", hash = "sha256:1d115679c0aec100c82cedcfbabcbea5a8b161c8ed88a2ef181bd1c5f4df0a27", size = 207136, upload-time = "2026-11-02T21:04:19.497Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/c8/02b314f6b67f3a02278ebd3cd4274968e86bd771eb49693647c28d69164f/data_finder-0.1.20.tar.gz", hash = "sha256:ee45827470776d89d5557ae43f37c560c8a94e9b76fdef75372115379fa12737", size = 224194, upload-time = "2026-11-08T18:42:34.585Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/dc/73e8254633693c6669378b30618c7ac445f0d6fe558576de60e875c4b7ae/data_finder-0.1.19-py3-none-any.whl", hash = "sha256:a4782c638eec22e92dcca17388f9197011e0c8524426498f3074ba4c2025e684", size = 235508, upload-time = "2026-11-02T21:04:17.837Z" },
+    { url = "https://files.pythonhosted.org/packages/48/a1/8200f4450e2d2e9b9279884f72c3cb5eb55f7191d23b0f365e2723dd0c85/data_finder-0.1.20-py3-none-any.whl", hash = "sha256:7faf1719103953a7c91d0e27bb38582ec4a61b7a71ab2ec186097c70a4503c78", size = 252548, upload-time = "2026-11-08T18:42:32.63Z" },
 ]
 
 [package.optional-dependencies]
@@ -43,7 +43,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "data-finder", extras = ["markdown"], specifier = ">=0.1.19" },
+    { name = "data-finder", extras = ["markdown"], specifier = ">=0.1.20" },
     { name = "pytest", specifier = ">=9.0.0" },
 ]
 

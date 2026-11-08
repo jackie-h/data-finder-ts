@@ -28,6 +28,6 @@ describe('JOINS_THROUGH_TABLES_EMPLOYEE_FINDER_SPECS', () => {
   const f = new EmployeeFinder();
 
   for (const c of JOINS_THROUGH_TABLES_EMPLOYEE_FINDER_SPECS) {
-    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

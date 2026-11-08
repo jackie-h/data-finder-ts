@@ -134,7 +134,7 @@ for (const scenario of SCENARIOS) {
         const { finder, cases } = groups[name];
         describe(name, () => {
           for (const c of cases) {
-            it.skipIf(c.expected.skipGraphql !== undefined)(c.name, async ctx => {
+            it.skipIf(c.expected.skipGraphql !== undefined || c.expected.pending !== undefined)(c.name, async ctx => {
               const module = await import(`./generated_graphql/${scenario.mapping}/${finder}.ts`);
               const runner = new GraphQLConnect();
               registerRunner(runner);

@@ -134,6 +134,31 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
       ], skipGraphql: 'A filter on an expression cannot be pushed to the server' },
   },
   {
+    name: 'negate_a_string_test_with_a_tilde',
+    query: (f: any) => { throw new Error('not ported yet'); },
+    expected: { columns: ['Name'], rows: [
+        ['Beta Corp'],
+        ['Delta Ltd'],
+        ['Gamma LLC'],
+      ], sql: 'NOT (t0.name LIKE \'Acme%\')', skipGraphql: 'The GraphQL finder cannot push a negated condition to the server', pending: 'negating a condition is not ported yet' },
+  },
+  {
+    name: 'matches_a_regular_expression_anywhere_in_the_text',
+    query: (f: any) => f.findAll(null, null, [f.name()], f.name().matches('^(Acme|Beta) .*p$')).orderBy(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
+        ['Acme Corp'],
+        ['Beta Corp'],
+      ], skipGraphql: 'The GraphQL finder cannot push a regular expression to the server', pending: 'matching a regular expression is not ported yet' },
+  },
+  {
+    name: 'negate_a_regular_expression_match',
+    query: (f: any) => { throw new Error('not ported yet'); },
+    expected: { columns: ['Name'], rows: [
+        ['Acme Industries'],
+        ['Gamma LLC'],
+      ], skipGraphql: 'The GraphQL finder cannot push a negated condition to the server', pending: 'negating a condition and matching a regular expression are not ported yet' },
+  },
+  {
     name: 'sum_of_arithmetic',
     query: f => f.findAll(null, null, [f.id().times(2).sum()]),
     expected: { columns: ['Sum Expression'], rows: [
@@ -797,6 +822,28 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
         [4, 5],
         [5, null],
       ], skipGraphql: 'Window functions are not supported by the GraphQL engine' },
+  },
+  {
+    name: 'integer_power_is_an_integer',
+    query: (f: any) => f.findAll(null, null, [f.id(), f.id().power(2)]).orderBy(f.id().ascending()),
+    expected: { columns: ['Id', 'Power Id'], rows: [
+        [1, 1],
+        [2, 4],
+        [3, 9],
+        [4, 16],
+        [5, 25],
+      ], sql: 'CAST(POWER(t0.id, 2) AS BIGINT)', skipGraphql: 'The GraphQL finder has no scalar functions', pending: 'the type of an arithmetic result is not ported yet' },
+  },
+  {
+    name: 'aggregate_over_a_window_keeps_every_row',
+    query: (f: any) => f.findAll(null, null, [f.id(), f.id().max().over([f.category()])]).orderBy(f.id().ascending()),
+    expected: { columns: ['Id', 'Max Id'], rows: [
+        [1, 3],
+        [2, 2],
+        [3, 3],
+        [4, 5],
+        [5, 5],
+      ], skipGraphql: 'Window functions are not supported by the GraphQL engine', pending: 'an aggregate over a window is not told from a grouping aggregate yet' },
   },
   {
     name: 'qcut_two_buckets',

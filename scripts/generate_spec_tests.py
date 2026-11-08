@@ -81,6 +81,29 @@ COLUMN_LABELS = {
     'fill_null_leaves_a_value_that_is_there': {'Fill Null Name': 'Or Else Name'},
 }
 
+# Expectations of features the port does not have yet: generated, but skipped, with the reason.
+# Each is removed with the change that ports its feature.
+PENDING: dict[str, str] = {
+    'negate_a_string_test_with_a_tilde': 'negating a condition is not ported yet',
+    'matches_a_regular_expression_anywhere_in_the_text': 'matching a regular expression is not ported yet',
+    'negate_a_regular_expression_match': 'negating a condition and matching a regular expression are not ported yet',
+    'expression_is_in': 'isIn on an expression is not ported yet',
+    'expression_is_not_in': 'isIn on an expression is not ported yet',
+    'integer_power_is_an_integer': 'the type of an arithmetic result is not ported yet',
+    'aggregate_over_a_window_keeps_every_row': 'an aggregate over a window is not told from a grouping aggregate yet',
+    'filter_on_a_year': 'comparing a date part, a difference or a moved date is not ported yet',
+    'filter_on_a_month_in_a_list': 'comparing a date part, a difference or a moved date is not ported yet',
+    'filter_on_a_difference': 'comparing a date part, a difference or a moved date is not ported yet',
+    'filter_on_a_moved_datetime': 'comparing a date part, a difference or a moved date is not ported yet',
+    'a_date_given_to_the_property_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
+    'a_date_given_to_a_property_of_the_embedded_address_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
+    'a_date_before_any_row_of_the_table_on_the_way_finds_no_country': 'dates through the tables a property passes are not ported yet',
+    'a_filter_on_a_property_of_the_embedded_address_that_reaches_another_table': 'dates through the tables a property passes are not ported yet',
+    'a_property_of_an_embedded_address_that_reaches_another_table': 'dates through the tables a property passes are not ported yet',
+    'a_property_mapped_through_another_table': 'dates through the tables a property passes are not ported yet',
+    'the_country_of_the_home_and_of_citizenship_are_read_through_the_same_tables_separately': 'dates through the tables a property passes are not ported yet',
+}
+
 # Specs that exercise Python features the TypeScript port doesn't have (SQL views: View / to_view).
 SKIPPED_SPECS = {
     'TRADE_VIEW_FINDER_SPECS': 'SQL views are not ported',
@@ -272,6 +295,10 @@ class Translator:
                 return f"new DateOnly('{y:04d}-{m:02d}-{d:02d}T00:00:00Z')"
             return 'new Date(Date.UTC(' + ', '.join(str(x) for x in [y, m - 1, d, *rest]) + '))'
         args = [self.expr(a) for a in node.args]
+        if func.attr == 'find_all' and node.args and isinstance(node.args[0], ast.List):
+            # data-finder 0.1.20: a class with no milestoning has no dates to give, find_all(columns, filter);
+            # the port still takes the two null dates
+            args = ['null', 'null'] + args
         name = method_name(func.attr)
         if func.attr in ('std', 'var') and node.keywords:
             # std(ddof=0): the degrees of freedom are the one argument
@@ -286,8 +313,12 @@ class Translator:
             if not isinstance(kw.value, ast.List):
                 order = f'[{order}]'
             return f'{self.expr(owner)}.{name}({", ".join((args or ["\'\'"]) + [order])})'
+        if func.attr == 'over' and node.keywords:
+            # over(partition_by=[...], order_by=[...]): positional in TypeScript
+            given = {k.arg: self.expr(k.value) for k in node.keywords}
+            args = [given.get('partition_by', 'undefined')] + ([given['order_by']] if 'order_by' in given else [])
         # Window functions take their keyword arguments as one options object.
-        if func.attr in ('rank', 'shift', 'qcut', 'first', 'last') and node.keywords:
+        elif func.attr in ('rank', 'shift', 'qcut', 'first', 'last') and node.keywords:
             opts = ', '.join(f'{OPTION_KEYS[k.arg]}: {self.expr(k.value)}' for k in node.keywords)
             args.append('{ ' + opts + ' }')
         elif node.keywords:
@@ -379,6 +410,8 @@ def generate_module(module_name: str) -> tuple[str, str]:
                     continue   # a docstring
                 if isinstance(inner, ast.Expr):
                     lines.append(f'  {translator.expr(inner.value)};')
+                elif isinstance(inner, ast.Assign) and len(inner.targets) == 1 and isinstance(inner.targets[0], ast.Name):
+                    lines.append(f'  const {inner.targets[0].id} = {translator.expr(inner.value)};')
                 elif isinstance(inner, ast.Return):
                     lines.append(f'  return {translator.expr(inner.value)};')
                 else:
@@ -419,8 +452,14 @@ def generate_module(module_name: str) -> tuple[str, str]:
         cases = []
         for exp in spec.expectations:
             lam = kwarg(expectation_calls[exp.name], 'query')
-            assert isinstance(lam, ast.Lambda)
-            query = translator.expr(lam.body)
+            assert isinstance(lam, (ast.Lambda, ast.Name)), ast.dump(lam)
+            pending = PENDING.get(exp.name)
+            try:
+                query = translator.expr(lam.body) if isinstance(lam, ast.Lambda) else f'{lam.id}(f)'   # or a helper
+            except NotImplementedError:
+                if pending is None:
+                    raise
+                query = "{ throw new Error('not ported yet'); }"   # a query the translator cannot write yet
             labels = COLUMN_LABELS.get(exp.name, {})
             columns = [labels.get(c, c) for c in exp.expected_columns]
             fields = [f"columns: [{', '.join(js_str(c) for c in columns)}]",
@@ -431,15 +470,19 @@ def generate_module(module_name: str) -> tuple[str, str]:
                 fields.append(f"unexpectedSql: {js_str(exp.unexpected_sql['duckdb'])}")
             if 'graphql' in exp.skip_backends:
                 fields.append(f"skipGraphql: {js_str(exp.skip_backends['graphql'])}")
+            if pending is not None:
+                fields.append(f"pending: {js_str(pending)}")
+            # a pending query may use what the port does not have yet, so it is not type-checked
+            param = '(f: any)' if pending is not None else 'f'
             cases.append(
-                f"  {{\n    name: {js_str(exp.name)},\n    query: f => {query},\n"
+                f"  {{\n    name: {js_str(exp.name)},\n    query: {param} => {query},\n"
                 f"    expected: {{ {', '.join(fields)} }},\n  }},\n"
             )
         case_blocks.append(f"export const {var_name}: SpecCase<{spec.finder_name}>[] = [\n" + ''.join(cases) + '];\n')
         test_blocks.append(
             f"describe({js_str(var_name)}, () => {{\n  const f = new {spec.finder_name}();\n\n"
             f"  for (const c of {var_name}) {{\n"
-            f"    it(c.name, () => runExpectation(c.query(f), runner, c.expected));\n  }}\n}});\n"
+            f"    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));\n  }}\n}});\n"
         )
         groups.append((var_name, spec.finder_name))
         if var_name in ORDER_INDEPENDENT.get(module_name, []):
@@ -452,7 +495,7 @@ def generate_module(module_name: str) -> tuple[str, str]:
         test_blocks.append(f"""// Related finders, and the join nodes under them, are shared between queries. A query that is missing a join
 // condition can pass only because an earlier query left its condition on a shared node, so each spec must also
 // pass when it runs in a different order.
-const ORDER_INDEPENDENT_SPECS: SpecCase<{finder}>[] = [{', '.join('...' + n for n in names)}];
+const ORDER_INDEPENDENT_SPECS: SpecCase<{finder}>[] = [{', '.join('...' + n for n in names)}].filter(c => c.expected.pending === undefined);
 
 describe('trade specs do not depend on order', () => {{
   const orders: [string, SpecCase<{finder}>[]][] = [
