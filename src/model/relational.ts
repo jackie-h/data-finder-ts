@@ -675,9 +675,10 @@ export function containsAggregateOrWindow(op: unknown): boolean {
   return false;
 }
 
-/** Whether `op` collapses rows: an aggregate or a count. Window functions keep every row. */
+/** Whether `op` collapses rows: an aggregate or a count. Window functions keep every row, and so does an aggregate over a window (`max().over()`). */
 export function containsAggregate(op: unknown): boolean {
-  if (op instanceof AggregateOperation || op instanceof CountAllOperation) return true;
+  if (op instanceof AggregateOperation) return op.window === undefined;
+  if (op instanceof CountAllOperation) return true;
   if (op instanceof BinaryOperation) return containsAggregate(op.left) || containsAggregate(op.right);
   if (op instanceof UnaryOperation || op instanceof Alias) return containsAggregate(op.element);
   return false;
