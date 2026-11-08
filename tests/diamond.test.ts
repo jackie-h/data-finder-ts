@@ -33,36 +33,34 @@ afterAll(() => {
 
 describe('RecordFinder — diamond inheritance', () => {
   it('returns all records with id and name', async () => {
-    const rows = await rf.findAll(null, null, [rf.id(), rf.recordName()])
+    const rows = await rf.findAll([rf.id(), rf.recordName()])
       .orderBy(rf.id().ascending()).toRows();
     expect(rows).toEqual([[1, 'Alpha'], [2, 'Beta'], [3, 'Gamma']]);
   });
 
   it('filters by inherited id field', async () => {
-    const rows = await rf.findAll(null, null, [rf.recordName()], rf.id().eq(2)).toRows();
+    const rows = await rf.findAll([rf.recordName()], rf.id().eq(2)).toRows();
     expect(rows[0][0]).toBe('Beta');
   });
 
   it('filters by inherited created_at field', async () => {
-    const rows = await rf.findAll(null, null, [rf.recordName()], rf.createdAt().eq('2024-03-01')).toRows();
+    const rows = await rf.findAll([rf.recordName()], rf.createdAt().eq('2024-03-01')).toRows();
     expect(rows[0][0]).toBe('Gamma');
   });
 
   it('filters by inherited updated_at field', async () => {
-    const rows = await rf.findAll(null, null, [rf.recordName()], rf.updatedAt().eq('2024-06-01')).toRows();
+    const rows = await rf.findAll([rf.recordName()], rf.updatedAt().eq('2024-06-01')).toRows();
     expect(rows[0][0]).toBe('Alpha');
   });
 
   it('filters by version from Versioned mixin', async () => {
-    const rows = await rf.findAll(null, null, [rf.recordName(), rf.version()], rf.version().eq(1)).toRows();
+    const rows = await rf.findAll([rf.recordName(), rf.version()], rf.version().eq(1)).toRows();
     expect(rows[0][0]).toBe('Beta');
     expect(Number(rows[0][1])).toBe(1);
   });
 
   it('projects all diamond inheritance fields', async () => {
-    const rows = await rf.findAll(
-      null, null,
-      [rf.id(), rf.createdAt(), rf.updatedAt(), rf.version(), rf.recordName()],
+    const rows = await rf.findAll([rf.id(), rf.createdAt(), rf.updatedAt(), rf.version(), rf.recordName()],
       rf.recordName().eq('Alpha'),
     ).toRows();
     expect(rows.length).toBe(1);

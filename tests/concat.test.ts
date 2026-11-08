@@ -71,24 +71,24 @@ describe('companies against DuckDB', () => {
   afterAll(() => { conn.disconnectSync(); instance.closeSync(); });
 
   it('joins columns and text', async () => {
-    const query = f.findAll(null, null, [f.name().concat(' (', f.category(), ')')]).orderBy(f.name().ascending()).limit(2);
+    const query = f.findAll([f.name().concat(' (', f.category(), ')')]).orderBy(f.name().ascending()).limit(2);
     expect(query.toSql()).toContain("t0.name || ' (' || t0.category || ')'");
     expect(await query.toRows()).toEqual([['Acme Corp (Technology)'], ['Acme Industries (Manufacturing)']]);
   });
 
   it('joins text before a column', async () => {
-    const rows = await f.findAll(null, null, [concat('Company: ', f.name())]).orderBy(f.name().ascending()).limit(1).toRows();
+    const rows = await f.findAll([concat('Company: ', f.name())]).orderBy(f.name().ascending()).limit(1).toRows();
     expect(rows).toEqual([['Company: Acme Corp']]);
   });
 
   it('joins a function of a column', async () => {
-    const rows = await f.findAll(null, null, [f.name().toUpperCase().concat('/', f.category().toLowerCase())])
+    const rows = await f.findAll([f.name().toUpperCase().concat('/', f.category().toLowerCase())])
       .orderBy(f.name().ascending()).limit(1).toRows();
     expect(rows).toEqual([['ACME CORP/technology']]);
   });
 
   it('filters on joined text', async () => {
-    const rows = await f.findAll(null, null, [f.id()], f.name().concat('/', f.category()).eq('Beta Corp/Technology')).toRows();
+    const rows = await f.findAll([f.id()], f.name().concat('/', f.category()).eq('Beta Corp/Technology')).toRows();
     expect(rows.map(r => Number(r[0]))).toEqual([3]);
   });
 });
@@ -107,7 +107,7 @@ describe('orgchart against DuckDB', () => {
 
   it('a missing part makes the whole missing', async () => {
     const f = new EmployeeFinder();
-    const rows = await f.findAll(null, null, [f.name().concat(' reports to ', f.manager().name())]).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.name().concat(' reports to ', f.manager().name())]).orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([[null], ['Bob reports to Alice'], ['Carol reports to Alice'], ['Dave reports to Bob']]);
   });
 });

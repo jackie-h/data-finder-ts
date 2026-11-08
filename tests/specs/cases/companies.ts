@@ -6,21 +6,21 @@ import type { CompanyFinder } from '../../generated_examples/companies/CompanyFi
 export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   {
     name: 'count_distinct_of_the_whole_result',
-    query: f => f.findAll(null, null, [f.category().countDistinct()]),
+    query: f => f.findAll([f.category().countDistinct()]),
     expected: { columns: ['Category Count Distinct'], rows: [
         [3],
       ], sql: 'COUNT(DISTINCT t0.category)' },
   },
   {
     name: 'count_distinct_is_less_than_count_where_values_repeat',
-    query: f => f.findAll(null, null, [f.category().count(), f.category().countDistinct()]),
+    query: f => f.findAll([f.category().count(), f.category().countDistinct()]),
     expected: { columns: ['Category Count', 'Category Count Distinct'], rows: [
         [5, 3],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'count_distinct_per_group',
-    query: f => f.findAll(null, null, [f.category(), f.name().countDistinct()]).groupBy(f.category()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), f.name().countDistinct()]).groupBy(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Name Count Distinct'], rows: [
         ['Finance', 2],
         ['Manufacturing', 1],
@@ -29,14 +29,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'count_distinct_with_a_filter',
-    query: f => f.findAll(null, null, [f.category().countDistinct()], f.name().startsWith('Acme')),
+    query: f => f.findAll([f.category().countDistinct()], f.name().startsWith('Acme')),
     expected: { columns: ['Category Count Distinct'], rows: [
         [2],
       ] },
   },
   {
     name: 'join_per_group_in_an_order',
-    query: f => f.findAll(null, null, [f.category(), f.name().join(', ', [f.name().ascending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), f.name().join(', ', [f.name().ascending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Join Name'], rows: [
         ['Finance', 'Delta Ltd, Gamma LLC'],
         ['Manufacturing', 'Acme Industries'],
@@ -45,7 +45,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'join_descending',
-    query: f => f.findAll(null, null, [f.category(), f.name().join('|', [f.name().descending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), f.name().join('|', [f.name().descending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Join Name'], rows: [
         ['Finance', 'Gamma LLC|Delta Ltd'],
         ['Manufacturing', 'Acme Industries'],
@@ -54,21 +54,21 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'join_of_the_whole_result',
-    query: f => f.findAll(null, null, [f.category().join('/', [f.id().ascending()])]),
+    query: f => f.findAll([f.category().join('/', [f.id().ascending()])]),
     expected: { columns: ['Join Category'], rows: [
         ['Technology/Manufacturing/Technology/Finance/Finance'],
       ], skipGraphql: 'The GraphQL engine cannot order the values it joins' },
   },
   {
     name: 'join_without_an_order_joins_every_value',
-    query: f => f.findAll(null, null, [f.category(), f.name().join(',')], f.category().eq('Manufacturing')).groupBy(f.category()),
+    query: f => f.findAll([f.category(), f.name().join(',')], f.category().eq('Manufacturing')).groupBy(f.category()),
     expected: { columns: ['Category', 'Join Name'], rows: [
         ['Manufacturing', 'Acme Industries'],
       ], sql: 'STRING_AGG(t0.name, \',\')' },
   },
   {
     name: 'count_all_counts_rows_per_group',
-    query: f => f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), countAll()]).groupBy(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Count'], rows: [
         ['Finance', 2],
         ['Manufacturing', 1],
@@ -77,35 +77,35 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'population_standard_deviation',
-    query: f => f.findAll(null, null, [f.id().std(0)], f.id().isIn([1, 3])),
+    query: f => f.findAll([f.id().std(0)], f.id().isIn([1, 3])),
     expected: { columns: ['Std Id'], rows: [
         [1.0],
       ], sql: 'STDDEV_POP', skipGraphql: 'The GraphQL finder has no standard deviation yet' },
   },
   {
     name: 'sample_variance',
-    query: f => f.findAll(null, null, [f.id().var()], f.id().isIn([1, 3])),
+    query: f => f.findAll([f.id().var()], f.id().isIn([1, 3])),
     expected: { columns: ['Var Id'], rows: [
         [2.0],
       ], sql: 'VAR_SAMP', skipGraphql: 'The GraphQL finder has no variance yet' },
   },
   {
     name: 'population_variance',
-    query: f => f.findAll(null, null, [f.id().var(0)], f.id().isIn([1, 3])),
+    query: f => f.findAll([f.id().var(0)], f.id().isIn([1, 3])),
     expected: { columns: ['Var Id'], rows: [
         [1.0],
       ], sql: 'VAR_POP', skipGraphql: 'The GraphQL finder has no variance yet' },
   },
   {
     name: 'smallest_and_largest_text',
-    query: f => f.findAll(null, null, [f.name().min(), f.name().max()]),
+    query: f => f.findAll([f.name().min(), f.name().max()]),
     expected: { columns: ['Min Name', 'Max Name'], rows: [
         ['Acme Corp', 'Gamma LLC'],
       ], skipGraphql: 'The GraphQL finder cannot take the smallest or largest text yet' },
   },
   {
     name: 'having_a_count',
-    query: f => f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1)).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1)).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Count'], rows: [
         ['Finance', 2],
         ['Technology', 2],
@@ -113,21 +113,21 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'having_a_sum_and_a_grouping_column',
-    query: f => f.findAll(null, null, [f.category(), f.id().sum()]).groupBy(f.category()).having(f.id().sum().gt(3), f.category().ne('Finance')).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), f.id().sum()]).groupBy(f.category()).having(f.id().sum().gt(3), f.category().ne('Finance')).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Sum Id'], rows: [
         ['Technology', 4],
       ], skipGraphql: 'The GraphQL finder cannot filter the groups of an aggregation' },
   },
   {
     name: 'having_on_joined_text',
-    query: f => f.findAll(null, null, [f.category(), f.name().join(',')]).groupBy(f.category()).having(f.name().join(',').contains('Gamma')),
+    query: f => f.findAll([f.category(), f.name().join(',')]).groupBy(f.category()).having(f.name().join(',').contains('Gamma')),
     expected: { columns: ['Category', 'Join Name'], rows: [
         ['Finance', 'Gamma LLC,Delta Ltd'],
       ], skipGraphql: 'The GraphQL finder cannot filter the groups of an aggregation' },
   },
   {
     name: 'starts_with_on_a_function_of_a_column',
-    query: f => f.findAll(null, null, [f.name()], f.name().toUpperCase().startsWith('ACME')).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().toUpperCase().startsWith('ACME')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -135,7 +135,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'negate_a_string_test_with_a_tilde',
-    query: f => f.findAll(null, null, [f.name()], f.name().startsWith('Acme').not()).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().startsWith('Acme').not()).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Beta Corp'],
         ['Delta Ltd'],
@@ -144,7 +144,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'matches_a_regular_expression_anywhere_in_the_text',
-    query: f => f.findAll(null, null, [f.name()], f.name().matches('^(Acme|Beta) .*p$')).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().matches('^(Acme|Beta) .*p$')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
@@ -152,7 +152,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'negate_a_regular_expression_match',
-    query: f => f.findAll(null, null, [f.name()], f.name().matches('Corp|Ltd').not()).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().matches('Corp|Ltd').not()).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Industries'],
         ['Gamma LLC'],
@@ -160,21 +160,21 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sum_of_arithmetic',
-    query: f => f.findAll(null, null, [f.id().times(2).sum()]),
+    query: f => f.findAll([f.id().times(2).sum()]),
     expected: { columns: ['Sum Expression'], rows: [
         [30],
       ], sql: 'SUM(t0.id * 2)', skipGraphql: 'The GraphQL finder cannot aggregate an expression' },
   },
   {
     name: 'sum_of_a_constant_counts_the_rows',
-    query: f => f.findAll(null, null, [constant(1).sum()]),
+    query: f => f.findAll([constant(1).sum()]),
     expected: { columns: ['Sum Expression'], rows: [
         [5],
       ], sql: 'SUM(1)', skipGraphql: 'The GraphQL finder cannot aggregate an expression' },
   },
   {
     name: 'sum_of_a_conditional_per_group',
-    query: f => f.findAll(null, null, [f.category(), when(f.category().eq('Technology')).then(5.0).otherwise(1.0).sum().alias('Profit')]).groupBy(f.category()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), when(f.category().eq('Technology')).then(5.0).otherwise(1.0).sum().alias('Profit')]).groupBy(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Profit'], rows: [
         ['Finance', 2.0],
         ['Manufacturing', 1.0],
@@ -183,7 +183,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'all_and_any_of_a_condition_per_group',
-    query: f => f.findAll(null, null, [f.category(), f.id().gt(0).all().alias('All'), f.id().gt(3).any().alias('Any')]).groupBy(f.category()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), f.id().gt(0).all().alias('All'), f.id().gt(3).any().alias('Any')]).groupBy(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'All', 'Any'], rows: [
         ['Finance', true, true],
         ['Manufacturing', true, false],
@@ -192,7 +192,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'concat_columns_and_text',
-    query: f => f.findAll(null, null, [f.name().concat(' (').concat(f.category()).concat(')')]).orderBy(f.name().ascending()).limit(2),
+    query: f => f.findAll([f.name().concat(' (').concat(f.category()).concat(')')]).orderBy(f.name().ascending()).limit(2),
     expected: { columns: ['Expression'], rows: [
         ['Acme Corp (Technology)'],
         ['Acme Industries (Manufacturing)'],
@@ -200,21 +200,21 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'concat_text_before_a_column',
-    query: f => f.findAll(null, null, [concat('Company: ', f.name())]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([concat('Company: ', f.name())]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Expression'], rows: [
         ['Company: Acme Corp'],
       ], skipGraphql: 'The GraphQL finder cannot join text' },
   },
   {
     name: 'concat_a_function_of_a_column',
-    query: f => f.findAll(null, null, [f.name().toUpperCase().concat('/').concat(f.category().toLowerCase())]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name().toUpperCase().concat('/').concat(f.category().toLowerCase())]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Expression'], rows: [
         ['ACME CORP/technology'],
       ], skipGraphql: 'The GraphQL finder cannot join text' },
   },
   {
     name: 'text_functions_chain',
-    query: f => f.findAll(null, null, [f.name().toUpperCase().length()]).orderBy(f.name().ascending()).limit(2),
+    query: f => f.findAll([f.name().toUpperCase().length()]).orderBy(f.name().ascending()).limit(2),
     expected: { columns: ['Length Upper Name'], rows: [
         [9],
         [15],
@@ -222,35 +222,35 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'a_text_function_of_a_text_function',
-    query: f => f.findAll(null, null, [f.name().toUpperCase().replace('ACME', 'X')]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name().toUpperCase().replace('ACME', 'X')]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Replace Upper Name'], rows: [
         ['X CORP'],
       ], skipGraphql: 'The GraphQL finder cannot chain functions' },
   },
   {
     name: 'slice_the_result_of_a_function',
-    query: f => f.findAll(null, null, [f.name().toLowerCase().left(4)]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name().toLowerCase().left(4)]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Left Lower Name'], rows: [
         ['acme'],
       ], skipGraphql: 'The GraphQL finder cannot chain functions' },
   },
   {
     name: 'filter_on_a_function_of_a_column',
-    query: f => f.findAll(null, null, [f.name()], f.name().toUpperCase().eq('ACME CORP')),
+    query: f => f.findAll([f.name()], f.name().toUpperCase().eq('ACME CORP')),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ], sql: 'UPPER(t0.name) = \'ACME CORP\'', skipGraphql: 'A filter on an expression cannot be pushed to the server' },
   },
   {
     name: 'filter_on_the_length_of_a_column',
-    query: f => f.findAll(null, null, [f.name()], f.name().length().gt(10)).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().length().gt(10)).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Industries'],
       ], skipGraphql: 'A filter on an expression cannot be pushed to the server' },
   },
   {
     name: 'filter_on_arithmetic',
-    query: f => f.findAll(null, null, [f.id()], f.id().times(2).gte(8)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.id().times(2).gte(8)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [4],
         [5],
@@ -258,14 +258,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'filter_on_joined_text',
-    query: f => f.findAll(null, null, [f.id()], f.name().concat('/').concat(f.category()).eq('Beta Corp/Technology')),
+    query: f => f.findAll([f.id()], f.name().concat('/').concat(f.category()).eq('Beta Corp/Technology')),
     expected: { columns: ['Id'], rows: [
         [3],
       ], skipGraphql: 'A filter on an expression cannot be pushed to the server' },
   },
   {
     name: 'filter_comparing_two_expressions',
-    query: f => f.findAll(null, null, [f.id()], f.name().length().gt(f.category().length().plus(1))).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.name().length().gt(f.category().length().plus(1))).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [4],
@@ -274,7 +274,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'filter_on_an_expression_with_another_filter',
-    query: f => f.findAll(null, null, [f.id()], f.name().toUpperCase().eq('DELTA LTD').or(f.id().times(1).eq(1))).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.name().toUpperCase().eq('DELTA LTD').or(f.id().times(1).eq(1))).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [5],
@@ -282,7 +282,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'not_equal_on_an_expression',
-    query: f => f.findAll(null, null, [f.id()], f.name().toLowerCase().ne('acme corp')).orderBy(f.id().ascending()).limit(2),
+    query: f => f.findAll([f.id()], f.name().toLowerCase().ne('acme corp')).orderBy(f.id().ascending()).limit(2),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -290,7 +290,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_an_aggregate_descending_then_a_column',
-    query: f => f.findAll(null, null, [f.category(), f.id().count()]).groupBy(f.category()).orderBy(f.id().count().descending(), f.category().ascending()),
+    query: f => f.findAll([f.category(), f.id().count()]).groupBy(f.category()).orderBy(f.id().count().descending(), f.category().ascending()),
     expected: { columns: ['Category', 'Id Count'], rows: [
         ['Finance', 2],
         ['Technology', 2],
@@ -299,7 +299,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_an_aggregate_ascending',
-    query: f => f.findAll(null, null, [f.category(), f.id().count()]).groupBy(f.category()).orderBy(f.id().count().ascending(), f.category().descending()),
+    query: f => f.findAll([f.category(), f.id().count()]).groupBy(f.category()).orderBy(f.id().count().ascending(), f.category().descending()),
     expected: { columns: ['Category', 'Id Count'], rows: [
         ['Manufacturing', 1],
         ['Technology', 2],
@@ -308,7 +308,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'a_comparison_as_a_column',
-    query: f => f.findAll(null, null, [f.name(), f.category().eq('Technology')]).orderBy(f.id().ascending()).limit(3),
+    query: f => f.findAll([f.name(), f.category().eq('Technology')]).orderBy(f.id().ascending()).limit(3),
     expected: { columns: ['Name', 'Expression'], rows: [
         ['Acme Corp', true],
         ['Acme Industries', false],
@@ -317,7 +317,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'a_combined_condition_as_a_column',
-    query: f => f.findAll(null, null, [f.id(), f.category().eq('Finance').or(f.name().startsWith('Acme'))]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.category().eq('Finance').or(f.name().startsWith('Acme'))]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Expression'], rows: [
         [1, true],
         [2, true],
@@ -328,7 +328,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'a_null_check_as_a_column',
-    query: f => f.findAll(null, null, [f.name().isNull()]).orderBy(f.id().ascending()).limit(2),
+    query: f => f.findAll([f.name().isNull()]).orderBy(f.id().ascending()).limit(2),
     expected: { columns: ['Expression'], rows: [
         [false],
         [false],
@@ -336,7 +336,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'a_membership_test_as_a_column',
-    query: f => f.findAll(null, null, [f.id().isIn([1, 3])]).orderBy(f.id().ascending()).limit(3),
+    query: f => f.findAll([f.id().isIn([1, 3])]).orderBy(f.id().ascending()).limit(3),
     expected: { columns: ['Expression'], rows: [
         [true],
         [false],
@@ -345,7 +345,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'a_condition_as_a_column_next_to_a_filter',
-    query: f => f.findAll(null, null, [f.name(), f.id().gt(3)], f.category().eq('Finance')).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name(), f.id().gt(3)], f.category().eq('Finance')).orderBy(f.id().ascending()),
     expected: { columns: ['Name', 'Expression'], rows: [
         ['Gamma LLC', true],
         ['Delta Ltd', true],
@@ -353,7 +353,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'alias_names_the_columns',
-    query: f => f.findAll(null, null, [f.name().alias('Company'), f.category().alias('Sector')]).orderBy(f.name().ascending()).limit(2),
+    query: f => f.findAll([f.name().alias('Company'), f.category().alias('Sector')]).orderBy(f.name().ascending()).limit(2),
     expected: { columns: ['Company', 'Sector'], rows: [
         ['Acme Corp', 'Technology'],
         ['Acme Industries', 'Manufacturing'],
@@ -361,35 +361,35 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'alias_names_the_same_column_twice',
-    query: f => f.findAll(null, null, [f.name().alias('A'), f.name().alias('B')]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name().alias('A'), f.name().alias('B')]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['A', 'B'], rows: [
         ['Acme Corp', 'Acme Corp'],
       ] },
   },
   {
     name: 'alias_again_replaces_the_name',
-    query: f => f.findAll(null, null, [f.name().alias('First').alias('Second')]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name().alias('First').alias('Second')]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Second'], rows: [
         ['Acme Corp'],
       ] },
   },
   {
     name: 'alias_names_an_aggregate',
-    query: f => f.findAll(null, null, [f.id().count().alias('Companies')]),
+    query: f => f.findAll([f.id().count().alias('Companies')]),
     expected: { columns: ['Companies'], rows: [
         [5],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'alias_names_a_function_of_a_column',
-    query: f => f.findAll(null, null, [f.name().toUpperCase().alias('Loud')]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name().toUpperCase().alias('Loud')]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Loud'], rows: [
         ['ACME CORP'],
       ], skipGraphql: 'The GraphQL finder has no scalar functions' },
   },
   {
     name: 'constant_string_column',
-    query: f => f.findAll(null, null, [f.name(), constant('Hello').alias('Greeting')]).orderBy(f.name().ascending()).limit(2),
+    query: f => f.findAll([f.name(), constant('Hello').alias('Greeting')]).orderBy(f.name().ascending()).limit(2),
     expected: { columns: ['Name', 'Greeting'], rows: [
         ['Acme Corp', 'Hello'],
         ['Acme Industries', 'Hello'],
@@ -397,26 +397,26 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'constant_number_and_boolean_columns',
-    query: f => f.findAll(null, null, [f.name(), constant(7).alias('Seven'), constant(1.5).alias('Ratio'), constant(true).alias('Flag')]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name(), constant(7).alias('Seven'), constant(1.5).alias('Ratio'), constant(true).alias('Flag')]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Name', 'Seven', 'Ratio', 'Flag'], rows: [
         ['Acme Corp', 7, 1.5, true],
       ] },
   },
   {
     name: 'constant_column_is_named_constant_by_default',
-    query: f => f.findAll(null, null, [f.name(), constant(1)]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name(), constant(1)]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Name', 'Constant'], rows: [
         ['Acme Corp', 1],
       ] },
   },
   {
     name: 'constant_column_with_a_filter_and_no_matches',
-    query: f => f.findAll(null, null, [f.name(), constant('x').alias('X')], f.name().eq('Nobody')),
+    query: f => f.findAll([f.name(), constant('x').alias('X')], f.name().eq('Nobody')),
     expected: { columns: ['Name', 'X'], rows: [] },
   },
   {
     name: 'distinct_removes_repeated_rows',
-    query: f => f.findAll(null, null, [f.category()]).distinct().orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category()]).distinct().orderBy(f.category().ascending()),
     expected: { columns: ['Category'], rows: [
         ['Finance'],
         ['Manufacturing'],
@@ -425,7 +425,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'without_distinct_rows_repeat',
-    query: f => f.findAll(null, null, [f.category()]).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category()]).orderBy(f.category().ascending()),
     expected: { columns: ['Category'], rows: [
         ['Finance'],
         ['Finance'],
@@ -436,7 +436,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'distinct_keeps_rows_that_differ_in_any_column',
-    query: f => f.findAll(null, null, [f.category(), f.name()]).distinct().orderBy(f.category().ascending(), f.name().ascending()).limit(3),
+    query: f => f.findAll([f.category(), f.name()]).distinct().orderBy(f.category().ascending(), f.name().ascending()).limit(3),
     expected: { columns: ['Category', 'Name'], rows: [
         ['Finance', 'Delta Ltd'],
         ['Finance', 'Gamma LLC'],
@@ -445,7 +445,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'distinct_with_a_filter',
-    query: f => f.findAll(null, null, [f.category()], f.name().startsWith('Acme')).distinct().orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category()], f.name().startsWith('Acme')).distinct().orderBy(f.category().ascending()),
     expected: { columns: ['Category'], rows: [
         ['Manufacturing'],
         ['Technology'],
@@ -453,7 +453,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'distinct_applies_before_the_limit',
-    query: f => f.findAll(null, null, [f.category()]).distinct().orderBy(f.category().ascending()).limit(2),
+    query: f => f.findAll([f.category()]).distinct().orderBy(f.category().ascending()).limit(2),
     expected: { columns: ['Category'], rows: [
         ['Finance'],
         ['Manufacturing'],
@@ -461,7 +461,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'offset_skips_the_first_rows',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).offset(2),
+    query: f => f.findAll([f.name()]).orderBy(f.name().ascending()).offset(2),
     expected: { columns: ['Name'], rows: [
         ['Beta Corp'],
         ['Delta Ltd'],
@@ -470,7 +470,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'offset_then_limit_is_a_page',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).offset(1).limit(2),
+    query: f => f.findAll([f.name()]).orderBy(f.name().ascending()).offset(1).limit(2),
     expected: { columns: ['Name'], rows: [
         ['Acme Industries'],
         ['Beta Corp'],
@@ -478,7 +478,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'slice_is_start_up_to_stop',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).slice(1, 4),
+    query: f => f.findAll([f.name()]).orderBy(f.name().ascending()).slice(1, 4),
     expected: { columns: ['Name'], rows: [
         ['Acme Industries'],
         ['Beta Corp'],
@@ -487,12 +487,12 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'offset_past_the_end_is_empty',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).offset(10),
+    query: f => f.findAll([f.name()]).orderBy(f.name().ascending()).offset(10),
     expected: { columns: ['Name'], rows: [] },
   },
   {
     name: 'offset_zero_changes_nothing',
-    query: f => f.findAll(null, null, [f.id()]).orderBy(f.id().ascending()).offset(0).limit(2),
+    query: f => f.findAll([f.id()]).orderBy(f.id().ascending()).offset(0).limit(2),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
@@ -500,14 +500,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'offset_applies_after_distinct',
-    query: f => f.findAll(null, null, [f.category()]).distinct().orderBy(f.category().ascending()).offset(1).limit(1),
+    query: f => f.findAll([f.category()]).distinct().orderBy(f.category().ascending()).offset(1).limit(1),
     expected: { columns: ['Category'], rows: [
         ['Manufacturing'],
       ] },
   },
   {
     name: 'if_chooses_between_two_values',
-    query: f => f.findAll(null, null, [f.name(), when(f.category().eq('Technology')).then('tech').otherwise('other')]).orderBy(f.id().ascending()).limit(3),
+    query: f => f.findAll([f.name(), when(f.category().eq('Technology')).then('tech').otherwise('other')]).orderBy(f.id().ascending()).limit(3),
     expected: { columns: ['Name', 'Expression'], rows: [
         ['Acme Corp', 'tech'],
         ['Acme Industries', 'other'],
@@ -516,7 +516,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'if_nests_for_several_cases',
-    query: f => f.findAll(null, null, [when(f.id().lt(2)).then('low').when(f.id().lt(4)).then('mid').otherwise('high')]).orderBy(f.id().ascending()),
+    query: f => f.findAll([when(f.id().lt(2)).then('low').when(f.id().lt(4)).then('mid').otherwise('high')]).orderBy(f.id().ascending()),
     expected: { columns: ['Expression'], rows: [
         ['low'],
         ['mid'],
@@ -527,7 +527,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'if_with_numbers_as_the_values',
-    query: f => f.findAll(null, null, [when(f.name().startsWith('Acme')).then(1).otherwise(0)]).orderBy(f.id().ascending()),
+    query: f => f.findAll([when(f.name().startsWith('Acme')).then(1).otherwise(0)]).orderBy(f.id().ascending()),
     expected: { columns: ['Expression'], rows: [
         [1],
         [1],
@@ -538,7 +538,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'if_with_columns_as_the_values',
-    query: f => f.findAll(null, null, [when(f.id().gt(3)).then(f.name()).otherwise(f.category())]).orderBy(f.id().ascending()),
+    query: f => f.findAll([when(f.id().gt(3)).then(f.name()).otherwise(f.category())]).orderBy(f.id().ascending()),
     expected: { columns: ['Expression'], rows: [
         ['Technology'],
         ['Manufacturing'],
@@ -549,7 +549,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'if_without_otherwise_is_missing_where_the_condition_fails',
-    query: f => f.findAll(null, null, [when(f.category().eq('Finance')).then('F')]).orderBy(f.id().ascending()),
+    query: f => f.findAll([when(f.category().eq('Finance')).then('F')]).orderBy(f.id().ascending()),
     expected: { columns: ['Expression'], rows: [
         [null],
         [null],
@@ -560,7 +560,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'if_with_a_combined_condition',
-    query: f => f.findAll(null, null, [when(f.category().eq('Technology').or(f.id().eq(5))).then('yes').otherwise('no')]).orderBy(f.id().ascending()),
+    query: f => f.findAll([when(f.category().eq('Technology').or(f.id().eq(5))).then('yes').otherwise('no')]).orderBy(f.id().ascending()),
     expected: { columns: ['Expression'], rows: [
         ['yes'],
         ['no'],
@@ -571,35 +571,35 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'count_all',
-    query: f => f.findAll(null, null, [f.count()]),
+    query: f => f.findAll([f.count()]),
     expected: { columns: ['Count'], rows: [
         [5],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'count_technology',
-    query: f => f.findAll(null, null, [f.count()], f.category().eq('Technology')),
+    query: f => f.findAll([f.count()], f.category().eq('Technology')),
     expected: { columns: ['Count'], rows: [
         [2],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'count_no_matches',
-    query: f => f.findAll(null, null, [f.count()], f.category().eq('Nonexistent')),
+    query: f => f.findAll([f.count()], f.category().eq('Nonexistent')),
     expected: { columns: ['Count'], rows: [
         [0],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'count_name_attribute',
-    query: f => f.findAll(null, null, [f.name().count()]),
+    query: f => f.findAll([f.name().count()]),
     expected: { columns: ['Name Count'], rows: [
         [5],
       ] },
   },
   {
     name: 'group_by_category_count',
-    query: f => f.findAll(null, null, [f.category(), f.count()]).groupBy(f.category()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), f.count()]).groupBy(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Count'], rows: [
         ['Finance', 2],
         ['Manufacturing', 1],
@@ -608,7 +608,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_name_asc',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()]).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -619,7 +619,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_id_desc',
-    query: f => f.findAll(null, null, [f.id()]).orderBy(f.id().descending()),
+    query: f => f.findAll([f.id()]).orderBy(f.id().descending()),
     expected: { columns: ['Id'], rows: [
         [5],
         [4],
@@ -630,7 +630,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'chained_order_by_makes_the_later_sort_primary',
-    query: f => f.findAll(null, null, [f.name(), f.category()]).orderBy(f.name().ascending()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.name(), f.category()]).orderBy(f.name().ascending()).orderBy(f.category().ascending()),
     expected: { columns: ['Name', 'Category'], rows: [
         ['Delta Ltd', 'Finance'],
         ['Gamma LLC', 'Finance'],
@@ -641,7 +641,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'chained_order_by_replaces_the_direction_of_a_column_sorted_again',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).orderBy(f.name().descending()),
+    query: f => f.findAll([f.name()]).orderBy(f.name().ascending()).orderBy(f.name().descending()),
     expected: { columns: ['Name'], rows: [
         ['Gamma LLC'],
         ['Delta Ltd'],
@@ -652,7 +652,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'chained_order_by_of_three_calls',
-    query: f => f.findAll(null, null, [f.id(), f.name(), f.category()]).orderBy(f.id().ascending()).orderBy(f.name().descending()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.id(), f.name(), f.category()]).orderBy(f.id().ascending()).orderBy(f.name().descending()).orderBy(f.category().ascending()),
     expected: { columns: ['Id', 'Name', 'Category'], rows: [
         [4, 'Gamma LLC', 'Finance'],
         [5, 'Delta Ltd', 'Finance'],
@@ -663,7 +663,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_category_asc_name_desc',
-    query: f => f.findAll(null, null, [f.name(), f.category()]).orderBy(f.category().ascending(), f.name().descending()),
+    query: f => f.findAll([f.name(), f.category()]).orderBy(f.category().ascending(), f.name().descending()),
     expected: { columns: ['Name', 'Category'], rows: [
         ['Gamma LLC', 'Finance'],
         ['Delta Ltd', 'Finance'],
@@ -674,7 +674,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_filter_technology_asc',
-    query: f => f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.category().eq('Technology')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
@@ -682,7 +682,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'limit_two_by_name',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).limit(2),
+    query: f => f.findAll([f.name()]).orderBy(f.name().ascending()).limit(2),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -690,28 +690,28 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_eq_exact_match',
-    query: f => f.findAll(null, null, [f.name()], f.name().eq('Acme Corp')),
+    query: f => f.findAll([f.name()], f.name().eq('Acme Corp')),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },
   },
   {
     name: 'string_eq_operator',
-    query: f => f.findAll(null, null, [f.name()], f.name().eq('Acme Corp')),
+    query: f => f.findAll([f.name()], f.name().eq('Acme Corp')),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },
   },
   {
     name: 'string_ne_excludes_row',
-    query: f => f.findAll(null, null, [f.count()], f.name().ne('Acme Corp')),
+    query: f => f.findAll([f.count()], f.name().ne('Acme Corp')),
     expected: { columns: ['Count'], rows: [
         [4],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'string_contains_corp',
-    query: f => f.findAll(null, null, [f.name()], f.name().contains('Corp')).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().contains('Corp')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
@@ -719,7 +719,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_contains_acme',
-    query: f => f.findAll(null, null, [f.name()], f.name().contains('Acme')).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().contains('Acme')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -727,7 +727,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_starts_with_acme',
-    query: f => f.findAll(null, null, [f.name()], f.name().startsWith('Acme')).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().startsWith('Acme')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -735,7 +735,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_ends_with_corp',
-    query: f => f.findAll(null, null, [f.name()], f.name().endsWith('Corp')).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().endsWith('Corp')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
@@ -743,14 +743,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_ends_with_llc',
-    query: f => f.findAll(null, null, [f.name()], f.name().endsWith('LLC')),
+    query: f => f.findAll([f.name()], f.name().endsWith('LLC')),
     expected: { columns: ['Name'], rows: [
         ['Gamma LLC'],
       ] },
   },
   {
     name: 'string_is_in',
-    query: f => f.findAll(null, null, [f.name()], f.name().isIn(['Acme Corp', 'Gamma LLC'])).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().isIn(['Acme Corp', 'Gamma LLC'])).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Gamma LLC'],
@@ -758,7 +758,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_is_not_in',
-    query: f => f.findAll(null, null, [f.name()], f.name().isNotIn(['Acme Corp', 'Acme Industries', 'Gamma LLC'])).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.name().isNotIn(['Acme Corp', 'Acme Industries', 'Gamma LLC'])).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Beta Corp'],
         ['Delta Ltd'],
@@ -766,7 +766,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_category_starts_with_fin',
-    query: f => f.findAll(null, null, [f.name()], f.category().startsWith('Fin')).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.category().startsWith('Fin')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Delta Ltd'],
         ['Gamma LLC'],
@@ -774,14 +774,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'string_category_ne_technology',
-    query: f => f.findAll(null, null, [f.count()], f.category().ne('Technology')),
+    query: f => f.findAll([f.count()], f.category().ne('Technology')),
     expected: { columns: ['Count'], rows: [
         [3],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'rank_min_by_id',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'min', orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().rank({ method: 'min', orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Rank'], rows: [
         [1, 1],
         [2, 2],
@@ -792,7 +792,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'rank_dense_with_partition_by_category',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'dense', partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().rank({ method: 'dense', partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Dense Rank'], rows: [
         [1, 1],
         [2, 1],
@@ -803,7 +803,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'shift_lag_second_row',
-    query: f => f.findAll(null, null, [f.id(), f.id().shift(1, { orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().shift(1, { orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Lag Id'], rows: [
         [1, null],
         [2, 1],
@@ -814,7 +814,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'shift_lead_last_row',
-    query: f => f.findAll(null, null, [f.id(), f.id().shift(-1, { orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().shift(-1, { orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Lead Id'], rows: [
         [1, 2],
         [2, 3],
@@ -825,7 +825,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'integer_power_is_an_integer',
-    query: f => f.findAll(null, null, [f.id(), f.id().power(2)]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().power(2)]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Power Id'], rows: [
         [1, 1],
         [2, 4],
@@ -836,7 +836,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'aggregate_over_a_window_keeps_every_row',
-    query: f => f.findAll(null, null, [f.id(), f.id().max().over([f.category()])]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().max().over([f.category()])]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Max Id'], rows: [
         [1, 3],
         [2, 2],
@@ -847,7 +847,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'qcut_two_buckets',
-    query: f => f.findAll(null, null, [f.id(), f.id().qcut(2, { orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().qcut(2, { orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Quantile'], rows: [
         [1, 1],
         [2, 1],
@@ -858,7 +858,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'first_id_per_category',
-    query: f => f.findAll(null, null, [f.id(), f.category(), f.id().first({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.category(), f.id().first({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Category', 'First Id'], rows: [
         [1, 'Technology', 1],
         [2, 'Manufacturing', 2],
@@ -869,7 +869,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'last_id_per_category',
-    query: f => f.findAll(null, null, [f.id(), f.category(), f.id().last({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.category(), f.id().last({ partitionBy: [f.category()], orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Category', 'Last Id'], rows: [
         [1, 'Technology', 1],
         [2, 'Manufacturing', 2],
@@ -880,7 +880,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'rank_method_first',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ method: 'first', orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().rank({ method: 'first', orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Row Number'], rows: [
         [1, 1],
         [2, 2],
@@ -891,7 +891,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'rank_pct',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ pct: true, orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().rank({ pct: true, orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Percent Rank'], rows: [
         [1.0, 0.0],
         [2.0, 0.25],
@@ -902,7 +902,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'rank_pct_method_max',
-    query: f => f.findAll(null, null, [f.id(), f.id().rank({ pct: true, method: 'max', orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.id().rank({ pct: true, method: 'max', orderBy: [f.id().ascending()] })]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Cume Dist'], rows: [
         [1.0, 0.2],
         [2.0, 0.4],
@@ -913,42 +913,42 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'count_with_contains_filter',
-    query: f => f.findAll(null, null, [f.count()], f.name().contains('Corp')),
+    query: f => f.findAll([f.count()], f.name().contains('Corp')),
     expected: { columns: ['Count'], rows: [
         [2],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'count_finance_category',
-    query: f => f.findAll(null, null, [f.count()], f.category().eq('Finance')),
+    query: f => f.findAll([f.count()], f.category().eq('Finance')),
     expected: { columns: ['Count'], rows: [
         [2],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'count_id_attribute',
-    query: f => f.findAll(null, null, [f.id().count()]),
+    query: f => f.findAll([f.id().count()]),
     expected: { columns: ['Id Count'], rows: [
         [5],
       ] },
   },
   {
     name: 'count_name_technology_filter',
-    query: f => f.findAll(null, null, [f.name().count()], f.category().eq('Technology')),
+    query: f => f.findAll([f.name().count()], f.category().eq('Technology')),
     expected: { columns: ['Name Count'], rows: [
         [2],
       ] },
   },
   {
     name: 'count_name_ne_technology',
-    query: f => f.findAll(null, null, [f.name().count()], f.category().ne('Technology')),
+    query: f => f.findAll([f.name().count()], f.category().ne('Technology')),
     expected: { columns: ['Name Count'], rows: [
         [3],
       ] },
   },
   {
     name: 'sort_by_id_asc',
-    query: f => f.findAll(null, null, [f.id()]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()]).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
@@ -959,7 +959,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_name_desc',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().descending()),
+    query: f => f.findAll([f.name()]).orderBy(f.name().descending()),
     expected: { columns: ['Name'], rows: [
         ['Gamma LLC'],
         ['Delta Ltd'],
@@ -970,7 +970,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_category_asc_name_asc',
-    query: f => f.findAll(null, null, [f.name(), f.category()]).orderBy(f.category().ascending(), f.name().ascending()),
+    query: f => f.findAll([f.name(), f.category()]).orderBy(f.category().ascending(), f.name().ascending()),
     expected: { columns: ['Name', 'Category'], rows: [
         ['Delta Ltd', 'Finance'],
         ['Gamma LLC', 'Finance'],
@@ -981,14 +981,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'limit_one',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name()]).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },
   },
   {
     name: 'limit_three',
-    query: f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).limit(3),
+    query: f => f.findAll([f.name()]).orderBy(f.name().ascending()).limit(3),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Acme Industries'],
@@ -997,7 +997,7 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'limit_with_filter',
-    query: f => f.findAll(null, null, [f.name()], f.category().eq('Technology')).orderBy(f.name().ascending()).limit(1),
+    query: f => f.findAll([f.name()], f.category().eq('Technology')).orderBy(f.name().ascending()).limit(1),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
       ] },

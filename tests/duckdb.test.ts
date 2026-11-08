@@ -41,9 +41,7 @@ describe('AccountFinder', () => {
     const { AccountFinder } = await import('../example/generated/AccountFinder');
     const af = new AccountFinder();
 
-    const rows = await af.findAll(
-      null, null,
-      [af.id(), af.name()],
+    const rows = await af.findAll([af.id(), af.name()],
       af.id().eq(211978),
     ).toRows();
 
@@ -54,7 +52,7 @@ describe('AccountFinder', () => {
     const { AccountFinder } = await import('../example/generated/AccountFinder');
     const af = new AccountFinder();
 
-    const sql = af.findAll(null, null, [af.id(), af.name()], af.id().eq(211978)).toSql();
+    const sql = af.findAll([af.id(), af.name()], af.id().eq(211978)).toSql();
     expect(sql).toContain('ref_data.account_master');
     expect(sql).toContain('211978');
     expect(sql).toContain('WHERE');

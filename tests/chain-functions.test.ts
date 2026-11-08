@@ -94,44 +94,44 @@ describe('companies against DuckDB', () => {
   const plain = (rows: unknown[][]) => rows.map(r => r.map(v => typeof v === 'bigint' ? Number(v) : v));
 
   it('text functions chain', async () => {
-    const query = f.findAll(null, null, [f.name().toUpperCase().length()]).orderBy(f.name().ascending()).limit(2);
+    const query = f.findAll([f.name().toUpperCase().length()]).orderBy(f.name().ascending()).limit(2);
     expect(query.toSql()).toContain('LENGTH(UPPER(t0.name))');
     expect(plain(await query.toRows())).toEqual([[9], [15]]);
   });
 
   it('a text function of a text function', async () => {
-    const rows = await f.findAll(null, null, [f.name().toUpperCase().replace('ACME', 'X')]).orderBy(f.name().ascending()).limit(1).toRows();
+    const rows = await f.findAll([f.name().toUpperCase().replace('ACME', 'X')]).orderBy(f.name().ascending()).limit(1).toRows();
     expect(rows).toEqual([['X CORP']]);
   });
 
   it('slices the result of a function', async () => {
-    const rows = await f.findAll(null, null, [f.name().toLowerCase().left(4)]).orderBy(f.name().ascending()).limit(1).toRows();
+    const rows = await f.findAll([f.name().toLowerCase().left(4)]).orderBy(f.name().ascending()).limit(1).toRows();
     expect(rows).toEqual([['acme']]);
   });
 
   it('filters on a function of a column', async () => {
-    const query = f.findAll(null, null, [f.name()], f.name().toUpperCase().eq('ACME CORP'));
+    const query = f.findAll([f.name()], f.name().toUpperCase().eq('ACME CORP'));
     expect(query.toSql()).toContain("UPPER(t0.name) = 'ACME CORP'");
     expect(await query.toRows()).toEqual([['Acme Corp']]);
   });
 
   it('filters on the length of a column', async () => {
-    const rows = await f.findAll(null, null, [f.name()], f.name().length().gt(10)).orderBy(f.name().ascending()).toRows();
+    const rows = await f.findAll([f.name()], f.name().length().gt(10)).orderBy(f.name().ascending()).toRows();
     expect(rows).toEqual([['Acme Industries']]);
   });
 
   it('not equal on an expression', async () => {
-    const rows = await f.findAll(null, null, [f.id()], f.name().toLowerCase().ne('acme corp')).orderBy(f.id().ascending()).limit(2).toRows();
+    const rows = await f.findAll([f.id()], f.name().toLowerCase().ne('acme corp')).orderBy(f.id().ascending()).limit(2).toRows();
     expect(plain(rows)).toEqual([[2], [3]]);
   });
 
   it('compares two expressions', async () => {
-    const rows = await f.findAll(null, null, [f.id()], f.name().length().gt(f.category().length())).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.id()], f.name().length().gt(f.category().length())).orderBy(f.id().ascending()).toRows();
     expect(plain(rows)).toEqual([[2], [4], [5]]);
   });
 
   it('combines with another filter', async () => {
-    const rows = await f.findAll(null, null, [f.id()], f.name().toUpperCase().eq('DELTA LTD').or(f.id().eq(1))).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.id()], f.name().toUpperCase().eq('DELTA LTD').or(f.id().eq(1))).orderBy(f.id().ascending()).toRows();
     expect(plain(rows)).toEqual([[1], [5]]);
   });
 });
@@ -150,7 +150,7 @@ describe('orgchart against DuckDB', () => {
 
   it('filters on a function of a related column', async () => {
     const f = new EmployeeFinder();
-    const rows = await f.findAll(null, null, [f.name()], f.manager().name().toUpperCase().eq('ALICE')).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.name()], f.manager().name().toUpperCase().eq('ALICE')).orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([['Bob'], ['Carol']]);
   });
 });

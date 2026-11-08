@@ -59,7 +59,7 @@ describe('EmployeeFinder — two-hop: employee → projects', () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart_inheritance/EmployeeFinder');
     await import('./generated_examples/orgchart_inheritance/ProjectFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.firstName(), ef.projects().name()]).toRows();
+    const rows = await ef.findAll([ef.firstName(), ef.projects().name()]).toRows();
     const byEmp: Record<string, Set<string>> = {};
     for (const [fn, pname] of rows) {
       (byEmp[fn as string] ??= new Set()).add(pname as string);
@@ -73,14 +73,14 @@ describe('EmployeeFinder — two-hop: employee → projects', () => {
   it('filters project codes for a specific employee', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart_inheritance/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.firstName(), ef.projects().code()], ef.firstName().eq('Bob')).toRows();
+    const rows = await ef.findAll([ef.firstName(), ef.projects().code()], ef.firstName().eq('Bob')).toRows();
     expect(new Set(rows.map(r => r[1]))).toEqual(new Set(['ALPHA', 'BETA']));
   });
 
   it('filters by project name to find the employee', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart_inheritance/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.firstName()], ef.projects().name().eq('Delta Ops')).toRows();
+    const rows = await ef.findAll([ef.firstName()], ef.projects().name().eq('Delta Ops')).toRows();
     expect(rows[0][0]).toBe('Dave');
   });
 });
@@ -89,7 +89,7 @@ describe('EmployeeFinder — three-hop: employee → manager → projects', () =
   it("returns manager's project names alongside employee name", async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart_inheritance/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.firstName(), ef.manager().projects().name()]).toRows();
+    const rows = await ef.findAll([ef.firstName(), ef.manager().projects().name()]).toRows();
     const byEmp: Record<string, Set<string>> = {};
     for (const [fn, pname] of rows) {
       (byEmp[fn as string] ??= new Set()).add(pname as string);
@@ -102,21 +102,21 @@ describe('EmployeeFinder — three-hop: employee → manager → projects', () =
   it('ancestor-join regression: only leaf column selected', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart_inheritance/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.manager().projects().name()], ef.firstName().eq('Dave')).toRows();
+    const rows = await ef.findAll([ef.manager().projects().name()], ef.firstName().eq('Dave')).toRows();
     expect(new Set(rows.map(r => r[0]))).toEqual(new Set(['Alpha Initiative', 'Beta Platform']));
   });
 
   it('ancestor-join regression: manager project only in WHERE not SELECT', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart_inheritance/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.firstName()], ef.manager().projects().code().eq('ALPHA')).toRows();
+    const rows = await ef.findAll([ef.firstName()], ef.manager().projects().code().eq('ALPHA')).toRows();
     expect(rows.map(r => r[0])).toEqual(['Dave']);
   });
 
   it('filters by manager name, selects manager project', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart_inheritance/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.manager().projects().name()], ef.manager().firstName().eq('Alice')).toRows();
+    const rows = await ef.findAll([ef.manager().projects().name()], ef.manager().firstName().eq('Alice')).toRows();
     expect(new Set(rows.map(r => r[0]))).toEqual(new Set(['Epsilon Research']));
   });
 });
@@ -125,7 +125,7 @@ describe('ProjectFinder — reverse: project → assignee', () => {
   it('returns assignee name for each project', async () => {
     const { ProjectFinder } = await import('./generated_examples/orgchart_inheritance/ProjectFinder');
     const pf = new ProjectFinder();
-    const rows = await pf.findAll(null, null, [pf.name(), pf.assignee().firstName()]).toRows();
+    const rows = await pf.findAll([pf.name(), pf.assignee().firstName()]).toRows();
     const byProject = Object.fromEntries(rows.map(r => [r[0], r[1]]));
     expect(byProject['Alpha Initiative']).toBe('Bob');
     expect(byProject['Gamma Tooling']).toBe('Carol');
@@ -135,7 +135,7 @@ describe('ProjectFinder — reverse: project → assignee', () => {
   it('filters projects by assignee department', async () => {
     const { ProjectFinder } = await import('./generated_examples/orgchart_inheritance/ProjectFinder');
     const pf = new ProjectFinder();
-    const rows = await pf.findAll(null, null, [pf.code()], pf.assignee().department().eq('Engineering')).toRows();
+    const rows = await pf.findAll([pf.code()], pf.assignee().department().eq('Engineering')).toRows();
     expect(new Set(rows.map(r => r[0]))).toEqual(new Set(['ALPHA', 'BETA', 'GAMMA']));
   });
 });

@@ -60,9 +60,9 @@ describe('against DuckDB', () => {
 
   it('sorts by category, then name', async () => {
     const f = new CompanyFinder();
-    const chained = await f.findAll(null, null, [f.name(), f.category()])
+    const chained = await f.findAll([f.name(), f.category()])
       .orderBy(f.name().ascending()).orderBy(f.category().ascending()).toRows();
-    const single = await f.findAll(null, null, [f.name(), f.category()])
+    const single = await f.findAll([f.name(), f.category()])
       .orderBy(f.category().ascending(), f.name().ascending()).toRows();
     expect(chained).toEqual(single);
   });

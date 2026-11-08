@@ -104,59 +104,59 @@ describe('companies against DuckDB', () => {
   afterAll(() => { conn.disconnectSync(); instance.closeSync(); });
 
   it('a comparison as a column', async () => {
-    const query = f.findAll(null, null, [f.name(), f.category().eq('Technology')]).orderBy(f.id().ascending()).limit(3);
+    const query = f.findAll([f.name(), f.category().eq('Technology')]).orderBy(f.id().ascending()).limit(3);
     expect(query.toSql()).toContain(`t0.category = 'Technology' AS "Expression"`);
     expect(await query.toRows()).toEqual([['Acme Corp', true], ['Acme Industries', false], ['Beta Corp', true]]);
   });
 
   it('a combined condition as a column', async () => {
-    const rows = await f.findAll(null, null, [f.id(), f.category().eq('Finance').or(f.name().startsWith('Acme'))]).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.id(), f.category().eq('Finance').or(f.name().startsWith('Acme'))]).orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([[1, true], [2, true], [3, false], [4, true], [5, true]]);
   });
 
   it('a null check as a column', async () => {
-    expect(await f.findAll(null, null, [f.name().isNull()]).orderBy(f.id().ascending()).limit(2).toRows()).toEqual([[false], [false]]);
+    expect(await f.findAll([f.name().isNull()]).orderBy(f.id().ascending()).limit(2).toRows()).toEqual([[false], [false]]);
   });
 
   it('a membership test as a column', async () => {
-    expect(await f.findAll(null, null, [f.id().isIn([1, 3])]).orderBy(f.id().ascending()).limit(3).toRows()).toEqual([[true], [false], [true]]);
+    expect(await f.findAll([f.id().isIn([1, 3])]).orderBy(f.id().ascending()).limit(3).toRows()).toEqual([[true], [false], [true]]);
   });
 
   it('a condition as a column next to a filter', async () => {
-    const rows = await f.findAll(null, null, [f.name(), f.id().gt(3)], f.category().eq('Finance')).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.name(), f.id().gt(3)], f.category().eq('Finance')).orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([['Gamma LLC', true], ['Delta Ltd', true]]);
   });
 
   it('chooses between two values', async () => {
-    const query = f.findAll(null, null, [f.name(), when(f.category().eq('Technology')).then('tech').otherwise('other')])
+    const query = f.findAll([f.name(), when(f.category().eq('Technology')).then('tech').otherwise('other')])
       .orderBy(f.id().ascending()).limit(3);
     expect(query.toSql()).toContain(`CASE WHEN t0.category = 'Technology' THEN 'tech' ELSE 'other' END`);
     expect(await query.toRows()).toEqual([['Acme Corp', 'tech'], ['Acme Industries', 'other'], ['Beta Corp', 'tech']]);
   });
 
   it('nests for several cases', async () => {
-    const rows = await f.findAll(null, null, [when(f.id().lt(2)).then('low').when(f.id().lt(4)).then('mid').otherwise('high')])
+    const rows = await f.findAll([when(f.id().lt(2)).then('low').when(f.id().lt(4)).then('mid').otherwise('high')])
       .orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([['low'], ['mid'], ['mid'], ['high'], ['high']]);
   });
 
   it('with numbers as the values', async () => {
-    const rows = await f.findAll(null, null, [when(f.name().startsWith('Acme')).then(1).otherwise(0)]).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([when(f.name().startsWith('Acme')).then(1).otherwise(0)]).orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([[1], [1], [0], [0], [0]]);
   });
 
   it('with columns as the values', async () => {
-    const rows = await f.findAll(null, null, [when(f.id().gt(3)).then(f.name()).otherwise(f.category())]).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([when(f.id().gt(3)).then(f.name()).otherwise(f.category())]).orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([['Technology'], ['Manufacturing'], ['Technology'], ['Gamma LLC'], ['Delta Ltd']]);
   });
 
   it('without otherwise is missing where the condition fails', async () => {
-    const rows = await f.findAll(null, null, [when(f.category().eq('Finance')).then('F')]).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([when(f.category().eq('Finance')).then('F')]).orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([[null], [null], [null], ['F'], ['F']]);
   });
 
   it('with a combined condition', async () => {
-    const rows = await f.findAll(null, null, [when(f.category().eq('Technology').or(f.id().eq(5))).then('yes').otherwise('no')])
+    const rows = await f.findAll([when(f.category().eq('Technology').or(f.id().eq(5))).then('yes').otherwise('no')])
       .orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([['yes'], ['no'], ['yes'], ['no'], ['yes']]);
   });
@@ -176,23 +176,23 @@ describe('orgchart against DuckDB', () => {
   afterAll(() => { conn.disconnectSync(); instance.closeSync(); });
 
   it('a condition on a related column as a column', async () => {
-    const rows = await f.findAll(null, null, [f.name(), f.manager().name().isNull()]).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.name(), f.manager().name().isNull()]).orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([['Alice', true], ['Bob', false], ['Carol', false], ['Dave', false]]);
   });
 
   it('a comparison with a missing value is missing', async () => {
-    const rows = await f.findAll(null, null, [f.name(), f.manager().name().eq('Alice')]).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.name(), f.manager().name().eq('Alice')]).orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([['Alice', null], ['Bob', true], ['Carol', true], ['Dave', false]]);
   });
 
   it('on a related column with a fallback', async () => {
-    const rows = await f.findAll(null, null, [f.name(), when(f.manager().name().isNull()).then('top').otherwise(f.manager().name())])
+    const rows = await f.findAll([f.name(), when(f.manager().name().isNull()).then('top').otherwise(f.manager().name())])
       .orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([['Alice', 'top'], ['Bob', 'Alice'], ['Carol', 'Alice'], ['Dave', 'Bob']]);
   });
 
   it('whose condition is missing takes otherwise', async () => {
-    const rows = await f.findAll(null, null, [f.name(), when(f.manager().name().eq('Alice')).then('alice').otherwise('other')])
+    const rows = await f.findAll([f.name(), when(f.manager().name().eq('Alice')).then('alice').otherwise('other')])
       .orderBy(f.id().ascending()).toRows();
     expect(rows).toEqual([['Alice', 'other'], ['Bob', 'alice'], ['Carol', 'alice'], ['Dave', 'other']]);
   });

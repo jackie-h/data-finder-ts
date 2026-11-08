@@ -47,13 +47,13 @@ describe('a generated finder', () => {
   afterAll(() => { conn.disconnectSync(); instance.closeSync(); });
 
   it('writes the key of the manager first, and still joins', async () => {
-    const query = f.findAll(null, null, [f.name(), f.manager().name()]).orderBy(f.id().ascending());
+    const query = f.findAll([f.name(), f.manager().name()]).orderBy(f.id().ascending());
     expect(query.toSql()).toContain('ON (t1.id = t0.manager_id)');
     expect(await query.toRows()).toEqual([['Alice', null], ['Bob', 'Alice'], ['Carol', 'Alice'], ['Dave', 'Bob']]);
   });
 
   it('writes the key first through the reverse association', async () => {
-    const query = f.findAll(null, null, [f.name(), f.employees().name()]).orderBy(f.id().ascending());
+    const query = f.findAll([f.name(), f.employees().name()]).orderBy(f.id().ascending());
     expect(query.toSql()).toMatch(/ON \(t0\.id = t1\.manager_id\)/);
   });
 });

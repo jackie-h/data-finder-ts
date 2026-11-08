@@ -116,25 +116,25 @@ describe('orgchart against DuckDB', () => {
   const counts = (rows: unknown[][]) => rows.map(r => r.map(v => typeof v === 'bigint' ? Number(v) : v));
 
   it('count of reports for each employee', async () => {
-    const query = f.findAll(null, null, [f.name(), f.employees().id().count()]).orderBy(f.name().ascending());
+    const query = f.findAll([f.name(), f.employees().id().count()]).orderBy(f.name().ascending());
     expect(query.toSql()).toContain('GROUP BY t0.id, t0.name');
     expect(counts(await query.toRows())).toEqual([['Alice', 2], ['Bob', 1], ['Carol', 0], ['Dave', 0]]);
   });
 
   it('count of reports alone is still for each employee', async () => {
-    const query = f.findAll(null, null, [f.employees().id().count()]).orderBy(f.id().ascending());
+    const query = f.findAll([f.employees().id().count()]).orderBy(f.id().ascending());
     expect(query.toSql()).toContain('GROUP BY t0.id ORDER BY t0.id ASC');
     expect(counts(await query.toRows())).toEqual([[2], [1], [0], [0]]);
   });
 
   it('an explicit groupBy is used as given', async () => {
-    const rows = await f.findAll(null, null, [f.manager().name(), f.id().count()])
+    const rows = await f.findAll([f.manager().name(), f.id().count()])
       .groupBy(f.manager().name()).orderBy(f.manager().name().ascending()).toRows();
     expect(counts(rows)).toEqual([['Alice', 2], ['Bob', 1], [null, 1]]);
   });
 
   it('an aggregate over a to-one association groups by the plain columns', async () => {
-    const query = f.findAll(null, null, [f.manager().name(), f.id().count()]).orderBy(f.manager().name().ascending());
+    const query = f.findAll([f.manager().name(), f.id().count()]).orderBy(f.manager().name().ascending());
     expect(query.toSql()).toContain('GROUP BY t1.name');
     expect(counts(await query.toRows())).toEqual([['Alice', 2], ['Bob', 1], [null, 1]]);
   });

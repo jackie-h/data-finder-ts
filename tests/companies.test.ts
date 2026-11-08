@@ -35,85 +35,85 @@ afterAll(() => {
 
 describe('CompanyFinder — count', () => {
   it('counts all rows', async () => {
-    const rows = await cf.findAll(null, null, [cf.count()]).toRows();
+    const rows = await cf.findAll([cf.count()]).toRows();
     expect(Number(rows[0][0])).toBe(5);
   });
 
   it('counts with eq filter', async () => {
-    const rows = await cf.findAll(null, null, [cf.count()], cf.category().eq('Technology')).toRows();
+    const rows = await cf.findAll([cf.count()], cf.category().eq('Technology')).toRows();
     expect(Number(rows[0][0])).toBe(2);
   });
 
   it('returns zero when filter has no matches', async () => {
-    const rows = await cf.findAll(null, null, [cf.count()], cf.category().eq('Nonexistent')).toRows();
+    const rows = await cf.findAll([cf.count()], cf.category().eq('Nonexistent')).toRows();
     expect(Number(rows[0][0])).toBe(0);
   });
 
   it('counts with contains filter', async () => {
-    const rows = await cf.findAll(null, null, [cf.count()], cf.name().contains('Corp')).toRows();
+    const rows = await cf.findAll([cf.count()], cf.name().contains('Corp')).toRows();
     expect(Number(rows[0][0])).toBe(2);
   });
 
   it('counts name attribute', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().count()]).toRows();
+    const rows = await cf.findAll([cf.name().count()]).toRows();
     expect(Number(rows[0][0])).toBe(5);
   });
 
   it('counts attribute with filter', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().count()], cf.category().eq('Technology')).toRows();
+    const rows = await cf.findAll([cf.name().count()], cf.category().eq('Technology')).toRows();
     expect(Number(rows[0][0])).toBe(2);
   });
 
   it('counts attribute with ne filter', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().count()], cf.category().ne('Technology')).toRows();
+    const rows = await cf.findAll([cf.name().count()], cf.category().ne('Technology')).toRows();
     expect(Number(rows[0][0])).toBe(3);
   });
 });
 
 describe('CompanyFinder — string operations', () => {
   it('eq returns exact match', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.name().eq('Acme Corp')).toRows();
+    const rows = await cf.findAll([cf.name()], cf.name().eq('Acme Corp')).toRows();
     expect(rows.map(r => r[0])).toEqual(['Acme Corp']);
   });
 
   it('ne excludes matching row', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.name().ne('Acme Corp')).toRows();
+    const rows = await cf.findAll([cf.name()], cf.name().ne('Acme Corp')).toRows();
     expect(rows.map(r => r[0])).not.toContain('Acme Corp');
     expect(rows.length).toBe(4);
   });
 
   it('ne returns all rows when value absent', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.name().ne('Nonexistent')).toRows();
+    const rows = await cf.findAll([cf.name()], cf.name().ne('Nonexistent')).toRows();
     expect(rows.length).toBe(5);
   });
 
   it('contains matches substring', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.name().contains('Corp')).toRows();
+    const rows = await cf.findAll([cf.name()], cf.name().contains('Corp')).toRows();
     expect(new Set(rows.map(r => r[0]))).toEqual(new Set(['Acme Corp', 'Beta Corp']));
   });
 
   it('startsWith matches prefix', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.name().startsWith('Acme')).toRows();
+    const rows = await cf.findAll([cf.name()], cf.name().startsWith('Acme')).toRows();
     expect(new Set(rows.map(r => r[0]))).toEqual(new Set(['Acme Corp', 'Acme Industries']));
   });
 
   it('endsWith matches suffix', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.name().endsWith('Corp')).toRows();
+    const rows = await cf.findAll([cf.name()], cf.name().endsWith('Corp')).toRows();
     expect(new Set(rows.map(r => r[0]))).toEqual(new Set(['Acme Corp', 'Beta Corp']));
   });
 
   it('endsWith single result', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.name().endsWith('LLC')).toRows();
+    const rows = await cf.findAll([cf.name()], cf.name().endsWith('LLC')).toRows();
     expect(rows.map(r => r[0])).toEqual(['Gamma LLC']);
   });
 
   it('filters on non-key column with contains', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.category().contains('nology')).toRows();
+    const rows = await cf.findAll([cf.name()], cf.category().contains('nology')).toRows();
     expect(new Set(rows.map(r => r[0]))).toEqual(new Set(['Acme Corp', 'Beta Corp']));
   });
 
   it('filters on non-key column with ne', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.category().ne('Technology')).toRows();
+    const rows = await cf.findAll([cf.name()], cf.category().ne('Technology')).toRows();
     const names = rows.map(r => r[0]);
     expect(names).not.toContain('Acme Corp');
     expect(names).not.toContain('Beta Corp');
@@ -123,27 +123,27 @@ describe('CompanyFinder — string operations', () => {
 
 describe('CompanyFinder — sort', () => {
   it('sorts by name ascending', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()])
+    const rows = await cf.findAll([cf.name()])
       .orderBy(cf.name().ascending()).toRows();
     const names = rows.map(r => r[0] as string);
     expect(names).toEqual([...names].sort());
   });
 
   it('sorts by name descending', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()])
+    const rows = await cf.findAll([cf.name()])
       .orderBy(cf.name().descending()).toRows();
     const names = rows.map(r => r[0] as string);
     expect(names).toEqual([...names].sort().reverse());
   });
 
   it('sorts by id descending, first row is highest', async () => {
-    const rows = await cf.findAll(null, null, [cf.id()])
+    const rows = await cf.findAll([cf.id()])
       .orderBy(cf.id().descending()).toRows();
     expect(Number(rows[0][0])).toBe(5);
   });
 
   it('multi-column sort: category asc then name asc', async () => {
-    const rows = await cf.findAll(null, null, [cf.name(), cf.category()])
+    const rows = await cf.findAll([cf.name(), cf.category()])
       .orderBy(cf.category().ascending(), cf.name().ascending()).toRows();
     expect(rows[0][1]).toBe('Finance');
     const financeRows = rows.filter(r => r[1] === 'Finance');
@@ -152,7 +152,7 @@ describe('CompanyFinder — sort', () => {
   });
 
   it('multi-column sort: category asc then name desc', async () => {
-    const rows = await cf.findAll(null, null, [cf.name(), cf.category()])
+    const rows = await cf.findAll([cf.name(), cf.category()])
       .orderBy(cf.category().ascending(), cf.name().descending()).toRows();
     const financeRows = rows.filter(r => r[1] === 'Finance');
     expect(financeRows[0][0]).toBe('Gamma LLC');
@@ -160,7 +160,7 @@ describe('CompanyFinder — sort', () => {
   });
 
   it('sorts filtered results', async () => {
-    const rows = await cf.findAll(null, null, [cf.name()], cf.category().eq('Technology'))
+    const rows = await cf.findAll([cf.name()], cf.category().eq('Technology'))
       .orderBy(cf.name().ascending()).toRows();
     expect(rows.length).toBe(2);
     expect(rows[0][0]).toBe('Acme Corp');
@@ -170,7 +170,7 @@ describe('CompanyFinder — sort', () => {
 
 describe('CompanyFinder — group by', () => {
   it('count per category', async () => {
-    const rows = await cf.findAll(null, null, [cf.category(), cf.count()])
+    const rows = await cf.findAll([cf.category(), cf.count()])
       .groupBy(cf.category()).toRows();
     const counts = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
     expect(counts['Technology']).toBe(2);
@@ -179,13 +179,13 @@ describe('CompanyFinder — group by', () => {
   });
 
   it('group by returns one row per group', async () => {
-    const rows = await cf.findAll(null, null, [cf.category(), cf.count()])
+    const rows = await cf.findAll([cf.category(), cf.count()])
       .groupBy(cf.category()).toRows();
     expect(rows.length).toBe(3);
   });
 
   it('group by with filter', async () => {
-    const rows = await cf.findAll(null, null, [cf.category(), cf.count()], cf.category().ne('Manufacturing'))
+    const rows = await cf.findAll([cf.category(), cf.count()], cf.category().ne('Manufacturing'))
       .groupBy(cf.category()).toRows();
     expect(rows.length).toBe(2);
     const counts = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
@@ -194,7 +194,7 @@ describe('CompanyFinder — group by', () => {
   });
 
   it('attribute count per category', async () => {
-    const rows = await cf.findAll(null, null, [cf.category(), cf.name().count()])
+    const rows = await cf.findAll([cf.category(), cf.name().count()])
       .groupBy(cf.category()).toRows();
     const counts = Object.fromEntries(rows.map(r => [r[0], Number(r[1])]));
     expect(counts['Technology']).toBe(2);
@@ -203,7 +203,7 @@ describe('CompanyFinder — group by', () => {
   });
 
   it('group by with order by', async () => {
-    const rows = await cf.findAll(null, null, [cf.category(), cf.count()])
+    const rows = await cf.findAll([cf.category(), cf.count()])
       .groupBy(cf.category()).orderBy(cf.category().ascending()).toRows();
     const categories = rows.map(r => r[0] as string);
     expect(categories).toEqual([...categories].sort());

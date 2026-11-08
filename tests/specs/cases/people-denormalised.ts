@@ -8,7 +8,7 @@ export const _ALL = [['Peter', '1 the street', 'Firm X', '200 west'], ['John', '
 export const PERSON_DENORMALISED_FINDER_SPECS: SpecCase<PersonFinder>[] = [
   {
     name: 'embedded_properties_are_read_from_the_row',
-    query: f => f.findAll(null, null, [f.firstName(), f.address().name(), f.firm().legalName(), f.firm().address().name()]),
+    query: f => f.findAll([f.firstName(), f.address().name(), f.firm().legalName(), f.firm().address().name()]),
     expected: { columns: ['FirstName', 'Address Name', 'Firm LegalName', 'Firm Address Name'], rows: [
         ['Peter', '1 the street', 'Firm X', '200 west'],
         ['John', '5 Park Ave', 'Firm X', '200 west'],
@@ -17,14 +17,14 @@ export const PERSON_DENORMALISED_FINDER_SPECS: SpecCase<PersonFinder>[] = [
   },
   {
     name: 'filter_on_an_embedded_property',
-    query: f => f.findAll(null, null, [f.firstName(), f.firm().address().name()], f.firm().legalName().eq('Firm A')),
+    query: f => f.findAll([f.firstName(), f.firm().address().name()], f.firm().legalName().eq('Firm A')),
     expected: { columns: ['FirstName', 'Firm Address Name'], rows: [
         ['Fabrice', '3 somewhere'],
       ], unexpectedSql: 'JOIN' },
   },
   {
     name: 'filter_on_a_nested_embedded_property',
-    query: f => f.findAll(null, null, [f.firstName()], f.firm().address().name().endsWith('west')),
+    query: f => f.findAll([f.firstName()], f.firm().address().name().endsWith('west')),
     expected: { columns: ['FirstName'], rows: [
         ['Peter'],
         ['John'],
@@ -32,7 +32,7 @@ export const PERSON_DENORMALISED_FINDER_SPECS: SpecCase<PersonFinder>[] = [
   },
   {
     name: 'group_by_an_embedded_property',
-    query: f => f.findAll(null, null, [f.firm().legalName(), when(f.address().name().startsWith('1')).then(1).otherwise(0).sum()]).groupBy(f.firm().legalName()).orderBy(f.firm().legalName().ascending()),
+    query: f => f.findAll([f.firm().legalName(), when(f.address().name().startsWith('1')).then(1).otherwise(0).sum()]).groupBy(f.firm().legalName()).orderBy(f.firm().legalName().ascending()),
     expected: { columns: ['Firm LegalName', 'Sum Expression'], rows: [
         ['Firm A', 0],
         ['Firm X', 1],

@@ -33,37 +33,37 @@ afterAll(() => {
 
 describe('CompanyFinder — string scalar functions', () => {
   it('trimStart removes leading whitespace', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().trimStart()], cf.id().eq(1)).toRows();
+    const rows = await cf.findAll([cf.name().trimStart()], cf.id().eq(1)).toRows();
     expect(rows[0][0]).toBe('Acme Corp  ');
   });
 
   it('trimEnd removes trailing whitespace', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().trimEnd()], cf.id().eq(1)).toRows();
+    const rows = await cf.findAll([cf.name().trimEnd()], cf.id().eq(1)).toRows();
     expect(rows[0][0]).toBe('  Acme Corp');
   });
 
   it('reverse reverses the string', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().reverse()], cf.id().eq(2)).toRows();
+    const rows = await cf.findAll([cf.name().reverse()], cf.id().eq(2)).toRows();
     expect(rows[0][0]).toBe('beta corp'.split('').reverse().join(''));
   });
 
   it('toUpperCase uppercases the string', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().toUpperCase()], cf.id().eq(2)).toRows();
+    const rows = await cf.findAll([cf.name().toUpperCase()], cf.id().eq(2)).toRows();
     expect(rows[0][0]).toBe('BETA CORP');
   });
 
   it('toLowerCase lowercases the string', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().toLowerCase()], cf.id().eq(3)).toRows();
+    const rows = await cf.findAll([cf.name().toLowerCase()], cf.id().eq(3)).toRows();
     expect(rows[0][0]).toBe('hello world');
   });
 
   it('trim removes both leading and trailing whitespace', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().trim()], cf.id().eq(1)).toRows();
+    const rows = await cf.findAll([cf.name().trim()], cf.id().eq(1)).toRows();
     expect(rows[0][0]).toBe('Acme Corp');
   });
 
   it('left(4) returns first 4 characters', async () => {
-    const rows = await cf.findAll(null, null, [cf.name().left(4)], cf.id().eq(2)).toRows();
+    const rows = await cf.findAll([cf.name().left(4)], cf.id().eq(2)).toRows();
     expect(rows[0][0]).toBe('beta');
   });
 });

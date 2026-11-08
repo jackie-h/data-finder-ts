@@ -10,189 +10,189 @@ export const _D3 = new DateOnly('2024-11-05T00:00:00Z');
 export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   {
     name: 'year_extract',
-    query: f => f.findAll(null, null, [f.tradeDate().year()], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().year()], f.id().eq(1)),
     expected: { columns: ['Year Trade Date'], rows: [
         [2024],
       ] },
   },
   {
     name: 'month_extract',
-    query: f => f.findAll(null, null, [f.tradeDate().month()], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().month()], f.id().eq(1)),
     expected: { columns: ['Month Trade Date'], rows: [
         [3],
       ] },
   },
   {
     name: 'day_extract',
-    query: f => f.findAll(null, null, [f.tradeDate().day()], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().day()], f.id().eq(1)),
     expected: { columns: ['Day Trade Date'], rows: [
         [15],
       ] },
   },
   {
     name: 'quarter_extract',
-    query: f => f.findAll(null, null, [f.tradeDate().quarter()], f.id().eq(2)),
+    query: f => f.findAll([f.tradeDate().quarter()], f.id().eq(2)),
     expected: { columns: ['Quarter Trade Date'], rows: [
         [3],
       ] },
   },
   {
     name: 'week_extract',
-    query: f => f.findAll(null, null, [f.tradeDate().week()], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().week()], f.id().eq(1)),
     expected: { columns: ['Week Trade Date'], rows: [
         [11],
       ] },
   },
   {
     name: 'first_day_of_week',
-    query: f => f.findAll(null, null, [f.tradeDate().firstDayOfWeek()], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().firstDayOfWeek()], f.id().eq(1)),
     expected: { columns: ['First Day Of Week Trade Date'], rows: [
         [ts('2024-03-11')],
       ], sql: 'CAST(DATE_TRUNC(\'week\', t0.trade_date) AS DATE)', skipGraphql: 'The GraphQL finder cannot truncate dates' },
   },
   {
     name: 'first_day_of_month',
-    query: f => f.findAll(null, null, [f.tradeDate().firstDayOfMonth()], f.id().eq(2)),
+    query: f => f.findAll([f.tradeDate().firstDayOfMonth()], f.id().eq(2)),
     expected: { columns: ['First Day Of Month Trade Date'], rows: [
         [ts('2024-07-01')],
       ], skipGraphql: 'The GraphQL finder cannot truncate dates' },
   },
   {
     name: 'first_day_of_quarter',
-    query: f => f.findAll(null, null, [f.tradeDate().firstDayOfQuarter()], f.id().eq(3)),
+    query: f => f.findAll([f.tradeDate().firstDayOfQuarter()], f.id().eq(3)),
     expected: { columns: ['First Day Of Quarter Trade Date'], rows: [
         [ts('2024-10-01')],
       ], skipGraphql: 'The GraphQL finder cannot truncate dates' },
   },
   {
     name: 'first_day_of_year',
-    query: f => f.findAll(null, null, [f.tradeDate().firstDayOfYear()], f.id().eq(3)),
+    query: f => f.findAll([f.tradeDate().firstDayOfYear()], f.id().eq(3)),
     expected: { columns: ['First Day Of Year Trade Date'], rows: [
         [ts('2024-01-01')],
       ], skipGraphql: 'The GraphQL finder cannot truncate dates' },
   },
   {
     name: 'filter_on_first_day_of_month',
-    query: f => f.findAll(null, null, [f.id()], f.tradeDate().firstDayOfMonth().eq(new DateOnly('2024-07-01T00:00:00Z'))),
+    query: f => f.findAll([f.id()], f.tradeDate().firstDayOfMonth().eq(new DateOnly('2024-07-01T00:00:00Z'))),
     expected: { columns: ['Id'], rows: [
         [2],
       ], sql: 'CAST(DATE_TRUNC(\'month\', t0.trade_date) AS DATE) = \'2024-07-01\'', skipGraphql: 'A filter on an expression cannot be pushed to the server' },
   },
   {
     name: 'earliest_and_latest_date',
-    query: f => f.findAll(null, null, [f.tradeDate().min(), f.tradeDate().max()]),
+    query: f => f.findAll([f.tradeDate().min(), f.tradeDate().max()]),
     expected: { columns: ['Min Trade Date', 'Max Trade Date'], rows: [
         [ts('2024-03-15'), ts('2024-11-05')],
       ], sql: 'MIN(t0.trade_date)', skipGraphql: 'The GraphQL finder cannot take the earliest or latest date yet' },
   },
   {
     name: 'subtract_months_one',
-    query: f => f.findAll(null, null, [f.tradeDate().subtractMonths(1)], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().subtractMonths(1)], f.id().eq(1)),
     expected: { columns: ['Subtract Months Trade Date'], rows: [
         [ts('2024-02-15T00:00:00.000000')],
       ] },
   },
   {
     name: 'add_days_ten',
-    query: f => f.findAll(null, null, [f.tradeDate().addDays(10)], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().addDays(10)], f.id().eq(1)),
     expected: { columns: ['Add Days Trade Date'], rows: [
         [ts('2024-03-25T00:00:00.000000')],
       ] },
   },
   {
     name: 'subtract_days_five',
-    query: f => f.findAll(null, null, [f.tradeDate().subtractDays(5)], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().subtractDays(5)], f.id().eq(1)),
     expected: { columns: ['Subtract Days Trade Date'], rows: [
         [ts('2024-03-10T00:00:00.000000')],
       ] },
   },
   {
     name: 'add_months_one',
-    query: f => f.findAll(null, null, [f.tradeDate().addMonths(1)], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().addMonths(1)], f.id().eq(1)),
     expected: { columns: ['Add Months Trade Date'], rows: [
         [ts('2024-04-15T00:00:00.000000')],
       ] },
   },
   {
     name: 'add_years_one',
-    query: f => f.findAll(null, null, [f.tradeDate().addYears(1)], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().addYears(1)], f.id().eq(1)),
     expected: { columns: ['Add Years Trade Date'], rows: [
         [ts('2025-03-15T00:00:00.000000')],
       ] },
   },
   {
     name: 'diff_days',
-    query: f => f.findAll(null, null, [f.tradeDate().diffDays(new DateOnly('2024-03-25T00:00:00Z'))], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().diffDays(new DateOnly('2024-03-25T00:00:00Z'))], f.id().eq(1)),
     expected: { columns: ['Diff Days Trade Date'], rows: [
         [10],
       ] },
   },
   {
     name: 'diff_months',
-    query: f => f.findAll(null, null, [f.tradeDate().diffMonths(new DateOnly('2024-06-15T00:00:00Z'))], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().diffMonths(new DateOnly('2024-06-15T00:00:00Z'))], f.id().eq(1)),
     expected: { columns: ['Diff Months Trade Date'], rows: [
         [3],
       ] },
   },
   {
     name: 'diff_years',
-    query: f => f.findAll(null, null, [f.tradeDate().diffYears(new DateOnly('2026-03-15T00:00:00Z'))], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().diffYears(new DateOnly('2026-03-15T00:00:00Z'))], f.id().eq(1)),
     expected: { columns: ['Diff Years Trade Date'], rows: [
         [2],
       ] },
   },
   {
     name: 'day_of_week',
-    query: f => f.findAll(null, null, [f.tradeDate().dayOfWeek()], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().dayOfWeek()], f.id().eq(1)),
     expected: { columns: ['Day Of Week Trade Date'], rows: [
         [5],
       ] },
   },
   {
     name: 'subtract_years_one',
-    query: f => f.findAll(null, null, [f.tradeDate().subtractYears(1)], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().subtractYears(1)], f.id().eq(1)),
     expected: { columns: ['Subtract Years Trade Date'], rows: [
         [ts('2023-03-15T00:00:00.000000')],
       ] },
   },
   {
     name: 'add_timedelta_days',
-    query: f => f.findAll(null, null, [f.tradeDate().addDays(5)], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().addDays(5)], f.id().eq(1)),
     expected: { columns: ['Add Days Trade Date'], rows: [
         [ts('2024-03-20T00:00:00.000000')],
       ] },
   },
   {
     name: 'sub_timedelta_days',
-    query: f => f.findAll(null, null, [f.tradeDate().subtractDays(5)], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().subtractDays(5)], f.id().eq(1)),
     expected: { columns: ['Subtract Days Trade Date'], rows: [
         [ts('2024-03-10T00:00:00.000000')],
       ] },
   },
   {
     name: 'trade_date_eq',
-    query: f => f.findAll(null, null, [f.id()], f.tradeDate().eq(_D1)),
+    query: f => f.findAll([f.id()], f.tradeDate().eq(_D1)),
     expected: { columns: ['Id'], rows: [
         [1],
       ] },
   },
   {
     name: 'trade_date_gt',
-    query: f => f.findAll(null, null, [f.id()], f.tradeDate().gt(_D2)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.tradeDate().gt(_D2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [3],
       ] },
   },
   {
     name: 'trade_date_lt',
-    query: f => f.findAll(null, null, [f.id()], f.tradeDate().lt(_D2)),
+    query: f => f.findAll([f.id()], f.tradeDate().lt(_D2)),
     expected: { columns: ['Id'], rows: [
         [1],
       ] },
   },
   {
     name: 'trade_date_ge',
-    query: f => f.findAll(null, null, [f.id()], f.tradeDate().gte(_D2)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.tradeDate().gte(_D2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -200,7 +200,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'trade_date_le',
-    query: f => f.findAll(null, null, [f.id()], f.tradeDate().lte(_D2)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.tradeDate().lte(_D2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
@@ -208,14 +208,14 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'npv_eq',
-    query: f => f.findAll(null, null, [f.id()], f.npv().eq(500.0)),
+    query: f => f.findAll([f.id()], f.npv().eq(500.0)),
     expected: { columns: ['Id'], rows: [
         [1],
       ] },
   },
   {
     name: 'npv_gt',
-    query: f => f.findAll(null, null, [f.id()], f.npv().gt(500.0)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.npv().gt(500.0)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -223,14 +223,14 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'npv_lt',
-    query: f => f.findAll(null, null, [f.id()], f.npv().lt(800.0)),
+    query: f => f.findAll([f.id()], f.npv().lt(800.0)),
     expected: { columns: ['Id'], rows: [
         [1],
       ] },
   },
   {
     name: 'npv_ge',
-    query: f => f.findAll(null, null, [f.id()], f.npv().gte(800.0)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.npv().gte(800.0)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -238,7 +238,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'npv_le',
-    query: f => f.findAll(null, null, [f.id()], f.npv().lte(800.0)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.npv().lte(800.0)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
@@ -246,42 +246,42 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'npv_min',
-    query: f => f.findAll(null, null, [f.npv().min()]),
+    query: f => f.findAll([f.npv().min()]),
     expected: { columns: ['Min Npv'], rows: [
         [500.0],
       ] },
   },
   {
     name: 'npv_max',
-    query: f => f.findAll(null, null, [f.npv().max()]),
+    query: f => f.findAll([f.npv().max()]),
     expected: { columns: ['Max Npv'], rows: [
         [1200.0],
       ] },
   },
   {
     name: 'npv_average',
-    query: f => f.findAll(null, null, [f.npv().average()]),
+    query: f => f.findAll([f.npv().average()]),
     expected: { columns: ['Average Npv'], rows: [
         [833.333333333333],
       ] },
   },
   {
     name: 'npv_eq_operator',
-    query: f => f.findAll(null, null, [f.id()], f.npv().eq(500.0)),
+    query: f => f.findAll([f.id()], f.npv().eq(500.0)),
     expected: { columns: ['Id'], rows: [
         [1],
       ] },
   },
   {
     name: 'id_eq_operator',
-    query: f => f.findAll(null, null, [f.id()], f.id().eq(1)),
+    query: f => f.findAll([f.id()], f.id().eq(1)),
     expected: { columns: ['Id'], rows: [
         [1],
       ] },
   },
   {
     name: 'id_gt',
-    query: f => f.findAll(null, null, [f.id()], f.id().gt(1)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.id().gt(1)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -289,7 +289,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'id_lt',
-    query: f => f.findAll(null, null, [f.id()], f.id().lt(3)),
+    query: f => f.findAll([f.id()], f.id().lt(3)),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
@@ -297,7 +297,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'id_ge',
-    query: f => f.findAll(null, null, [f.id()], f.id().gte(2)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.id().gte(2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -305,7 +305,7 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'id_le',
-    query: f => f.findAll(null, null, [f.id()], f.id().lte(2)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.id().lte(2)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],

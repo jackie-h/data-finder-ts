@@ -52,8 +52,8 @@ describe('against DuckDB', () => {
   });
   afterAll(() => { conn.disconnectSync(); instance.closeSync(); });
 
-  const first = async (column: Parameters<typeof f.findAll>[2][number], id: number) => {
-    const rows = await f.findAll(null, null, [column], f.id().eq(id)).toRows();
+  const first = async (column: Parameters<typeof f.findAll>[0][number], id: number) => {
+    const rows = await f.findAll([column], f.id().eq(id)).toRows();
     return String(rows[0][0]);
   };
 
@@ -63,7 +63,7 @@ describe('against DuckDB', () => {
   it('first day of year', async () => { expect(await first(f.tradeDate().firstDayOfYear(), 3)).toContain('2024-01-01'); });
 
   it('filters on the first day of the month', async () => {
-    const query = f.findAll(null, null, [f.id()], f.tradeDate().firstDayOfMonth().eq(new DateOnly('2024-07-01')));
+    const query = f.findAll([f.id()], f.tradeDate().firstDayOfMonth().eq(new DateOnly('2024-07-01')));
     expect(query.toSql()).toContain(`CAST(DATE_TRUNC('month', t0.trade_date) AS DATE) = '2024-07-01'`);
     expect((await query.toRows()).map(r => Number(r[0]))).toEqual([2]);
   });

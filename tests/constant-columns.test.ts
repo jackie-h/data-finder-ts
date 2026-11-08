@@ -49,14 +49,13 @@ describe('the SQL', () => {
 
 type Case = [string, (f: CompanyFinder) => ReturnType<CompanyFinder['findAll']>, unknown[][]];
 const cases: Case[] = [
-  ['constant string column', f => f.findAll(null, null, [f.name(), constant('Hello').alias('Greeting')]).orderBy(f.name().ascending()).limit(2),
+  ['constant string column', f => f.findAll([f.name(), constant('Hello').alias('Greeting')]).orderBy(f.name().ascending()).limit(2),
     [['Acme Corp', 'Hello'], ['Acme Industries', 'Hello']]],
-  ['constant number and boolean columns', f => f.findAll(null, null,
-    [f.name(), constant(7).alias('Seven'), constant(1.5).alias('Ratio'), constant(true).alias('Flag')]).orderBy(f.name().ascending()).limit(1),
+  ['constant number and boolean columns', f => f.findAll([f.name(), constant(7).alias('Seven'), constant(1.5).alias('Ratio'), constant(true).alias('Flag')]).orderBy(f.name().ascending()).limit(1),
     [['Acme Corp', 7, 1.5, true]]],
-  ['constant column is named Constant by default', f => f.findAll(null, null, [f.name(), constant(1)]).orderBy(f.name().ascending()).limit(1),
+  ['constant column is named Constant by default', f => f.findAll([f.name(), constant(1)]).orderBy(f.name().ascending()).limit(1),
     [['Acme Corp', 1]]],
-  ['constant column with a filter and no matches', f => f.findAll(null, null, [f.name(), constant('x').alias('X')], f.name().eq('Nobody')), []],
+  ['constant column with a filter and no matches', f => f.findAll([f.name(), constant('x').alias('X')], f.name().eq('Nobody')), []],
 ];
 
 describe('against DuckDB', () => {
@@ -77,7 +76,7 @@ describe('against DuckDB', () => {
 
   it('renders the constant', () => {
     const f = new CompanyFinder();
-    expect(f.findAll(null, null, [f.name(), constant('Hello').alias('Greeting')]).toSql()).toContain(`'Hello' AS "Greeting"`);
+    expect(f.findAll([f.name(), constant('Hello').alias('Greeting')]).toSql()).toContain(`'Hello' AS "Greeting"`);
   });
 });
 
@@ -105,12 +104,12 @@ describe('against GraphQL', () => {
 
   it('names the columns', async () => {
     const f = new GraphQLCompanyFinder(endpoint);
-    await f.findAll(null, null, [f.name(), constant(1), constant('x').alias('X')]).limit(1).toRows();
+    await f.findAll([f.name(), constant(1), constant('x').alias('X')]).limit(1).toRows();
     expect(runner.lastColumns).toEqual(['Name', 'Constant', 'X']);
   });
 
   it('refuses a query of only constants', async () => {
     const f = new GraphQLCompanyFinder(endpoint);
-    await expect(f.findAll(null, null, [constant(1)]).toRows()).rejects.toThrow('only constants');
+    await expect(f.findAll([constant(1)]).toRows()).rejects.toThrow('only constants');
   });
 });
