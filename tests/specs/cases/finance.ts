@@ -129,31 +129,31 @@ export const TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'filter_on_a_year',
-    query: (f: any) => f.findAll(null, _AT, [f.symbol()], f.validFrom().year().eq(2020)),
+    query: f => f.findAll(null, _AT, [f.symbol()], f.validFrom().year().eq(2020)),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
-      ], skipGraphql: 'The GraphQL finder cannot filter on a date function', pending: 'comparing a date part, a difference or a moved date is not ported yet' },
+      ], skipGraphql: 'The GraphQL finder cannot filter on a date function' },
   },
   {
     name: 'filter_on_a_month_in_a_list',
-    query: (f: any) => f.findAll(null, _AT, [f.symbol()], f.validFrom().month().isIn([1, 2])),
+    query: f => f.findAll(null, _AT, [f.symbol()], f.validFrom().month().isIn([1, 2])),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
-      ], skipGraphql: 'The GraphQL finder cannot filter on a date function', pending: 'comparing a date part, a difference or a moved date is not ported yet' },
+      ], skipGraphql: 'The GraphQL finder cannot filter on a date function' },
   },
   {
     name: 'filter_on_a_difference',
-    query: (f: any) => f.findAll(null, _AT, [f.symbol()], f.validFrom().diffDays(new Date(Date.UTC(2020, 1, 1, 0, 0, 0))).gte(31)),
+    query: f => f.findAll(null, _AT, [f.symbol()], f.validFrom().diffDays(new Date(Date.UTC(2020, 1, 1, 0, 0, 0))).gte(31)),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
-      ], skipGraphql: 'The GraphQL finder cannot filter on a date function', pending: 'comparing a date part, a difference or a moved date is not ported yet' },
+      ], skipGraphql: 'The GraphQL finder cannot filter on a date function' },
   },
   {
     name: 'filter_on_a_moved_datetime',
-    query: (f: any) => f.findAll(null, _AT, [f.symbol()], f.validFrom().addDays(1).gt(new Date(Date.UTC(2020, 0, 1, 0, 0, 0)))),
+    query: f => f.findAll(null, _AT, [f.symbol()], f.validFrom().addDays(1).gt(new Date(Date.UTC(2020, 0, 1, 0, 0, 0)))),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
-      ], skipGraphql: 'The GraphQL finder cannot filter on a date function', pending: 'comparing a date part, a difference or a moved date is not ported yet' },
+      ], skipGraphql: 'The GraphQL finder cannot filter on a date function' },
   },
   {
     name: 'filter_on_the_first_day_of_the_month',

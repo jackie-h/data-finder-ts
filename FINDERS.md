@@ -246,6 +246,10 @@ as a column does (`eq`, `ne`, `lt`, `lte`, `gt`, `gte`), and `contains`, `starts
 expression that holds text, such as `f.name().toUpperCase().startsWith('AC')` or a joined text. The GraphQL runner
 throws `GraphQLClientComputationError` for `having`.
 
+`isIn` and `isNotIn` work on an expression as on a column: `f.name().substring(0, 4).isIn(['beta', 'Hell'])`. A date part,
+a date difference and a moved date compare with the comparisons of a column (`eq` ... `gte`, `isIn`):
+`f.validFrom().year().isIn([2019, 2020])`, `f.validFrom().diffDays(date).gte(31)`, `f.validFrom().addDays(1).gt(date)`.
+
 `.not()` negates a condition, `f.name().startsWith('Acme').not()` (a negation of a negation is the condition itself), and
 `.matches(pattern)` is a regular expression searched anywhere in the text: `f.name().matches('^(Acme|Beta) .*p$')`. It is
 `REGEXP_MATCHES` in DuckDB, `~` in Postgres and `RLIKE` in Databricks; `contains`, `startsWith` and `endsWith` match their

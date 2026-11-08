@@ -360,6 +360,8 @@ export class DateExtractOperation extends UnaryOperation implements Sortable {
     readonly part: DatePart,
     readonly displayName?: string,
   ) { super(element); }
+
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
 
 /** The first day of the week, month, quarter or year that the date falls in, as a date. */
@@ -393,6 +395,8 @@ export class DateArithmeticOperation extends UnaryOperation implements Sortable 
     readonly isAdd: boolean = true,
     readonly displayName?: string,
   ) { super(element); }
+
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
 
 export class DateDiffOperation extends UnaryOperation implements Sortable {
@@ -409,6 +413,8 @@ export class DateDiffOperation extends UnaryOperation implements Sortable {
     readonly unit: DatePart,
     readonly displayName?: string,
   ) { super(element); }
+
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
 
 export class Column extends RelationalOperationElement {
@@ -719,6 +725,16 @@ export abstract class Comparable {
   gt(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.GREATER_THAN, other); }
   /** Filter to rows where this expression is at least `other`. */
   gte(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, other); }
+
+  private _constants(values: readonly unknown[]): ConstantOperation[] {
+    if (values.length === 0) throw new Error('isIn / isNotIn need at least one value');
+    return values.map(valueOperand);
+  }
+
+  /** Filter to rows where this expression equals any of `values`: `f.name().substring(0, 4).isIn(['beta', 'Hell'])`. */
+  isIn(values: readonly unknown[]): InOperation { return new InOperation(this.comparisonOperand(), this._constants(values)); }
+  /** Filter to rows where this expression equals none of `values`. */
+  isNotIn(values: readonly unknown[]): NotInOperation { return new NotInOperation(this.comparisonOperand(), this._constants(values)); }
 }
 
 /** Whether a standard deviation or variance is the sample one (`ddof` 1) or the population one (0). */
@@ -911,6 +927,15 @@ export function concat(...parts: ConcatPart[]): ConcatOperation {
 
 export interface ConcatOperation extends Comparable, StringPredicates {}
 applyMixins(ConcatOperation, [Comparable, StringPredicates]);
+
+export interface DateExtractOperation extends Comparable {}
+applyMixins(DateExtractOperation, [Comparable]);
+
+export interface DateArithmeticOperation extends Comparable {}
+applyMixins(DateArithmeticOperation, [Comparable]);
+
+export interface DateDiffOperation extends Comparable {}
+applyMixins(DateDiffOperation, [Comparable]);
 
 export interface DateTruncOperation extends Comparable {}
 applyMixins(DateTruncOperation, [Comparable]);
