@@ -71,6 +71,8 @@ function normalize(value: unknown): unknown {
     if (name === 'DuckDBDateValue' || name === 'DuckDBTimestampValue') return instant(String(value));
     if (name === 'DuckDBDecimalValue') return Number(String(value));
   }
+  // the last digits of a sin, tan or log depend on the platform's math library, so floats are compared to 12 digits
+  if (typeof value === 'number' && Number.isFinite(value) && !Number.isInteger(value)) return Number(value.toPrecision(12));
   return value;
 }
 

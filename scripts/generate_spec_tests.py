@@ -320,7 +320,8 @@ def ts_value(value) -> str:
     if isinstance(value, (int, np.integer)):
         return str(int(value))
     if isinstance(value, (float, np.floating)):
-        return repr(float(value))
+        # 15 significant digits: the last digits of a sin, tan or log depend on the platform's math library
+        return repr(float(f'{float(value):.15g}'))
     if isinstance(value, str):
         return js_str(value)
     if isinstance(value, (datetime.datetime, datetime.date)):
