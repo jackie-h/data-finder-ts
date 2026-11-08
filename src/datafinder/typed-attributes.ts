@@ -84,6 +84,10 @@ export class StringAttribute extends Attribute {
   ne(value: string | Comparand): ComparisonOperation {
     return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new StringConstantOperation((value as string)));
   }
+  /** Filter to rows where this attribute has a match for the regular expression `pattern` anywhere in it. */
+  matches(pattern: string): ComparisonOperation {
+    return new ComparisonOperation(this.cwj(), ComparisonOperator.MATCHES, new StringConstantOperation(pattern));
+  }
   /** Filter to rows where this attribute contains `value` as a substring. */
   contains(value: string): ComparisonOperation {
     return new ComparisonOperation(this.cwj(), ComparisonOperator.LIKE, new StringConstantOperation(`%${escapeLike(value)}%`));

@@ -7,6 +7,8 @@ export enum ComparisonOperator {
   GREATER_THAN_OR_EQUAL_TO = 'GREATER_THAN_OR_EQUAL_TO',
   LIKE = 'LIKE',
   NOT_LIKE = 'NOT_LIKE',
+  /** A regular expression searched anywhere in the text. */
+  MATCHES = 'MATCHES',
 }
 
 /** The character that makes the next one literal in a LIKE pattern built from a value (`contains`, `startsWith`, ...). */
@@ -116,6 +118,9 @@ export abstract class Operation extends RelationalOperationElement implements Al
     return new LogicalOperation(this, LogicalOperator.AND, other);
   }
 
+  /** The condition does not hold: `f.name().startsWith('Acme').not()`. */
+  not(): Operation { return new NotOperation(this); }
+
   /** Combine with `other` using OR. A chain reads left to right: `a.or(b).and(c)` is `(a OR b) AND c`. */
   or(other: RelationalOperationElement): Operation {
     return new LogicalOperation(this, LogicalOperator.OR, other);
@@ -126,6 +131,9 @@ export class NoOperation extends Operation {
   and(other: RelationalOperationElement): Operation {
     return other as Operation;
   }
+
+  /** No filter matches every row, so there is nothing to negate. */
+  not(): Operation { throw new Error('No condition to negate: a query with no filter matches every row'); }
 
   /** No filter matches every row, so OR-ing anything with it still matches every row. */
   or(_other: RelationalOperationElement): Operation {
@@ -212,6 +220,11 @@ export class InOperation extends UnaryOperation {
 /** The element is none of `values` (`element NOT IN (...)`). */
 export class NotInOperation extends UnaryOperation {
   constructor(element: RelationalOperationElement, readonly values: ConstantOperation[]) { super(element); }
+}
+
+/** The condition does not hold: `NOT (element)`. Negating it again gives the condition. */
+export class NotOperation extends UnaryOperation {
+  not(): Operation { return this.element as Operation; }
 }
 
 export class ComparisonOperation extends BinaryOperation {
@@ -597,6 +610,9 @@ export class ExistsOperation extends RelationalOperationElement implements Alias
   or(other: RelationalOperationElement): LogicalOperation {
     return new LogicalOperation(this, LogicalOperator.OR, other);
   }
+
+  /** The step reaches no row: `notExists()`. */
+  not(): NotExistsOperation { return new NotExistsOperation(this.node); }
 }
 
 /** Returned by `RelatedFinder.notExists()`. A backend translates it to a join-absence check. */
@@ -613,6 +629,9 @@ export class NotExistsOperation extends RelationalOperationElement implements Al
   or(other: RelationalOperationElement): LogicalOperation {
     return new LogicalOperation(this, LogicalOperator.OR, other);
   }
+
+  /** The step reaches a row: `exists()`. */
+  not(): ExistsOperation { return new ExistsOperation(this.node); }
 }
 
 export class SelectOperation {
@@ -719,6 +738,10 @@ export abstract class StringPredicates {
     return new ComparisonOperation(this.comparisonOperand(), ComparisonOperator.LIKE, new StringConstantOperation(pattern));
   }
 
+  /** Filter to rows where this text has a match for the regular expression `pattern` anywhere in it, as `RegExp.test`. */
+  matches(pattern: string): ComparisonOperation {
+    return new ComparisonOperation(this.comparisonOperand(), ComparisonOperator.MATCHES, new StringConstantOperation(pattern));
+  }
   /** Filter to rows where this text contains `value`. */
   contains(value: string): ComparisonOperation { return this._like(`%${escapeLike(value)}%`); }
   /** Filter to rows where this text starts with `prefix`. */
@@ -927,6 +950,9 @@ applyMixins(IsNotNullOperation, [BooleanAggregates]);
 
 export interface InOperation extends BooleanAggregates {}
 applyMixins(InOperation, [BooleanAggregates]);
+
+export interface NotOperation extends BooleanAggregates {}
+applyMixins(NotOperation, [BooleanAggregates]);
 
 export interface NotInOperation extends BooleanAggregates {}
 applyMixins(NotInOperation, [BooleanAggregates]);

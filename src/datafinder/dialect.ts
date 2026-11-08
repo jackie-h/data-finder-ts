@@ -33,6 +33,9 @@ export interface SqlDialect {
   /** Whole `unit`s from `from` to `to`; both are SQL expressions. */
   dateDiff(unit: DatePart, from: string, to: string): string;
 
+  /** Whether `expression` has a match for the regular expression `pattern` anywhere in it; both are SQL expressions. */
+  regexMatches(expression: string, pattern: string): string;
+
   /** The values of a group joined with `separator` (an SQL literal), in the order given (each with its direction). */
   stringAgg(expression: string, separator: string, orderBy: string[]): string;
 }
@@ -64,6 +67,7 @@ export const POSTGRES: SqlDialect = {
       }
     }
   },
+  regexMatches: (expression, pattern) => `(${expression} ~ ${pattern})`,
   stringAgg: (expression, separator, orderBy) =>
     `STRING_AGG(${expression}, ${separator}${orderBy.length > 0 ? ' ORDER BY ' + orderBy.join(', ') : ''})`,
 };
@@ -75,6 +79,7 @@ export const DUCKDB: SqlDialect = {
   orderDirection: direction => (direction === SortDirection.ASC ? ' ASC' : ' DESC NULLS FIRST'),
   doubleType: 'DOUBLE',
   dateDiff: (unit, from, to) => `DATE_DIFF('${unit.toLowerCase()}', ${from}, ${to})`,
+  regexMatches: (expression, pattern) => `REGEXP_MATCHES(${expression}, ${pattern})`,
 };
 
 export const DATABRICKS: SqlDialect = {
@@ -90,6 +95,8 @@ export const DATABRICKS: SqlDialect = {
   // DAYOFWEEK is 1 = Sunday through 7 = Saturday
   dayOfWeek: expression => `(DAYOFWEEK(${expression}) - 1)`,
   dateDiff: (unit, from, to) => `DATEDIFF(${unit}, ${from}, ${to})`,
+  // RLIKE searches anywhere in the text
+  regexMatches: (expression, pattern) => `(${expression} RLIKE ${pattern})`,
   stringAgg: (expression, separator, orderBy) =>
     `LISTAGG(${expression}, ${separator})${orderBy.length > 0 ? ' WITHIN GROUP (ORDER BY ' + orderBy.join(', ') + ')' : ''}`,
 };

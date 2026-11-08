@@ -84,9 +84,6 @@ COLUMN_LABELS = {
 # Expectations of features the port does not have yet: generated, but skipped, with the reason.
 # Each is removed with the change that ports its feature.
 PENDING: dict[str, str] = {
-    'negate_a_string_test_with_a_tilde': 'negating a condition is not ported yet',
-    'matches_a_regular_expression_anywhere_in_the_text': 'matching a regular expression is not ported yet',
-    'negate_a_regular_expression_match': 'negating a condition and matching a regular expression are not ported yet',
     'expression_is_in': 'isIn on an expression is not ported yet',
     'expression_is_not_in': 'isIn on an expression is not ported yet',
     'integer_power_is_an_integer': 'the type of an arithmetic result is not ported yet',
@@ -221,6 +218,8 @@ class Translator:
     def visit_UnaryOp(self, node: ast.UnaryOp) -> str:
         if isinstance(node.op, ast.USub):
             return '-' + self.expr(node.operand)
+        if isinstance(node.op, ast.Invert):   # ~condition
+            return f'{self.expr(node.operand)}.not()'
         raise NotImplementedError(ast.dump(node))
 
     def visit_Compare(self, node: ast.Compare) -> str:

@@ -27,6 +27,7 @@ export const CORPUS: Record<string, Query> = {
   'quotes and backslashes in strings': q([text], text.eq("it's a\\b")),
   'like with an escape': q([text], text.contains('50%')),
   'not in with nulls': q([text], text.isNotIn(['x'])),
+  'regular expression and negation': q([text], text.matches('^a.*z$').and(text.startsWith('x').not())),
   'is null': q([text], text.isNull().or(n.isNotNull())),
   'sort ascending and descending': q([text, n], new NoOperation(), [text.ascending(), n.descending()]),
   'limit and offset': q([text], new NoOperation(), [text.ascending()], [], 3, 2),
