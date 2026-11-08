@@ -87,4 +87,13 @@ export abstract class {{rcm.clazz.name}}FinderBase {
     filterOp?: Operation,
   ): FinderResult;
 {% endif %}
+{% if rcm.milestone_mapping and has_processing_snapshot(rcm.milestone_mapping) %}
+  abstract findForProcessingRange(
+    processingFrom: Date | string,
+    processingTo: Date | string,
+    businessDate: Date | string | null,
+    displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
+    filterOp?: Operation,
+  ): FinderResult;
+{% endif %}
 }

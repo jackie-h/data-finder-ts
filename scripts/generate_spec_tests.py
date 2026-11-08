@@ -47,12 +47,14 @@ SEEDS = {
     'positions_specs': 'positions',
     'people_denormalised_specs': 'people_denormalised',
     'business_range_specs': 'business_range',
+    'processing_snapshot_specs': 'processing_snapshot',
 }
 
 # Python finder/attribute methods whose TypeScript names aren't a plain snake -> camel conversion.
 METHOD_NAMES = {
     'find_all': 'findAll',
     'find_for_date_range': 'findForDateRange',
+    'find_for_processing_range': 'findForProcessingRange',
     'and_op': 'and',
     'and_': 'and',
     'or_': 'or',
@@ -85,7 +87,6 @@ SKIPPED_MODULES = {
 
 # Spec modules of data-finder features the port does not have yet: not generated until it does.
 PENDING_MODULES = {
-    'processing_snapshot_specs': 'a processing snapshot is not ported yet',
     'joins_through_tables_specs': 'joins through other tables are not ported yet',
 }
 

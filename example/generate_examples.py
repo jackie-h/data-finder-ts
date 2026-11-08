@@ -25,6 +25,7 @@ _MAPPINGS = [
     'null_end_milestoning_mapping.md',
     'people_denormalised_mapping.md',
     'business_range_mapping.md',
+    'processing_snapshot_mapping.md',
 ]
 
 if __name__ == '__main__':
