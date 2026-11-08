@@ -42,6 +42,8 @@ export interface Expectation {
   unexpectedSql?: string;
   /** Why the expectation does not apply to the GraphQL backend; the GraphQL specs skip it. */
   skipGraphql?: string;
+  /** The data-finder feature this expectation needs that is not ported yet; the case is skipped until it is. */
+  pending?: string;
 }
 
 /** The backend an expectation runs against: SQL is only checked for `duckdb`. */
@@ -69,6 +71,8 @@ function normalize(value: unknown): unknown {
     if (name === 'DuckDBDateValue' || name === 'DuckDBTimestampValue') return instant(String(value));
     if (name === 'DuckDBDecimalValue') return Number(String(value));
   }
+  // the last digits of a sin, tan or log depend on the platform's math library, so floats are compared to 12 digits
+  if (typeof value === 'number' && Number.isFinite(value) && !Number.isInteger(value)) return Number(value.toPrecision(12));
   return value;
 }
 
