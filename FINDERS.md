@@ -136,6 +136,14 @@ To group differently, build the part that should bind first and combine it on th
 
 The result of a function has the functions of its type, so they chain: `cf.name().toUpperCase().length()` is labelled "Length Upper Name", and `price().sqrt().floor()` works the same way. An expression can be compared like a column, with a value or with another expression: `cf.name().toUpperCase().eq('ACME CORP')`, `cf.name().length().gt(cf.category().length())`. The GraphQL runner does not compute either on the client.
 
+### Trigonometric and exponential functions
+
+A numeric column or expression has `.sin()`, `.cos()`, `.tan()`, `.asin()`, `.acos()`, `.atan()`, `.atan2(x)`, `.exp()` and `.log()` (the natural logarithm, `LN` in SQL). Angles are in radians. They are named "Sin Price" and so on, and chain like any other function.
+
+### Comparing with another column
+
+A column's comparisons (`eq`, `ne`, `gt`, `lt`, `gte`, `lte`) take another column or an expression as well as a value: `tf.price().gt(tf.cost().times(1.075))`, `tf.commitDate().lt(tf.receiptDate())`. `ne` is on every type. The date differences (`diffDays`, `diffMonths`, `diffYears`, and `diffHours`, `diffMinutes` and `diffSeconds` on a timestamp) take a column too: `tf.startDate().diffDays(tf.endDate())`.
+
 ### Arithmetic
 
 A numeric column, aggregate, number function or another calculation has `.plus()`, `.minus()`, `.times()` and `.dividedBy()`, with a number or another numeric expression on the other side: `tf.price().times(tf.quantity())`, `tf.price().plus(1.5)`. A number on the left is a constant: `constant(100).minus(tf.price())`. Parentheses are written only where the meaning needs them, so `tf.price().plus(1).times(2)` is `(t0.price + 1) * 2` and `a.minus(b.minus(1))` keeps its brackets. A result is named "Expression" unless `.alias()` names it, and can be compared (`tf.price().times(2).gte(8)`), sorted and aliased. A query that holds an aggregate in a calculation is grouped like any other aggregate. The GraphQL runner does not compute it on the client.
