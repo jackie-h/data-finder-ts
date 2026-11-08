@@ -81,23 +81,14 @@ COLUMN_LABELS = {
     'fill_null_leaves_a_value_that_is_there': {'Fill Null Name': 'Or Else Name'},
 }
 
-# Whole spec modules that are not ported.
-SKIPPED_MODULES = {
-    'tpch_bih_specs': 'the TPC-BiH benchmark is not ported',
-}
-
-# Spec modules of data-finder features the port does not have yet: not generated until it does.
-PENDING_MODULES = {
-}
-
-# Expectations of features the port does not have yet: generated, but skipped, with the reason.
-# Each is removed with the change that ports its feature.
-PENDING: dict[str, str] = {
-}
-
 # Specs that exercise Python features the TypeScript port doesn't have (SQL views: View / to_view).
 SKIPPED_SPECS = {
     'TRADE_VIEW_FINDER_SPECS': 'SQL views are not ported',
+}
+
+# Whole spec modules that are not ported.
+SKIPPED_MODULES = {
+    'tpch_bih_specs': 'the TPC-BiH benchmark is not ported',
 }
 
 # Spec groups whose expectations must also pass when run in a different order, and when every query is built
@@ -439,20 +430,15 @@ def generate_module(module_name: str) -> tuple[str, str]:
                 fields.append(f"unexpectedSql: {js_str(exp.unexpected_sql['duckdb'])}")
             if 'graphql' in exp.skip_backends:
                 fields.append(f"skipGraphql: {js_str(exp.skip_backends['graphql'])}")
-            pending = PENDING.get(exp.name)
-            if pending is not None:
-                fields.append(f"pending: {js_str(pending)}")
-            # a pending query may use what the port does not have yet, so it is not type-checked
-            param = '(f: any)' if pending is not None else 'f'
             cases.append(
-                f"  {{\n    name: {js_str(exp.name)},\n    query: {param} => {query},\n"
+                f"  {{\n    name: {js_str(exp.name)},\n    query: f => {query},\n"
                 f"    expected: {{ {', '.join(fields)} }},\n  }},\n"
             )
         case_blocks.append(f"export const {var_name}: SpecCase<{spec.finder_name}>[] = [\n" + ''.join(cases) + '];\n')
         test_blocks.append(
             f"describe({js_str(var_name)}, () => {{\n  const f = new {spec.finder_name}();\n\n"
             f"  for (const c of {var_name}) {{\n"
-            f"    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));\n  }}\n}});\n"
+            f"    it(c.name, () => runExpectation(c.query(f), runner, c.expected));\n  }}\n}});\n"
         )
         groups.append((var_name, spec.finder_name))
         if var_name in ORDER_INDEPENDENT.get(module_name, []):
@@ -465,7 +451,7 @@ def generate_module(module_name: str) -> tuple[str, str]:
         test_blocks.append(f"""// Related finders, and the join nodes under them, are shared between queries. A query that is missing a join
 // condition can pass only because an earlier query left its condition on a shared node, so each spec must also
 // pass when it runs in a different order.
-const ORDER_INDEPENDENT_SPECS: SpecCase<{finder}>[] = [{', '.join('...' + n for n in names)}].filter(c => c.expected.pending === undefined);
+const ORDER_INDEPENDENT_SPECS: SpecCase<{finder}>[] = [{', '.join('...' + n for n in names)}];
 
 describe('trade specs do not depend on order', () => {{
   const orders: [string, SpecCase<{finder}>[]][] = [
@@ -551,9 +537,6 @@ def main() -> None:
         module_name = os.path.basename(path)[:-3]
         if module_name in SKIPPED_MODULES:
             print(f'... skipped {module_name}: {SKIPPED_MODULES[module_name]}')
-            continue
-        if module_name in PENDING_MODULES:
-            print(f'... pending {module_name}: {PENDING_MODULES[module_name]}')
             continue
         cases_src, test_src = generate_module(module_name)
         name = case_module_name(module_name)

@@ -112,14 +112,10 @@ const dir = execFileSync("uv", ["run", "python", "-c", `import importlib, os; pr
   { cwd: repo, stdio: "pipe" }).toString().trim();
 const key = m => m.replace(/\.md$/, "");
 
-// Examples of data-finder features the port does not have yet; each is added to the config with the change that ports it.
-const PENDING_EXAMPLES = ["joins_through_tables_"];
-
 test("config covers every e2e model and database mapping file", () => {
   const listed = new Set([...config.models, ...config.mappings]);
   const files = readdirSync(dir).filter(f => f.endsWith(".md") && !f.endsWith("_graphql_mapping.md")   // GraphQL mappings have no tables to draw
-    && !f.startsWith("tpch_bih_")                                                                      // the TPC-BiH benchmark is not drawn
-    && !PENDING_EXAMPLES.some(prefix => f.startsWith(prefix)));                                        // examples of features not ported yet
+    && !f.startsWith("tpch_bih_"));                                                                    // the TPC-BiH benchmark is not drawn
   assert.deepEqual(files.filter(f => !listed.has(f)), [], "markdown files in the e2e folder missing from the config");
   assert.deepEqual([...listed].filter(f => !existsSync(join(dir, f))), [], "config lists files that do not exist");
 });
