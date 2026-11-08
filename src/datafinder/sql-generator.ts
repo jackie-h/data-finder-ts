@@ -293,7 +293,8 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
     for (const arg of operation.extraArgs) {
       parts.push(typeof arg === 'string' ? d.stringLiteral(arg) : String(arg));
     }
-    return fn + '(' + parts.join(', ') + ')';
+    const sql = fn + '(' + parts.join(', ') + ')';
+    return operation.cast ? 'CAST(' + sql + ' AS ' + operation.cast + ')' : sql;
   }
   if (operation instanceof DateExtractOperation) {
     const element = sqlOperationToString(operation.element, d);
@@ -936,7 +937,7 @@ class SQLQueryGenerator {
         op.window ? this._rewriteWindowSpec(op.window) : undefined);
     }
     if (op instanceof ScalarFunctionOperation) {
-      return new ScalarFunctionOperation(this._rewriteOperation(op.element), op.func, op.displayName, op.secondArg, op.extraArgs);
+      return new ScalarFunctionOperation(this._rewriteOperation(op.element), op.func, op.displayName, op.secondArg, op.extraArgs, op.cast, op.integer);
     }
     if (op instanceof DateExtractOperation) {
       return new DateExtractOperation(this._rewriteOperation(op.element), op.part, op.displayName);

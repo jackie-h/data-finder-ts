@@ -825,14 +825,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'integer_power_is_an_integer',
-    query: (f: any) => f.findAll(null, null, [f.id(), f.id().power(2)]).orderBy(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().power(2)]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Power Id'], rows: [
         [1, 1],
         [2, 4],
         [3, 9],
         [4, 16],
         [5, 25],
-      ], sql: 'CAST(POWER(t0.id, 2) AS BIGINT)', skipGraphql: 'The GraphQL finder has no scalar functions', pending: 'the type of an arithmetic result is not ported yet' },
+      ], sql: 'CAST(POWER(t0.id, 2) AS BIGINT)', skipGraphql: 'The GraphQL finder has no scalar functions' },
   },
   {
     name: 'aggregate_over_a_window_keeps_every_row',

@@ -27,6 +27,7 @@ export class StringFunctionOperation extends ScalarFunctionOperation {
 export class NumericFunctionOperation extends ScalarFunctionOperation {
   functionInput(): RelationalOperationElement { return this; }
   functionLabel(): string { return labelOf(this); }
+  isInteger(): boolean { return this.integer; }
 }
 
 function labelOf(operation: ScalarFunctionOperation): string {
@@ -42,8 +43,9 @@ function stringFunction(
 
 function numberFunction(
   element: RelationalOperationElement, func: ScalarFunction, label: string, secondArg?: number,
+  integer: boolean = false, cast?: string,
 ): NumericFunctionOperation {
-  return new NumericFunctionOperation(element, func, label, secondArg);
+  return new NumericFunctionOperation(element, func, label, secondArg, [], cast, integer);
 }
 
 /** Functions of text. */
@@ -80,7 +82,7 @@ export abstract class StringFunctions {
   }
   /** Return the number of characters in the string. */
   length(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.LENGTH, 'Length ' + this.functionLabel());
+    return numberFunction(this.functionInput(), ScalarFunction.LENGTH, 'Length ' + this.functionLabel(), undefined, true);
   }
   /** Return the string with characters in reverse order. */
   reverse(): StringFunctionOperation {
@@ -119,18 +121,20 @@ export abstract class NumericFunctions {
   abstract functionInput(): RelationalOperationElement;
   /** @internal What a function of this is labelled after. */
   abstract functionLabel(): string;
+  /** @internal Whether this gives whole numbers, so a function that keeps the type does too. A column that is not an integer one gives no. */
+  isInteger(): boolean { return false; }
 
   /** Absolute value (distance from zero, always non-negative). */
   abs(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.ABS, 'Abs ' + this.functionLabel());
+    return numberFunction(this.functionInput(), ScalarFunction.ABS, 'Abs ' + this.functionLabel(), undefined, this.isInteger());
   }
   /** Round up to the nearest integer. */
   ceil(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.CEILING, 'Ceil ' + this.functionLabel());
+    return numberFunction(this.functionInput(), ScalarFunction.CEILING, 'Ceil ' + this.functionLabel(), undefined, this.isInteger());
   }
   /** Round down to the nearest integer. */
   floor(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.FLOOR, 'Floor ' + this.functionLabel());
+    return numberFunction(this.functionInput(), ScalarFunction.FLOOR, 'Floor ' + this.functionLabel(), undefined, this.isInteger());
   }
   /** Square root. */
   sqrt(): NumericFunctionOperation {
@@ -174,11 +178,18 @@ export abstract class NumericFunctions {
   }
   /** Remainder after dividing by `n`. */
   mod(n: number): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.MOD, 'Mod ' + this.functionLabel(), n);
+    return numberFunction(this.functionInput(), ScalarFunction.MOD, 'Mod ' + this.functionLabel(), n, this.isInteger());
   }
-  /** Raise to the power of `n`. */
+  /**
+   * Raise to the power of `n`. An integer raised to a whole, non-negative `n` is an integer, as in JavaScript's `**`
+   * on whole numbers; SQL's `POWER` gives a double, so the result is cast to `BIGINT`. Any other power is a double.
+   */
   power(n: number): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.POWER, 'Power ' + this.functionLabel(), n);
+    const label = 'Power ' + this.functionLabel();
+    if (this.isInteger() && Number.isInteger(n) && n >= 0) {
+      return numberFunction(this.functionInput(), ScalarFunction.POWER, label, n, true, 'BIGINT');
+    }
+    return numberFunction(this.functionInput(), ScalarFunction.POWER, label, n);
   }
   /** Round to `d` decimal places, or to the nearest integer when `d` is omitted. */
   round(d?: number): NumericFunctionOperation {
