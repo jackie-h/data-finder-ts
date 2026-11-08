@@ -112,9 +112,14 @@ const dir = execFileSync("uv", ["run", "python", "-c", `import importlib, os; pr
   { cwd: repo, stdio: "pipe" }).toString().trim();
 const key = m => m.replace(/\.md$/, "");
 
+// Examples of data-finder features the port does not have yet; each is added to the config with the change that ports it.
+const PENDING_EXAMPLES = ["business_range_", "joins_through_tables_", "processing_snapshot_"];
+
 test("config covers every e2e model and database mapping file", () => {
   const listed = new Set([...config.models, ...config.mappings]);
-  const files = readdirSync(dir).filter(f => f.endsWith(".md") && !f.endsWith("_graphql_mapping.md"));   // GraphQL mappings have no tables to draw
+  const files = readdirSync(dir).filter(f => f.endsWith(".md") && !f.endsWith("_graphql_mapping.md")   // GraphQL mappings have no tables to draw
+    && !f.startsWith("tpch_bih_")                                                                      // the TPC-BiH benchmark is not drawn
+    && !PENDING_EXAMPLES.some(prefix => f.startsWith(prefix)));                                        // examples of features not ported yet
   assert.deepEqual(files.filter(f => !listed.has(f)), [], "markdown files in the e2e folder missing from the config");
   assert.deepEqual([...listed].filter(f => !existsSync(join(dir, f))), [], "config lists files that do not exist");
 });
@@ -140,7 +145,7 @@ test("e2e: full model is a flowchart with a clickable box per model file", () =>
     assert.match(mmd, new RegExp(`click m${i} href "model__${key(m).replace(/_model$/, "")}.html"`), m);
     assert.ok(has(`model__${key(m).replace(/_model$/, "")}.html`), m);
   });
-  assert.match(mmd, /m2 -->\|"2 associations"\| m3/);                                  // finance -> finance_trade (TradeAccount, TradeInstrument)
+  assert.match(mmd, /m2 -->\|"3 associations"\| m3/);                                  // finance -> finance_trade (TradeAccount, TradeInstrument, PositionAccount)
 });
 
 test("e2e: each model file has its own diagram; references to other models are stubs linking to them", () => {
@@ -165,9 +170,9 @@ test("e2e: all classes in one diagram, duplicates labelled by model", () => {
 
 test("e2e: a mapped model has the same views as the full model, restricted to the mapped classes", () => {
   const flow = read("finance_mapping__model.mmd");                                      // a clickable box per model file
-  assert.match(flow, /m0\["<b>Finance<\/b><br\/>3 classes"\]/);
+  assert.match(flow, /m0\["<b>Finance<\/b><br\/>4 classes"\]/);
   assert.match(flow, /m1\["<b>Finance Trade<\/b><br\/>2 classes"\]/);
-  assert.match(flow, /m0 -->\|"2 associations"\| m1/);
+  assert.match(flow, /m0 -->\|"3 associations"\| m1/);
   assert.match(flow, /click m0 href "finance_mapping__model__finance.html"/);
   assert.match(flow, /click m1 href "finance_mapping__model__finance_trade.html"/);
   assert.match(read("finance_mapping__model.html"), /finance_mapping__model__all.html/);
@@ -214,9 +219,9 @@ test("e2e: inheritance mapped model: self reference and many-to-many", () => {
 
 test("e2e: a database has a flowchart with a clickable box per schema", () => {
   const flow = read("finance_mapping__database.mmd");
-  assert.match(flow, /s0\["<b>ref_data<\/b><br\/>3 tables"\]/);
+  assert.match(flow, /s0\["<b>ref_data<\/b><br\/>4 tables"\]/);
   assert.match(flow, /s1\["<b>trading<\/b><br\/>2 tables"\]/);
-  assert.match(flow, /s0 -->\|"2 foreign keys"\| s1/);                                   // trades.account_id and trades.instrument_id into ref_data
+  assert.match(flow, /s0 -->\|"3 foreign keys"\| s1/);                                   // trades.account_id, trades.instrument_id and contractualposition.account_id into ref_data
   assert.match(flow, /click s0 href "finance_mapping__database__ref_data.html"/);
   assert.match(flow, /click s1 href "finance_mapping__database__trading.html"/);
   assert.match(read("finance_mapping__database.html"), /finance_mapping__database__all.html/);
@@ -256,5 +261,5 @@ test("e2e: column hover shows the logical property description", () => {
 });
 
 test("e2e: every foreign key is drawn and every association resolved", () => {
-  assert.match(gen.stdout, /9 mappings, 8 foreign keys \(0 associations unresolved\)/);
+  assert.match(gen.stdout, /9 mappings, 10 foreign keys \(0 associations unresolved\)/);
 });

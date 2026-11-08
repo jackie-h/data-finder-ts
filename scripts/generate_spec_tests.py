@@ -77,6 +77,45 @@ COLUMN_LABELS = {
     'fill_null_leaves_a_value_that_is_there': {'Fill Null Name': 'Or Else Name'},
 }
 
+# Whole spec modules that are not ported.
+SKIPPED_MODULES = {
+    'tpch_bih_specs': 'the TPC-BiH benchmark is not ported',
+}
+
+# Spec modules of data-finder features the port does not have yet: not generated until it does.
+PENDING_MODULES = {
+    'business_range_specs': 'a business date range is not ported yet',
+    'processing_snapshot_specs': 'a processing snapshot is not ported yet',
+    'joins_through_tables_specs': 'joins through other tables are not ported yet',
+}
+
+# Expectations of features the port does not have yet: generated, but skipped, with the reason.
+# Each is removed with the change that ports its feature.
+PENDING: dict[str, str] = {
+    'navigation_given_its_own_processing_time_uses_it': 'navigation dates are not ported yet',
+    'sibling_navigation_keeps_the_querys_time': 'navigation dates are not ported yet',
+    'navigation_time_given_as_a_datetime': 'navigation dates are not ported yet',
+    'non_milestoned_root_reads_a_milestoned_navigation_as_of_the_query_time': 'navigation dates are not ported yet',
+    'non_milestoned_root_reads_the_earlier_version_at_an_earlier_time': 'navigation dates are not ported yet',
+    'a_step_with_its_own_processing_time_uses_it_inside_the_sub_select': 'navigation dates and exists() as a sub-select are not ported yet',
+    'a_step_with_its_own_business_date_uses_it_inside_the_sub_select': 'navigation dates and exists() as a sub-select are not ported yet',
+    'a_step_with_a_business_date_with_no_position_is_no_row': 'navigation dates and exists() as a sub-select are not ported yet',
+    'exists_to_many_is_one_row_however_many_rows_match': 'exists() as a sub-select is not ported yet',
+    'exists_to_many_counts_a_row_once': 'exists() as a sub-select is not ported yet',
+    'not_exists_to_many_is_a_row_with_no_match': 'exists() as a sub-select is not ported yet',
+    'exists_and_not_exists_on_one_step_cover_every_row_once': 'exists() as a sub-select is not ported yet',
+    'the_step_is_milestoned_inside_the_sub_select': 'exists() as a sub-select is not ported yet',
+    'reading_a_value_through_the_step_keeps_a_row_for_each_match': 'exists() as a sub-select is not ported yet',
+    'a_step_given_a_value_filters_inside_the_sub_select': 'exists() as a sub-select is not ported yet',
+    'a_step_given_a_value_that_matches_no_current_row_is_no_row': 'exists() as a sub-select is not ported yet',
+    'a_step_given_a_value_that_matches_several_rows_is_one_row': 'exists() as a sub-select is not ported yet',
+    'a_step_given_a_value_that_matches_several_rows_counts_a_row_once': 'exists() as a sub-select is not ported yet',
+    'two_to_many_steps_do_not_multiply_each_other': 'exists() as a sub-select is not ported yet',
+    'exists_to_many_through_to_one_steps_is_one_row_per_position': 'exists() as a sub-select is not ported yet',
+    'exists_to_many_through_to_one_steps_is_one_row_per_trade': 'exists() as a sub-select is not ported yet',
+    'exists_to_many_through_a_to_one_step_is_one_row': 'exists() as a sub-select is not ported yet',
+}
+
 # Specs that exercise Python features the TypeScript port doesn't have (SQL views: View / to_view).
 SKIPPED_SPECS = {
     'TRADE_VIEW_FINDER_SPECS': 'SQL views are not ported',
@@ -88,6 +127,9 @@ ORDER_INDEPENDENT = {
     'finance_specs': ['TRADE_FINDER_SPECS', 'TRADE_MULTI_HOP_FINDER_SPECS', 'TRADE_EXISTS_FINDER_SPECS',
                       'TRADE_IS_NONE_FINDER_SPECS'],
 }
+
+# Keyword arguments that give a navigation the dates it is read at, not property values to filter on.
+NAVIGATION_DATES = {'business_date': 'businessDate', 'processing_time': 'processingTime'}
 
 COMPARE_METHODS = {ast.Eq: 'eq', ast.NotEq: 'ne', ast.Gt: 'gt', ast.Lt: 'lt', ast.GtE: 'gte', ast.LtE: 'lte'}
 TIMEDELTA_UNITS = {'days': 'Days', 'hours': 'Hours', 'minutes': 'Minutes', 'seconds': 'Seconds'}
@@ -129,6 +171,7 @@ class Translator:
 
     def __init__(self) -> None:
         self.properties: dict[str, str] = {}   # finder method -> type name, of the spec's mapping
+        self.helpers: set[str] = set()         # module-level helper functions the queries call
         self.used: set[str] = set()            # free functions the translated queries call
         self.model_used: set[str] = set()      # model classes the translated queries use
 
@@ -242,6 +285,8 @@ class Translator:
 
     def visit_Call(self, node: ast.Call) -> str:
         func = node.func
+        if isinstance(func, ast.Name) and func.id in self.helpers:
+            return f'{func.id}({", ".join(self.expr(a) for a in node.args)})'
         if isinstance(func, ast.Name):
             self.used.add(FREE_FUNCTIONS[func.id])
             return f'{FREE_FUNCTIONS[func.id]}({", ".join(self.expr(a) for a in node.args)})'
@@ -276,9 +321,13 @@ class Translator:
             opts = ', '.join(f'{OPTION_KEYS[k.arg]}: {self.expr(k.value)}' for k in node.keywords)
             args.append('{ ' + opts + ' }')
         elif node.keywords:
-            # A related-finder accessor given property filters: f.projects(code='ALPHA')
-            opts = ', '.join(f'{k.arg}: {self.expr(k.value)}' for k in node.keywords)
-            args.append('{ ' + opts + ' }')
+            # A related-finder accessor given property filters, f.projects(code='ALPHA'), and/or the dates it is read
+            # at, f.account(processing_time=...): the filters are the first argument, the dates the second.
+            dates = [k for k in node.keywords if k.arg in NAVIGATION_DATES]
+            filters = [k for k in node.keywords if k.arg not in NAVIGATION_DATES]
+            args.append('{ ' + ', '.join(f'{k.arg}: {self.expr(k.value)}' for k in filters) + ' }' if filters else 'undefined')
+            if dates:
+                args.append('{ ' + ', '.join(f'{NAVIGATION_DATES[k.arg]}: {self.expr(k.value)}' for k in dates) + ' }')
         return f'{self.expr(owner)}.{name}({", ".join(args)})'
 
 
@@ -346,6 +395,25 @@ def generate_module(module_name: str) -> tuple[str, str]:
                 and stmt.targets[0].id.startswith('_'):
             consts.append(f'export const {stmt.targets[0].id} = {translator.expr(stmt.value)};')
 
+    # Module-level helper functions (def _name(f): ...) that a query calls; their statements are translated too.
+    for stmt in tree.body:
+        if isinstance(stmt, ast.FunctionDef) and stmt.name.startswith('_'):
+            translator.helpers.add(stmt.name)
+    for stmt in tree.body:
+        if isinstance(stmt, ast.FunctionDef) and stmt.name in translator.helpers:
+            args = ', '.join(f'{a.arg}: any' for a in stmt.args.args)
+            lines = []
+            for inner in stmt.body:
+                if isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Constant):
+                    continue   # a docstring
+                if isinstance(inner, ast.Expr):
+                    lines.append(f'  {translator.expr(inner.value)};')
+                elif isinstance(inner, ast.Return):
+                    lines.append(f'  return {translator.expr(inner.value)};')
+                else:
+                    raise NotImplementedError(ast.dump(inner))
+            consts.append(f'export function {stmt.name}({args}) {{\n' + '\n'.join(lines) + '\n}')
+
     specs = finder_spec_nodes(tree)
     imports: dict[str, str] = {}   # finder class -> import path, relative to tests/specs/
     side_effects: set[str] = set()
@@ -392,15 +460,20 @@ def generate_module(module_name: str) -> tuple[str, str]:
                 fields.append(f"unexpectedSql: {js_str(exp.unexpected_sql['duckdb'])}")
             if 'graphql' in exp.skip_backends:
                 fields.append(f"skipGraphql: {js_str(exp.skip_backends['graphql'])}")
+            pending = PENDING.get(exp.name)
+            if pending is not None:
+                fields.append(f"pending: {js_str(pending)}")
+            # a pending query may use what the port does not have yet, so it is not type-checked
+            param = '(f: any)' if pending is not None else 'f'
             cases.append(
-                f"  {{\n    name: {js_str(exp.name)},\n    query: f => {query},\n"
+                f"  {{\n    name: {js_str(exp.name)},\n    query: {param} => {query},\n"
                 f"    expected: {{ {', '.join(fields)} }},\n  }},\n"
             )
         case_blocks.append(f"export const {var_name}: SpecCase<{spec.finder_name}>[] = [\n" + ''.join(cases) + '];\n')
         test_blocks.append(
             f"describe({js_str(var_name)}, () => {{\n  const f = new {spec.finder_name}();\n\n"
             f"  for (const c of {var_name}) {{\n"
-            f"    it(c.name, () => runExpectation(c.query(f), runner, c.expected));\n  }}\n}});\n"
+            f"    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));\n  }}\n}});\n"
         )
         groups.append((var_name, spec.finder_name))
         if var_name in ORDER_INDEPENDENT.get(module_name, []):
@@ -413,7 +486,7 @@ def generate_module(module_name: str) -> tuple[str, str]:
         test_blocks.append(f"""// Related finders, and the join nodes under them, are shared between queries. A query that is missing a join
 // condition can pass only because an earlier query left its condition on a shared node, so each spec must also
 // pass when it runs in a different order.
-const ORDER_INDEPENDENT_SPECS: SpecCase<{finder}>[] = [{', '.join('...' + n for n in names)}];
+const ORDER_INDEPENDENT_SPECS: SpecCase<{finder}>[] = [{', '.join('...' + n for n in names)}].filter(c => c.expected.pending === undefined);
 
 describe('trade specs do not depend on order', () => {{
   const orders: [string, SpecCase<{finder}>[]][] = [
@@ -497,6 +570,12 @@ def main() -> None:
     os.makedirs(os.path.join(OUT_DIR, 'cases'), exist_ok=True)
     for path in sorted(glob.glob(os.path.join(SPEC_DIR, '*_specs.py'))):
         module_name = os.path.basename(path)[:-3]
+        if module_name in SKIPPED_MODULES:
+            print(f'... skipped {module_name}: {SKIPPED_MODULES[module_name]}')
+            continue
+        if module_name in PENDING_MODULES:
+            print(f'... pending {module_name}: {PENDING_MODULES[module_name]}')
+            continue
         cases_src, test_src = generate_module(module_name)
         name = case_module_name(module_name)
         for out, src in ((os.path.join(OUT_DIR, 'cases', name + '.ts'), cases_src),

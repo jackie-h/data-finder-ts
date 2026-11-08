@@ -42,6 +42,8 @@ export interface Expectation {
   unexpectedSql?: string;
   /** Why the expectation does not apply to the GraphQL backend; the GraphQL specs skip it. */
   skipGraphql?: string;
+  /** The data-finder feature this expectation needs that is not ported yet; the case is skipped until it is. */
+  pending?: string;
 }
 
 /** The backend an expectation runs against: SQL is only checked for `duckdb`. */
