@@ -171,54 +171,54 @@ export const ORGCHART_AGGREGATE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
 export const ORGCHART_EXISTS_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'exists_to_many_is_one_row_however_many_rows_match',
-    query: (f: any) => f.findAll(null, null, [f.name()], f.employees().exists()).orderBy(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.employees().exists()).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Alice'],
         ['Bob'],
-      ], sql: 'SELECT DISTINCT t2.manager_id AS "manager_id" FROM hr.employees AS t2', skipGraphql: 'The GraphQL finder has no exists on a to-many association', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'SELECT DISTINCT t2.manager_id AS "manager_id" FROM hr.employees AS t2', skipGraphql: 'The GraphQL finder has no exists on a to-many association' },
   },
   {
     name: 'exists_to_many_counts_a_row_once',
-    query: (f: any) => f.findAll(null, null, [countAll()], f.employees().exists()),
+    query: f => f.findAll(null, null, [countAll()], f.employees().exists()),
     expected: { columns: ['Count'], rows: [
         [2],
-      ], skipGraphql: 'The GraphQL finder has no exists on a to-many association', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The GraphQL finder has no exists on a to-many association' },
   },
   {
     name: 'not_exists_to_many_is_a_row_with_no_match',
-    query: (f: any) => f.findAll(null, null, [f.name()], f.employees().notExists()).orderBy(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.employees().notExists()).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Carol'],
         ['Dave'],
-      ], skipGraphql: 'The GraphQL finder has no exists on a to-many association', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The GraphQL finder has no exists on a to-many association' },
   },
   {
     name: 'exists_and_not_exists_on_one_step_cover_every_row_once',
-    query: (f: any) => f.findAll(null, null, [f.name()], f.employees().exists().or(f.employees().notExists())).orderBy(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.employees().exists().or(f.employees().notExists())).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Alice'],
         ['Bob'],
         ['Carol'],
         ['Dave'],
-      ], skipGraphql: 'The GraphQL finder has no exists on a to-many association', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The GraphQL finder has no exists on a to-many association' },
   },
   {
     name: 'exists_to_many_through_a_to_one_step_is_one_row',
-    query: (f: any) => f.findAll(null, null, [f.name()], f.manager().employees().exists()).orderBy(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.name()], f.manager().employees().exists()).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Bob'],
         ['Carol'],
         ['Dave'],
-      ], sql: 'SELECT DISTINCT', skipGraphql: 'The GraphQL finder has no exists on a to-many association', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'SELECT DISTINCT', skipGraphql: 'The GraphQL finder has no exists on a to-many association' },
   },
   {
     name: 'reading_a_value_through_the_step_keeps_a_row_for_each_match',
-    query: (f: any) => f.findAll(null, null, [f.name(), f.employees().name()], f.employees().exists()).orderBy(f.id().ascending(), f.employees().name().ascending()),
+    query: f => f.findAll(null, null, [f.name(), f.employees().name()], f.employees().exists()).orderBy(f.id().ascending(), f.employees().name().ascending()),
     expected: { columns: ['Name', 'Employees Name'], rows: [
         ['Alice', 'Bob'],
         ['Alice', 'Carol'],
         ['Bob', 'Dave'],
-      ], unexpectedSql: 'SELECT DISTINCT', skipGraphql: 'The GraphQL finder has no exists on a to-many association', pending: 'exists() as a sub-select is not ported yet' },
+      ], unexpectedSql: 'SELECT DISTINCT', skipGraphql: 'The GraphQL finder has no exists on a to-many association' },
   },
 ];
 

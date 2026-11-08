@@ -204,7 +204,7 @@ A related-finder accessor takes the dates it is read at as a second argument, wh
 ef.findAll(null, null, [ef.firstName()], ef.manager().notExists())   // employees with no manager
 ```
 
-They compile to a LEFT JOIN checked for NULL, so a to-many join repeats the row once per match.
+They compile to a LEFT JOIN checked for NULL. For a to-many join that is only asked whether a row exists, the join is to a sub-select of the distinct join column, so the row is not repeated once per match; if the query also reads a value through that join, it stays a plain join and the row repeats for each child.
 
 ## Count
 

@@ -634,6 +634,11 @@ export class SelectOperation {
     readonly offset?: number,
     /** Keeps the groups that satisfy it (`HAVING`). */
     readonly having?: Operation,
+    /**
+     * Steps the query only asks the existence of, each as the query that stands for its table: the query joins to
+     * that instead of to the table, so a parent is not repeated for each row that matches.
+     */
+    readonly subSelects: ReadonlyMap<JoinTreeNodeOperation, SelectOperation> = new Map(),
   ) {}
 }
 

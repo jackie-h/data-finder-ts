@@ -92,23 +92,6 @@ PENDING_MODULES = {
 # Expectations of features the port does not have yet: generated, but skipped, with the reason.
 # Each is removed with the change that ports its feature.
 PENDING: dict[str, str] = {
-    'a_step_with_its_own_processing_time_uses_it_inside_the_sub_select': 'exists() as a sub-select is not ported yet',
-    'a_step_with_its_own_business_date_uses_it_inside_the_sub_select': 'exists() as a sub-select is not ported yet',
-    'a_step_with_a_business_date_with_no_position_is_no_row': 'exists() as a sub-select is not ported yet',
-    'exists_to_many_is_one_row_however_many_rows_match': 'exists() as a sub-select is not ported yet',
-    'exists_to_many_counts_a_row_once': 'exists() as a sub-select is not ported yet',
-    'not_exists_to_many_is_a_row_with_no_match': 'exists() as a sub-select is not ported yet',
-    'exists_and_not_exists_on_one_step_cover_every_row_once': 'exists() as a sub-select is not ported yet',
-    'the_step_is_milestoned_inside_the_sub_select': 'exists() as a sub-select is not ported yet',
-    'reading_a_value_through_the_step_keeps_a_row_for_each_match': 'exists() as a sub-select is not ported yet',
-    'a_step_given_a_value_filters_inside_the_sub_select': 'exists() as a sub-select is not ported yet',
-    'a_step_given_a_value_that_matches_no_current_row_is_no_row': 'exists() as a sub-select is not ported yet',
-    'a_step_given_a_value_that_matches_several_rows_is_one_row': 'exists() as a sub-select is not ported yet',
-    'a_step_given_a_value_that_matches_several_rows_counts_a_row_once': 'exists() as a sub-select is not ported yet',
-    'two_to_many_steps_do_not_multiply_each_other': 'exists() as a sub-select is not ported yet',
-    'exists_to_many_through_to_one_steps_is_one_row_per_position': 'exists() as a sub-select is not ported yet',
-    'exists_to_many_through_to_one_steps_is_one_row_per_trade': 'exists() as a sub-select is not ported yet',
-    'exists_to_many_through_a_to_one_step_is_one_row': 'exists() as a sub-select is not ported yet',
 }
 
 # Specs that exercise Python features the TypeScript port doesn't have (SQL views: View / to_view).

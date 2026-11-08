@@ -697,84 +697,84 @@ export const BRANCH_FINDER_SPECS: SpecCase<BranchFinder>[] = [
 export const BRANCH_EXISTS_FINDER_SPECS: SpecCase<BranchFinder>[] = [
   {
     name: 'exists_to_many_is_one_row_however_many_rows_match',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city()], f.accounts().exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city()], f.accounts().exists()),
     expected: { columns: ['City'], rows: [
         ['New York'],
-      ], sql: 'SELECT DISTINCT t2.BRANCH_ID AS "BRANCH_ID" FROM ref_data.account_master AS t2', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'SELECT DISTINCT t2.BRANCH_ID AS "BRANCH_ID" FROM ref_data.account_master AS t2', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
   {
     name: 'exists_to_many_counts_a_row_once',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [countAll()], f.accounts().exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [countAll()], f.accounts().exists()),
     expected: { columns: ['Count'], rows: [
         [1],
-      ], skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
   {
     name: 'not_exists_to_many_is_a_row_with_no_match',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city()], f.accounts().notExists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city()], f.accounts().notExists()),
     expected: { columns: ['City'], rows: [
         ['London'],
-      ], skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
   {
     name: 'exists_and_not_exists_on_one_step_cover_every_row_once',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city()], f.accounts().exists().or(f.accounts().notExists())).orderBy(f.city().ascending()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city()], f.accounts().exists().or(f.accounts().notExists())).orderBy(f.city().ascending()),
     expected: { columns: ['City'], rows: [
         ['London'],
         ['New York'],
-      ], skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
   {
     name: 'the_step_is_milestoned_inside_the_sub_select',
-    query: (f: any) => f.findAll(null, _BOTH_AT, [f.city()], f.accounts().exists()),
+    query: f => f.findAll(null, _BOTH_AT, [f.city()], f.accounts().exists()),
     expected: { columns: ['City'], rows: [
         ['London'],
-      ], sql: 'FROM ref_data.account_master AS t2 WHERE t2.in_z <=', unexpectedSql: 't1.in_z', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'FROM ref_data.account_master AS t2 WHERE t2.in_z <=', unexpectedSql: 't1.in_z', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
   {
     name: 'a_step_with_its_own_processing_time_uses_it_inside_the_sub_select',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city()], f.accounts(undefined, { processingTime: _BOTH_AT }).exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city()], f.accounts(undefined, { processingTime: _BOTH_AT }).exists()),
     expected: { columns: ['City'], rows: [
         ['London'],
-      ], sql: '2021-06-01', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: '2021-06-01', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
   {
     name: 'reading_a_value_through_the_step_keeps_a_row_for_each_match',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city(), f.accounts().name()], f.accounts().exists()).orderBy(f.accounts().name().ascending()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.city(), f.accounts().name()], f.accounts().exists()).orderBy(f.accounts().name().ascending()),
     expected: { columns: ['City', 'Accounts Name'], rows: [
         ['New York', 'Acme Corp'],
         ['New York', 'Beta Inc'],
-      ], unexpectedSql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'exists() as a sub-select is not ported yet' },
+      ], unexpectedSql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
 ];
 
 export const DESK_EXISTS_FINDER_SPECS: SpecCase<DeskFinder>[] = [
   {
     name: 'exists_to_many_is_one_row_however_many_rows_match',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.accounts().exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.accounts().exists()),
     expected: { columns: ['Name'], rows: [
         ['Equities'],
-      ], sql: 'SELECT DISTINCT t2.DESK_ID AS "DESK_ID" FROM ref_data.account_master AS t2', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'SELECT DISTINCT t2.DESK_ID AS "DESK_ID" FROM ref_data.account_master AS t2', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'not_exists_to_many_is_a_row_with_no_match',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.accounts().notExists()).orderBy(f.name().ascending()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.accounts().notExists()).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Credit'],
         ['Rates'],
-      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'a_step_given_a_value_filters_inside_the_sub_select',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.accounts({ name: 'Beta Inc' }).exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.accounts({ name: 'Beta Inc' }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Equities'],
-      ], sql: 'FROM ref_data.account_master AS t2 WHERE t2.ACCT_NAME = \'Beta Inc\' AND t2.in_z <=', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'FROM ref_data.account_master AS t2 WHERE t2.ACCT_NAME = \'Beta Inc\' AND t2.in_z <=', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'a_step_given_a_value_that_matches_no_current_row_is_no_row',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.accounts({ name: 'Acme Ltd' }).exists()),
-    expected: { columns: ['Name'], rows: [], sql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.accounts({ name: 'Acme Ltd' }).exists()),
+    expected: { columns: ['Name'], rows: [], sql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'not_exists_with_a_step_given_a_value',
@@ -786,113 +786,113 @@ export const DESK_EXISTS_FINDER_SPECS: SpecCase<DeskFinder>[] = [
   },
   {
     name: 'the_step_is_milestoned_inside_the_sub_select',
-    query: (f: any) => f.findAll(null, _BOTH_AT, [f.name()], f.accounts().exists()),
+    query: f => f.findAll(null, _BOTH_AT, [f.name()], f.accounts().exists()),
     expected: { columns: ['Name'], rows: [
         ['Rates'],
-      ], sql: 'FROM ref_data.account_master AS t2 WHERE t2.in_z <=', unexpectedSql: 't1.in_z', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'FROM ref_data.account_master AS t2 WHERE t2.in_z <=', unexpectedSql: 't1.in_z', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
 ];
 
 export const ACCOUNT_POSITION_EXISTS_FINDER_SPECS: SpecCase<AccountFinder>[] = [
   {
     name: 'exists_to_many_is_one_row_however_many_rows_match',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions().exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions().exists()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
-      ], sql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'exists_to_many_counts_a_row_once',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [countAll()], f.positions().exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [countAll()], f.positions().exists()),
     expected: { columns: ['Count'], rows: [
         [1],
-      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'not_exists_to_many_is_a_row_with_no_match',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions().notExists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions().notExists()),
     expected: { columns: ['Name'], rows: [
         ['Beta Inc'],
-      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'a_step_given_a_value_that_matches_several_rows_is_one_row',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions({ quantity: 100.0 }).exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions({ quantity: 100.0 }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
-      ], sql: 'WHERE t2.QUANTITY = 100.0 AND', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'WHERE t2.QUANTITY = 100.0 AND', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'a_step_given_a_value_that_matches_several_rows_counts_a_row_once',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [countAll()], f.positions({ quantity: 100.0 }).exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [countAll()], f.positions({ quantity: 100.0 }).exists()),
     expected: { columns: ['Count'], rows: [
         [1],
-      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'a_step_given_a_value_filters_inside_the_sub_select',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions({ quantity: 200.0 }).exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions({ quantity: 200.0 }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
-      ], sql: 'WHERE t2.QUANTITY = 200.0 AND', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'WHERE t2.QUANTITY = 200.0 AND', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'a_step_with_its_own_business_date_uses_it_inside_the_sub_select',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions(undefined, { businessDate: new DateOnly('2023-01-16T00:00:00Z') }).exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions(undefined, { businessDate: new DateOnly('2023-01-16T00:00:00Z') }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
-      ], sql: '2023-01-16', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: '2023-01-16', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'a_step_with_a_business_date_with_no_position_is_no_row',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions(undefined, { businessDate: new DateOnly('2023-02-01T00:00:00Z') }).exists()),
-    expected: { columns: ['Name'], rows: [], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions(undefined, { businessDate: new DateOnly('2023-02-01T00:00:00Z') }).exists()),
+    expected: { columns: ['Name'], rows: [], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'a_step_with_its_own_processing_time_uses_it_inside_the_sub_select',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions(undefined, { processingTime: '2023-01-12 12:00:00' }).exists()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name()], f.positions(undefined, { processingTime: '2023-01-12 12:00:00' }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
-      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'two_to_many_steps_do_not_multiply_each_other',
-    query: (f: any) => f.findAll(null, _POSITIONS_RECORDED_AT, [f.name()], f.trades().exists().and(f.positions().exists())),
+    query: f => f.findAll(null, _POSITIONS_RECORDED_AT, [f.name()], f.trades().exists().and(f.positions().exists())),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
-      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
   {
     name: 'reading_a_value_through_the_step_keeps_a_row_for_each_match',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name(), f.positions().quantity()], f.positions().exists()).orderBy(f.positions().quantity().ascending()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.name(), f.positions().quantity()], f.positions().exists()).orderBy(f.positions().quantity().ascending()),
     expected: { columns: ['Name', 'Positions Quantity'], rows: [
         ['Acme Corp', 100.0],
         ['Acme Corp', 100.0],
         ['Acme Corp', 200.0],
-      ], unexpectedSql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], unexpectedSql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
 ];
 
 export const POSITION_DESK_EXISTS_FINDER_SPECS: SpecCase<ContractualPositionFinder>[] = [
   {
     name: 'exists_to_many_through_to_one_steps_is_one_row_per_position',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.quantity()], f.account().desk().accounts().exists()).orderBy(f.quantity().ascending()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.quantity()], f.account().desk().accounts().exists()).orderBy(f.quantity().ascending()),
     expected: { columns: ['Quantity'], rows: [
         [100.0],
         [100.0],
         [200.0],
-      ], sql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map desks or the positions of an account' },
   },
 ];
 
 export const TRADE_TO_MANY_EXISTS_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
     name: 'exists_to_many_through_to_one_steps_is_one_row_per_trade',
-    query: (f: any) => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().accounts().exists()).orderBy(f.symbol().ascending()),
+    query: f => f.findAll(null, _MSFT_WITH_LIVE_ACCOUNT_AT, [f.symbol()], f.account().branch().accounts().exists()).orderBy(f.symbol().ascending()),
     expected: { columns: ['Symbol'], rows: [
         ['AAPL'],
         ['MSFT'],
-      ], sql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch', pending: 'exists() as a sub-select is not ported yet' },
+      ], sql: 'SELECT DISTINCT', skipGraphql: 'The finance GraphQL mapping does not map the accounts of a branch' },
   },
 ];
 

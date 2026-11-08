@@ -64,8 +64,9 @@ import {
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
 import { DialectName, SqlDialect, dialectOf } from './dialect';
 
+/** A name for a relation in a query: a table's name, or the query that stands for it, written `(SELECT ...)`. */
 class TableAlias {
-  constructor(readonly table: string, readonly alias: string) {}
+  constructor(readonly table: string | SelectOperation, readonly alias: string) {}
 }
 
 class TableAliasColumn extends RelationalOperationElement {
@@ -502,7 +503,7 @@ function walkWindowSpec(window: WindowSpecification, visit: RefVisitor, visitExi
  * into a relational filter on the join node. `columnMap` maps property ids to [column, type, table].
  */
 function buildJoinFilterFromProperties(
-  node: JoinTreeNodeOperation,
+  node: JoinTreeNodeOperation | undefined,
   filter: Record<string, unknown>,
   columnMap: Record<string, [string, string, string]>,
 ): Operation {
@@ -516,7 +517,11 @@ function buildJoinFilterFromProperties(
     const col = new ColumnWithJoin(new Column(name, type, table), node);
     let constant: ConstantOperation;
     if (typeof value === 'boolean') constant = new BooleanConstantOperation(value);
-    else if (typeof value === 'number') constant = Number.isInteger(value) ? new IntegerConstantOperation(value) : new FloatConstantOperation(value);
+    else if (typeof value === 'number') {
+      // 100 for a DOUBLE column is the float 100.0, which JavaScript cannot tell from the integer 100
+      const floating = /^(DOUBLE|FLOAT|REAL)/i.test(type);
+      constant = Number.isInteger(value) && !floating ? new IntegerConstantOperation(value) : new FloatConstantOperation(value);
+    }
     else if (value instanceof Date) constant = type.toUpperCase() === 'DATE' ? new DateConstantOperation(value) : new DateTimeConstantOperation(value);
     else constant = new StringConstantOperation(String(value));
     ops.push(new ComparisonOperation(col, ComparisonOperator.EQUAL, constant));
@@ -538,6 +543,32 @@ function withAncestors(nodes: Iterable<JoinTreeNodeOperation>): JoinTreeNodeOper
   };
   for (const node of nodes) add(node);
   return [...ordered];
+}
+
+/**
+ * The steps the query reaches only to ask whether a row exists (`exists` or `notExists`).
+ *
+ * Joining such a step repeats the parent once per matching row. A step the query also reads a value through is left
+ * as a join: those values are one row per child, and the existence then holds for a child with those values. Nor can
+ * a step stand for a query when a step below it is reached through it, or when its join has a filter object of its
+ * own, whose columns are not known to be the table's. A step given property values, as in `product({ id: 2 })`, can:
+ * they are conditions on the table. A to-one step cannot repeat a row, so it stays a join.
+ */
+function existsOnlyNodes(expressions: (RelationalOperationElement | undefined)[]): JoinTreeNodeOperation[] {
+  const required = new Set<JoinTreeNodeOperation>();
+  const referenced = new Set<JoinTreeNodeOperation>();
+  const collect: RefVisitor = ref => {
+    const parent = ref instanceof Attribute ? ref.parent() : ref.parent;
+    if (parent !== undefined) { required.add(parent); referenced.add(parent); }
+  };
+  const collectNode: NodeVisitor = node => required.add(node);
+  for (const expression of expressions) walkRefs(expression, collect, collectNode);
+  const ancestors = new Set<JoinTreeNodeOperation>();
+  for (const node of required) {
+    for (let parent = node.parent; parent !== undefined; parent = parent.parent) ancestors.add(parent);
+  }
+  return [...required].filter(node =>
+    node.many && !referenced.has(node) && !ancestors.has(node) && node.join.filter === undefined);
 }
 
 /**
@@ -623,7 +654,23 @@ function buildQueryOperation(
     if (combined !== undefined) joinFilters.set(node, combined);
   }
 
-  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having);
+  // for each step only asked the existence of: `SELECT DISTINCT <join column> FROM <its table>`, with the table's
+  // milestoning at the dates the step uses. Distinct on the join column makes it at most one row for a parent, however
+  // many rows of the table match. Property values the step was given are conditions of the query, on the table's own columns.
+  const subSelects = new Map<JoinTreeNodeOperation, SelectOperation>();
+  for (const node of existsOnlyNodes([...columns, ...groupBy, ...orderBy, op, having])) {
+    const right = node.join.right;
+    const dates = datesForNode(node, businessDate, businessDateTo, processingDatetime);
+    const values = node.join.filterKwargs;
+    const condition = Object.keys(values).length > 0
+      ? buildJoinFilterFromProperties(undefined, values, node.join.filterColumnMap)
+      : new NoOperation();
+    subSelects.set(node, buildQueryOperation(
+      dates.businessDate, dates.processingDatetime, [new Alias(right, right.name)], node.join.target, condition,
+      [], [], undefined, dates.businessDateTo, true));
+  }
+
+  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having, subSelects);
 }
 
 /**
@@ -654,7 +701,9 @@ function unaliased(op: unknown): unknown {
 }
 
 class SQLQueryGenerator {
-  constructor(private readonly _dialect: SqlDialect) {}
+  constructor(private readonly _dialect: SqlDialect, firstAlias: number = 0) {
+    this._tableAliasIncr = firstAlias;
+  }
 
   private _select: Alias[] = [];
   private _from: Set<TableAlias> = new Set();
@@ -666,17 +715,19 @@ class SQLQueryGenerator {
   private _limit?: number;
   private _distinct = false;
   private _offset?: number;
-  private _tableAliasIncr = 0;
+  private _tableAliasIncr: number;
   private _tableAliasesByTable = new Map<unknown, TableAlias>();
   private _addedJoinIds = new Set<JoinTreeNodeOperation>();
   private _rootTable?: Table;
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
+  private _subSelects: ReadonlyMap<JoinTreeNodeOperation, SelectOperation> = new Map();
 
   generate(select: SelectOperation): void {
     this._rootTable = select.table;
     this._elidableNodes = this._computeElidableNodes(select);
     this._joinFilters = select.joinFilters;
+    this._subSelects = select.subSelects;
     if (this._rootTable !== undefined) {
       this._from.add(this._tableAliasForTable(this._rootTable.qualifiedName, this._rootTable.qualifiedName));
     }
@@ -996,7 +1047,8 @@ class SQLQueryGenerator {
     const sc = new TableAliasColumn(left, srcTa);
     const right = join.right;
     const tc = new TableAliasColumn(right, this._tableAliasForTable(right.owner!, node));
-    const queryFilter = this._joinFilters.get(node);
+    // a sub-select carries the step's filter itself, so it is not repeated in the ON clause
+    const queryFilter = tc.tableAlias.table instanceof SelectOperation ? undefined : this._joinFilters.get(node);
     const filterOp = join.filter !== undefined && queryFilter !== undefined
       ? new LogicalOperation(join.filter as Operation, LogicalOperator.AND, queryFilter)
       : join.filter ?? queryFilter;
@@ -1076,20 +1128,31 @@ class SQLQueryGenerator {
     if (this._tableAliasesByTable.has(key)) {
       return this._tableAliasesByTable.get(key)!;
     }
-    const ta = new TableAlias(table, 't' + this._tableAliasIncr++);
+    const subSelect = key instanceof JoinTreeNodeOperation ? this._subSelects.get(key) : undefined;
+    const ta = new TableAlias(subSelect ?? table, 't' + this._tableAliasIncr++);
     this._tableAliasesByTable.set(key, ta);
     return ta;
   }
 
+  /** What follows FROM or JOIN: the table's name, or the query in parentheses, written by a generator of its own that numbers its aliases after this one's. */
+  private _relationSql(alias: TableAlias): string {
+    const relation = alias.table;
+    if (typeof relation === 'string') return relation;
+    const nested = new SQLQueryGenerator(this._dialect, this._tableAliasIncr);
+    nested.generate(relation);
+    this._tableAliasIncr = nested._tableAliasIncr;
+    return '(' + nested.buildQueryString() + ')';
+  }
+
   buildQueryString(): string {
     const joins = this._join.map(j =>
-      ' LEFT OUTER JOIN ' + j.target.tableAlias.table + ' AS ' + j.target.tableAlias.alias +
+      ' LEFT OUTER JOIN ' + this._relationSql(j.target.tableAlias) + ' AS ' + j.target.tableAlias.alias +
       ' ON (' + j.condition() +
       (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
     return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca, this._dialect)).join(',') +
-      ' FROM ' + Array.from(this._from).map(ta => ta.table + ' AS ' + ta.alias).join(',') +
+      ' FROM ' + Array.from(this._from).map(ta => this._relationSql(ta) + ' AS ' + ta.alias).join(',') +
       joins.join('') +
       this._buildWhere() +
       this._buildGroupBy() +
