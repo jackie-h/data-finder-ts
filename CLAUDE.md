@@ -41,7 +41,7 @@ Finder output (`example/generated/`, `tests/generated_examples/`, `tests/generat
 **`src/datafinder/`** — query building and execution:
 - `attribute.ts` — base `Attribute` wrapping a `Column`; parent/join-node tracking for JOIN resolution.
 - `typed-attributes.ts` — `StringAttribute`, `IntegerAttribute`, `DoubleAttribute` (= `FloatAttribute`), `DateAttribute`, `DateTimeAttribute`, `BooleanAttribute`, `DecimalAttribute`. Operator methods (`eq`, `gt`, `lt`, …) replace Python operator overloading.
-- `sql-generator.ts` — `SQLQueryGenerator`; `buildMilestoningFilterOperation()` applies temporal WHERE clauses; `buildQueryOperation()` resolves JOINs from the `JoinTreeNodeOperation` chain; `toSql()` is the public entry point. Dates are always formatted in UTC (`getUTCFullYear` etc.) — date-only strings like `'2023-01-15'` parse as UTC midnight so UTC formatting avoids timezone-shift bugs.
+- `sql-generator.ts` — `SQLQueryGenerator`; `buildMilestoningFilterOperation()` applies temporal WHERE clauses; `buildQuerySpecification()` resolves JOINs from the `JoinTreeNodeOperation` chain; `toSql()` is the public entry point. Dates are always formatted in UTC (`getUTCFullYear` etc.) — date-only strings like `'2023-01-15'` parse as UTC midnight so UTC formatting avoids timezone-shift bugs.
 - `runner.ts` — `QueryRunner` interface, module-level singleton registry (`registerRunner`/`clearRunner`/`getRunner`), `FinderResult` (lazy `toSql()` + async `toRows()`), `convertInputsAndSelect()`.
 - `finder-registry.ts` — module-level `Map` for reverse-association lazy lookup; avoids ESM circular import issues. Each generated `*Finder.ts` calls `registerRelatedFinderClass(name, cls)` at module load; reverse association methods call `getRelatedFinderClass(name)`.
 

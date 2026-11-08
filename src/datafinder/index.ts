@@ -5,7 +5,7 @@ export { StringFunctionOperation, NumericFunctionOperation } from './scalar-func
 export { constant, countAll } from './expressions';
 export { concat } from '../model/relational';
 export { when } from './conditional';
-export { toSql, selectSqlToString } from './sql-generator';
+export { toSql, querySqlToString } from './sql-generator';
 export { DialectName, SqlDialect, POSTGRES, DUCKDB, DATABRICKS, dialectOf } from './dialect';
 export { titleCase } from './naming';
 export { EmbeddedAttributes, embeddedUnder } from './embedded';
