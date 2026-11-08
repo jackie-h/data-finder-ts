@@ -28,7 +28,7 @@ describe('EMPLOYEE_INHERITANCE_FINDER_SPECS', () => {
   const f = new EmployeeFinder();
 
   for (const c of EMPLOYEE_INHERITANCE_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -36,6 +36,6 @@ describe('PROJECT_FINDER_SPECS', () => {
   const f = new ProjectFinder();
 
   for (const c of PROJECT_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

@@ -27,6 +27,6 @@ describe('COMPANIES_STRING_SCALAR_SPECS', () => {
   const f = new CompanyFinder();
 
   for (const c of COMPANIES_STRING_SCALAR_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

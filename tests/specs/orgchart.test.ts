@@ -27,7 +27,7 @@ describe('ORGCHART_FINDER_SPECS', () => {
   const f = new EmployeeFinder();
 
   for (const c of ORGCHART_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -35,7 +35,7 @@ describe('ORGCHART_AGGREGATE_FINDER_SPECS', () => {
   const f = new EmployeeFinder();
 
   for (const c of ORGCHART_AGGREGATE_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -43,6 +43,6 @@ describe('ORGCHART_EXISTS_FINDER_SPECS', () => {
   const f = new EmployeeFinder();
 
   for (const c of ORGCHART_EXISTS_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

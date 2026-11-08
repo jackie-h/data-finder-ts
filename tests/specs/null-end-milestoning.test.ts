@@ -27,6 +27,6 @@ describe('NULL_END_PRICE_FINDER_SPECS', () => {
   const f = new PriceFinder();
 
   for (const c of NULL_END_PRICE_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
