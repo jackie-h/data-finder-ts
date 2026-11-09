@@ -85,7 +85,6 @@ COLUMN_LABELS = {
 # Each is removed with the change that ports its feature.
 PENDING: dict[str, str] = {
     'integer_power_is_an_integer': 'the type of an arithmetic result is not ported yet',
-    'aggregate_over_a_window_keeps_every_row': 'an aggregate over a window is not told from a grouping aggregate yet',
     'a_date_given_to_the_property_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
     'a_date_given_to_a_property_of_the_embedded_address_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
     'a_date_before_any_row_of_the_table_on_the_way_finds_no_country': 'dates through the tables a property passes are not ported yet',

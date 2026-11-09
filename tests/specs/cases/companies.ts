@@ -836,14 +836,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'aggregate_over_a_window_keeps_every_row',
-    query: (f: any) => f.findAll(null, null, [f.id(), f.id().max().over([f.category()])]).orderBy(f.id().ascending()),
+    query: f => f.findAll(null, null, [f.id(), f.id().max().over([f.category()])]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Max Id'], rows: [
         [1, 3],
         [2, 2],
         [3, 3],
         [4, 5],
         [5, 5],
-      ], skipGraphql: 'Window functions are not supported by the GraphQL engine', pending: 'an aggregate over a window is not told from a grouping aggregate yet' },
+      ], skipGraphql: 'Window functions are not supported by the GraphQL engine' },
   },
   {
     name: 'qcut_two_buckets',
