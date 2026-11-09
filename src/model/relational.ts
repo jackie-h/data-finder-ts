@@ -470,11 +470,28 @@ export class Schema {
   }
 }
 
-export class Table {
+/**
+ * Something rows are read from, as in Legend: it has columns. A table and a query are relations. As in Legend a column
+ * is a RelationalOperationElement: a table's are its Columns, a query's are the expressions it shows.
+ */
+export abstract class Relation {
+  abstract get columns(): readonly RelationalOperationElement[];
+}
+
+/** A relation that has a name: a table. */
+export abstract class NamedRelation extends Relation {
+  constructor(readonly name: string) { super(); }
+
+  /** What the relation is called where it is read: a table's name with its schema's. */
+  get qualifiedName(): string { return this.name; }
+}
+
+export class Table extends NamedRelation {
   private readonly _columnsByName: Map<string, Column> = new Map();
   readonly foreignKeys: ForeignKey[] = [];
 
-  constructor(readonly name: string, columns: Column[], readonly schema?: Schema) {
+  constructor(name: string, columns: Column[], readonly schema?: Schema) {
+    super(name);
     for (const col of columns) {
       if (this._columnsByName.has(col.name)) {
         throw new Error(`Duplicate column name '${col.name}' in table '${name}'`);
@@ -489,7 +506,7 @@ export class Table {
     return Array.from(this._columnsByName.values());
   }
 
-  get qualifiedName(): string {
+  override get qualifiedName(): string {
     if (!this.schema) return this.name;
     if (!this.schema.datastore) return `${this.schema.name}.${this.name}`;
     return `${this.schema.datastore.namespace(this.schema.name)}.${this.name}`;
@@ -644,13 +661,24 @@ export class NotExistsOperation extends RelationalOperationElement implements Al
   not(): ExistsOperation { return new ExistsOperation(this.node); }
 }
 
-export class SelectOperation {
+/**
+ * What ANSI SQL calls a `<query expression>`: a query that returns rows and can be used where a table is. It is a
+ * relation, as Legend's select is: its columns are what it shows. It has no name of its own: a table alias gives it
+ * one where it is used. It has no ORDER BY or row limit: a table is a set of rows with no order.
+ */
+export abstract class QueryExpression extends Relation {}
+
+/**
+ * A single SELECT over a root table, as ANSI SQL's `<query specification>`: what to show, which rows qualify, how
+ * they are grouped, which groups qualify (HAVING) and whether duplicates are removed (DISTINCT). It has no ORDER BY
+ * or row limit; an `OrderedQuerySpecification`, which is run rather than stored, sets them.
+ */
+export class QuerySpecification extends QueryExpression {
   constructor(
-    readonly display: RelationalOperationElement[],
+    /** What the query shows. */
+    readonly columns: readonly RelationalOperationElement[],
     readonly filter: RelationalOperationElement,
-    readonly orderBy: SortOperation[] = [],
     readonly groupBy: RelationalOperationElement[] = [],
-    readonly limit?: number,
     readonly table?: Table,
     /**
      * Extra ON conditions for this query's joins (milestoning and property filters), keyed by join node.
@@ -659,16 +687,36 @@ export class SelectOperation {
     readonly joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map(),
     /** Whether each distinct row is returned once (`SELECT DISTINCT`). */
     readonly distinct: boolean = false,
-    /** How many rows to skip before the first one returned. */
-    readonly offset?: number,
     /** Keeps the groups that satisfy it (`HAVING`). */
     readonly having?: Operation,
     /**
      * Steps the query only asks the existence of, each as the query that stands for its table: the query joins to
      * that instead of to the table, so a parent is not repeated for each row that matches.
      */
-    readonly subSelects: ReadonlyMap<JoinTreeNodeOperation, SelectOperation> = new Map(),
-  ) {}
+    readonly subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map(),
+  ) { super(); }
+}
+
+/**
+ * A query specification that is run: it adds the ordering, row limit and offset applied to its result. ANSI SQL calls
+ * this a `<cursor specification>`: a `<query expression>` with an `<order by clause>`.
+ */
+export class OrderedQuerySpecification extends QuerySpecification {
+  constructor(
+    columns: readonly RelationalOperationElement[],
+    filter: RelationalOperationElement,
+    readonly orderBy: SortOperation[] = [],
+    groupBy: RelationalOperationElement[] = [],
+    /** How many rows are returned at most. */
+    readonly limit?: number,
+    table?: Table,
+    joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map(),
+    distinct: boolean = false,
+    /** How many rows to skip before the first one returned. */
+    readonly offset?: number,
+    having?: Operation,
+    subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map(),
+  ) { super(columns, filter, groupBy, table, joinFilters, distinct, having, subSelects); }
 }
 
 /** Whether `op` holds an aggregate, a window function or a count. */

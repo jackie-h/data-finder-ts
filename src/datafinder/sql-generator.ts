@@ -44,7 +44,8 @@ import {
   LIKE_ESCAPE,
   ExistsOperation,
   NotExistsOperation,
-  SelectOperation,
+  QuerySpecification,
+  OrderedQuerySpecification,
   BinaryOperation,
   CaseOperation,
   ConcatOperation,
@@ -70,7 +71,7 @@ import { DialectName, SqlDialect, dialectOf } from './dialect';
 
 /** A name for a relation in a query: a table's name, or the query that stands for it, written `(SELECT ...)`. */
 class TableAlias {
-  constructor(readonly table: string | SelectOperation, readonly alias: string) {}
+  constructor(readonly table: string | QuerySpecification, readonly alias: string) {}
 }
 
 class TableAliasColumn extends RelationalOperationElement {
@@ -633,7 +634,7 @@ function datesForNode(
   return { businessDate, businessDateTo, processingDatetime, processingDatetimeTo };
 }
 
-function buildQueryOperation(
+function buildQuerySpecification(
   businessDate: Date | null,
   processingDatetime: Date | null,
   columns: (Attribute | RelationalOperationElement)[],
@@ -647,7 +648,7 @@ function buildQueryOperation(
   offset?: number,
   having?: Operation,
   processingDatetimeTo: Date | null = null,
-): SelectOperation {
+): OrderedQuerySpecification {
   let filter = op;
   const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) => {
     const dates = node === undefined
@@ -696,7 +697,7 @@ function buildQueryOperation(
   // for each step only asked the existence of: `SELECT DISTINCT <join column> FROM <its table>`, with the table's
   // milestoning at the dates the step uses. Distinct on the join column makes it at most one row for a parent, however
   // many rows of the table match. Property values the step was given are conditions of the query, on the table's own columns.
-  const subSelects = new Map<JoinTreeNodeOperation, SelectOperation>();
+  const subSelects = new Map<JoinTreeNodeOperation, QuerySpecification>();
   for (const node of existsOnlyNodes([...columns, ...groupBy, ...orderBy, op, having])) {
     const right = node.join.right;
     const dates = datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
@@ -704,12 +705,12 @@ function buildQueryOperation(
     const condition = Object.keys(values).length > 0
       ? buildJoinFilterFromProperties(undefined, values, node.join.filterColumnMap)
       : new NoOperation();
-    subSelects.set(node, buildQueryOperation(
+    subSelects.set(node, buildQuerySpecification(
       dates.businessDate, dates.processingDatetime, [new Alias(right, right.name)], node.join.target, condition,
       [], [], undefined, dates.businessDateTo, true, undefined, undefined, dates.processingDatetimeTo));
   }
 
-  return new SelectOperation(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having, subSelects);
+  return new OrderedQuerySpecification(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having, subSelects);
 }
 
 /**
@@ -760,40 +761,42 @@ class SQLQueryGenerator {
   private _rootTable?: Table;
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
-  private _subSelects: ReadonlyMap<JoinTreeNodeOperation, SelectOperation> = new Map();
+  private _subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map();
 
-  generate(select: SelectOperation): void {
-    this._rootTable = select.table;
-    this._elidableNodes = this._computeElidableNodes(select);
-    this._joinFilters = select.joinFilters;
-    this._subSelects = select.subSelects;
+  generate(query: QuerySpecification): void {
+    // a query that is only stored has no order, limit or offset
+    const ordered = query instanceof OrderedQuerySpecification ? query : undefined;
+    this._rootTable = query.table;
+    this._elidableNodes = this._computeElidableNodes(query);
+    this._joinFilters = query.joinFilters;
+    this._subSelects = query.subSelects;
     if (this._rootTable !== undefined) {
       this._from.add(this._tableAliasForTable(this._rootTable.qualifiedName, this._rootTable.qualifiedName));
     }
-    this.processSelect(select.display);
-    this._where = this.buildFilter(this._guarded(select.filter));
+    this.processSelect([...query.columns]);
+    this._where = this.buildFilter(this._guarded(query.filter));
     const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
-    for (const expr of select.groupBy) {
+    for (const expr of query.groupBy) {
       this._collectRequiredJoins(expr, groupByJoins);
     }
     for (const node of groupByJoins.values()) {
       this._addJoin(node);
     }
-    this._groupByParts = this._groupByPartsFor(select);
+    this._groupByParts = this._groupByPartsFor(query);
     this._having = '';
-    if (select.having !== undefined) {
+    if (query.having !== undefined) {
       const havingJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
-      this._collectRequiredJoins(select.having, havingJoins);
+      this._collectRequiredJoins(query.having, havingJoins);
       for (const node of havingJoins.values()) this._addJoin(node);
       // HAVING filters the grouped result, which Legend does not guard: it is a filter on projected columns
-      this._having = this.buildFilter(select.having);
+      this._having = this.buildFilter(query.having);
     }
-    this._orderByParts = select.orderBy.map(s =>
+    this._orderByParts = (ordered?.orderBy ?? []).map(s =>
       this._sortExpression(s.column) + this._dialect.orderDirection(s.direction),
     );
-    this._limit = select.limit;
-    this._distinct = select.distinct;
-    this._offset = select.offset;
+    this._limit = ordered?.limit;
+    this._distinct = query.distinct;
+    this._offset = ordered?.offset;
   }
 
   /**
@@ -806,13 +809,13 @@ class SQLQueryGenerator {
    * aggregate covers every row. A constant needs no grouping: a bare
    * `GROUP BY 7` would be a column position.
    */
-  private _groupByPartsFor(select: SelectOperation): string[] {
-    if (select.groupBy.length > 0) return select.groupBy.map(a => this._attrToColString(a as Attribute));
-    const aggregates = select.display.filter(containsAggregate);
+  private _groupByPartsFor(query: QuerySpecification): string[] {
+    if (query.groupBy.length > 0) return query.groupBy.map(a => this._attrToColString(a as Attribute));
+    const aggregates = query.columns.filter(containsAggregate);
     if (aggregates.length === 0) return [];
-    const perRoot = select.table !== undefined && aggregates.some(reachesToMany);
-    const keys = perRoot ? select.table!.columns.filter(c => c.primaryKey).map(c => this._columnToString(c)) : [];
-    const grouped = select.display
+    const perRoot = query.table !== undefined && aggregates.some(reachesToMany);
+    const keys = perRoot ? query.table!.columns.filter(c => c.primaryKey).map(c => this._columnToString(c)) : [];
+    const grouped = query.columns
       .map((column, i) => ({ column, shown: this._select[i] }))
       .filter(({ column }) => !containsAggregateOrWindow(column) && !(unaliased(column) instanceof ConstantOperation))
       .map(({ shown }) => sqlOperationToString(shown.element, this._dialect));
@@ -847,7 +850,7 @@ class SQLQueryGenerator {
    * a node is elidable when every reference to it has an embedded alternate. A reference without one
    * (e.g. a milestoning column) keeps the join for every reference to that node.
    */
-  private _computeElidableNodes(select: SelectOperation): Set<JoinTreeNodeOperation> {
+  private _computeElidableNodes(query: QuerySpecification): Set<JoinTreeNodeOperation> {
     const refsByNode = new Map<JoinTreeNodeOperation, (Attribute | ColumnWithJoin)[]>();
     const record = (ref: Attribute | ColumnWithJoin) => {
       const parent = ref instanceof Attribute ? ref.parent() : ref.parent;
@@ -855,10 +858,10 @@ class SQLQueryGenerator {
       const refs = refsByNode.get(parent);
       if (refs) refs.push(ref); else refsByNode.set(parent, [ref]);
     };
-    for (const col of select.display) walkRefs(col, record);
-    for (const expr of select.groupBy) walkRefs(expr, record);
-    for (const sort of select.orderBy) walkRefs(sort, record);
-    walkRefs(select.filter, record);
+    for (const col of query.columns) walkRefs(col, record);
+    for (const expr of query.groupBy) walkRefs(expr, record);
+    for (const sort of query instanceof OrderedQuerySpecification ? query.orderBy : []) walkRefs(sort, record);
+    walkRefs(query.filter, record);
 
     const elidable = new Set<JoinTreeNodeOperation>();
     for (const [node, refs] of refsByNode) {
@@ -1088,7 +1091,7 @@ class SQLQueryGenerator {
     const right = join.right;
     const tc = new TableAliasColumn(right, this._tableAliasForTable(right.owner!, node));
     // a sub-select carries the step's filter itself, so it is not repeated in the ON clause
-    const queryFilter = tc.tableAlias.table instanceof SelectOperation ? undefined : this._joinFilters.get(node);
+    const queryFilter = tc.tableAlias.table instanceof QuerySpecification ? undefined : this._joinFilters.get(node);
     const filterOp = join.filter !== undefined && queryFilter !== undefined
       ? new LogicalOperation(join.filter as Operation, LogicalOperator.AND, queryFilter)
       : join.filter ?? queryFilter;
@@ -1228,9 +1231,9 @@ class SQLQueryGenerator {
   }
 }
 
-export function selectSqlToString(selectOperation: SelectOperation, dialect: DialectName | SqlDialect = 'postgres'): string {
+export function querySqlToString(query: OrderedQuerySpecification, dialect: DialectName | SqlDialect = 'postgres'): string {
   const qg = new SQLQueryGenerator(dialectOf(dialect));
-  qg.generate(selectOperation);
+  qg.generate(query);
   return qg.buildQueryString();
 }
 
@@ -1250,8 +1253,8 @@ export function toSql(
   dialect: DialectName | SqlDialect = 'postgres',
   processingDatetimeTo: Date | null = null,
 ): string {
-  const selectOp = buildQueryOperation(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having, processingDatetimeTo);
-  return selectSqlToString(selectOp, dialect);
+  const query = buildQuerySpecification(businessDate, processingDatetime, columns, table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having, processingDatetimeTo);
+  return querySqlToString(query, dialect);
 }
 
-export { buildQueryOperation };
+export { buildQuerySpecification };
