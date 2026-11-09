@@ -47,15 +47,15 @@ describe('on a result', () => {
 
 type Case = [string, (f: CompanyFinder) => ReturnType<CompanyFinder['findAll']>, unknown[][]];
 const cases: Case[] = [
-  ['offset skips the first rows', f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).offset(2),
+  ['offset skips the first rows', f => f.findAll([f.name()]).orderBy(f.name().ascending()).offset(2),
     [['Beta Corp'], ['Delta Ltd'], ['Gamma LLC']]],
-  ['offset then limit is a page', f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).offset(1).limit(2),
+  ['offset then limit is a page', f => f.findAll([f.name()]).orderBy(f.name().ascending()).offset(1).limit(2),
     [['Acme Industries'], ['Beta Corp']]],
-  ['slice is start up to stop', f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).slice(1, 4),
+  ['slice is start up to stop', f => f.findAll([f.name()]).orderBy(f.name().ascending()).slice(1, 4),
     [['Acme Industries'], ['Beta Corp'], ['Delta Ltd']]],
-  ['offset past the end is empty', f => f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).offset(10), []],
-  ['offset zero changes nothing', f => f.findAll(null, null, [f.id()]).orderBy(f.id().ascending()).offset(0).limit(2), [[1], [2]]],
-  ['offset applies after distinct', f => f.findAll(null, null, [f.category()]).distinct()
+  ['offset past the end is empty', f => f.findAll([f.name()]).orderBy(f.name().ascending()).offset(10), []],
+  ['offset zero changes nothing', f => f.findAll([f.id()]).orderBy(f.id().ascending()).offset(0).limit(2), [[1], [2]]],
+  ['offset applies after distinct', f => f.findAll([f.category()]).distinct()
     .orderBy(f.category().ascending()).offset(1).limit(1), [['Manufacturing']]],
 ];
 
@@ -77,7 +77,7 @@ describe('against DuckDB', () => {
 
   it('renders the offset', () => {
     const f = new CompanyFinder();
-    expect(f.findAll(null, null, [f.name()]).orderBy(f.name().ascending()).offset(1).limit(2).toSql()).toContain('LIMIT 2 OFFSET 1');
+    expect(f.findAll([f.name()]).orderBy(f.name().ascending()).offset(1).limit(2).toSql()).toContain('LIMIT 2 OFFSET 1');
   });
 });
 

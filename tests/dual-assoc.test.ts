@@ -39,8 +39,7 @@ describe('OrderFinder — dual association to Account', () => {
     const { OrderFinder } = await import('./generated_dual_assoc/OrderFinder');
     const of_ = new OrderFinder();
 
-    const rows = await of_.findAll(null, null,
-      [of_.id(), of_.billingAccount().name()],
+    const rows = await of_.findAll([of_.id(), of_.billingAccount().name()],
       of_.id().eq(42),
     ).toRows();
 
@@ -52,8 +51,7 @@ describe('OrderFinder — dual association to Account', () => {
     const { OrderFinder } = await import('./generated_dual_assoc/OrderFinder');
     const of_ = new OrderFinder();
 
-    const rows = await of_.findAll(null, null,
-      [of_.id(), of_.shippingAccount().name()],
+    const rows = await of_.findAll([of_.id(), of_.shippingAccount().name()],
       of_.id().eq(42),
     ).toRows();
 
@@ -65,8 +63,7 @@ describe('OrderFinder — dual association to Account', () => {
     const { OrderFinder } = await import('./generated_dual_assoc/OrderFinder');
     const of_ = new OrderFinder();
 
-    const rows = await of_.findAll(null, null,
-      [of_.id(), of_.billingAccount().name(), of_.shippingAccount().name()],
+    const rows = await of_.findAll([of_.id(), of_.billingAccount().name(), of_.shippingAccount().name()],
       of_.id().eq(42),
     ).toRows();
 
@@ -79,8 +76,7 @@ describe('OrderFinder — dual association to Account', () => {
     const { OrderFinder } = await import('./generated_dual_assoc/OrderFinder');
     const of_ = new OrderFinder();
 
-    const sql = of_.findAll(null, null,
-      [of_.billingAccount().name(), of_.shippingAccount().name()],
+    const sql = of_.findAll([of_.billingAccount().name(), of_.shippingAccount().name()],
     ).toSql();
 
     const joinCount = (sql.match(/LEFT OUTER JOIN/g) ?? []).length;

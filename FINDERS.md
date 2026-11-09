@@ -18,8 +18,6 @@ registerRunner(myRunner); // register once at app startup
 const af = new AccountFinder();
 
 const result = af.findAll(
-  businessDate,           // Date | string | null  (null = not milestoned)
-  processingDate,         // Date | string | null  (null = not milestoned); a 'YYYY-MM-DD' string or a DateOnly is a date literal, a Date or 'YYYY-MM-DD HH:MM:SS' a timestamp
   [af.id(), af.name()],  // columns to SELECT
   af.id().eq(42),         // optional WHERE filter
 );
@@ -28,6 +26,22 @@ const sql: string        = result.toSql();
 const rows: unknown[][]  = await result.toRows();
 // rows[i] aligns to displayColumns order
 ```
+
+A class with no milestoning has no dates to give. A milestoned class takes them first:
+
+```ts
+const tf = new TradeFinder();
+
+tf.findAll(
+  businessDate,           // Date | string | null  (null = not milestoned)
+  processingDate,         // Date | string | null  (null = not milestoned); a 'YYYY-MM-DD' string or a DateOnly is a date literal, a Date or 'YYYY-MM-DD HH:MM:SS' a timestamp
+  [tf.id(), tf.symbol()],
+  tf.id().eq(42),
+);
+```
+
+To read a milestoned class from one that has no milestoning, give the dates to the property that reaches it
+(see Dates for a navigation): `af.findAll([af.name(), af.trades(undefined, { processingTime }).symbol()])`.
 
 ## Milestoning (temporal filtering)
 
@@ -43,7 +57,7 @@ Pass dates to `findAll` to snapshot data at a point in time. Temporal WHERE clau
 | Business date + processing | required | required |
 | Bi-temporal | required | required |
 
-A class with no milestoning of its own passes the dates it is given on to the milestoned tables it reaches: `findAll(businessDate, processingTime, ...)` on `BranchFinder` reads the accounts of a branch as of those dates.
+A class with no milestoning of its own has no dates for a query: `findAll(columns, filter)` on `BranchFinder` takes none. The dates are given to the property that reaches a milestoned class, `branch.accounts(undefined, { processingTime }).name()` (see Dates for a navigation), as Legend's `branch.accounts(%time)`.
 
 A business date range holds a row from its `from` date up to, but not including, its `to` date; a `NULL` end is open.
 
@@ -109,7 +123,7 @@ const rows = await new TradeFinder().findAll(null, null, [tf.symbol(), tf.price(
 Queries time out after 60 seconds by default. Override per query with `.timeout(ms)`; a runner that exceeds it rejects with `QueryTimeoutError`.
 
 ```ts
-await af.findAll(null, null, [af.name()]).timeout(5_000).toRows();
+await af.findAll([af.name()]).timeout(5_000).toRows();
 ```
 
 Custom `QueryRunner`s receive the timeout as the last argument to `select`.
@@ -163,14 +177,14 @@ A numeric column, aggregate, number function or another calculation has `.plus()
 Sort with `.orderBy()` and limit with `.limit()`. Several `orderBy` calls accumulate: the latest call takes priority and the earlier ones break its ties, so the two sorts below order by category and then by name. Sorting a column again replaces its earlier direction.
 
 ```ts
-cf.findAll(null, null, [cf.name(), cf.category()])
+cf.findAll([cf.name(), cf.category()])
   .orderBy(cf.name().ascending())
   .orderBy(cf.category().ascending())
 ```
 
-A result can also be ordered by an aggregate or another expression: `cf.findAll(null, null, [cf.category(), cf.id().count()]).orderBy(cf.id().count().descending(), cf.category().ascending())`. Each expression is its own sort, so ordering by one again adds a sort.
+A result can also be ordered by an aggregate or another expression: `cf.findAll([cf.category(), cf.id().count()]).orderBy(cf.id().count().descending(), cf.category().ascending())`. Each expression is its own sort, so ordering by one again adds a sort.
 
-`.distinct()` returns each row once (`SELECT DISTINCT`): `cf.findAll(null, null, [cf.category()]).distinct()`. A sort on a distinct query has to use a selected column. The GraphQL runner removes the duplicates on the client, so it applies a limit after that rather than on the server.
+`.distinct()` returns each row once (`SELECT DISTINCT`): `cf.findAll([cf.category()]).distinct()`. A sort on a distinct query has to use a selected column. The GraphQL runner removes the duplicates on the client, so it applies a limit after that rather than on the server.
 
 `.offset(n)` skips the first `n` rows and `.slice(start, stop)` keeps rows `start` up to `stop`, counting from 0. Sort first: without an order, which rows come first is not defined. The GraphQL runner applies the offset on the client, after the sort, and the limit after that rather than on the server.
 
@@ -179,7 +193,7 @@ A result can also be ordered by an aggregate or another expression: `cf.findAll(
 A column is named in the result after its property. Give it another name with `.alias()`, on an attribute, an aggregate or a function of a column:
 
 ```ts
-cf.findAll(null, null, [cf.name().alias('Company'), cf.id().count().alias('N')])
+cf.findAll([cf.name().alias('Company'), cf.id().count().alias('N')])
 ```
 
 A condition can be named too (`cf.id().gt(3).alias('Big')`). A sort has no `.alias()`. Aliasing an alias replaces its name.
@@ -209,7 +223,7 @@ If the mapping declares flat columns on the table that duplicate a related prope
 A related-finder accessor accepts property values to restrict the joined rows (an equality filter on the join, so unmatched rows stay as NULLs rather than being dropped):
 
 ```ts
-ef.findAll(null, null, [ef.firstName(), ef.projects({ code: 'ALPHA' }).name()])
+ef.findAll([ef.firstName(), ef.projects({ code: 'ALPHA' }).name()])
 ```
 
 ### Dates for a navigation
@@ -221,7 +235,7 @@ A related-finder accessor takes the dates it is read at as a second argument, wh
 `exists()` and `notExists()` on a related finder keep only rows that do (or don't) have a match through that join:
 
 ```ts
-ef.findAll(null, null, [ef.firstName()], ef.manager().notExists())   // employees with no manager
+ef.findAll([ef.firstName()], ef.manager().notExists())   // employees with no manager
 ```
 
 They compile to a LEFT JOIN checked for NULL. For a to-many join that is only asked whether a row exists, the join is to a sub-select of the distinct join column, so the row is not repeated once per match; if the query also reads a value through that join, it stays a plain join and the row repeats for each child.
@@ -229,12 +243,12 @@ They compile to a LEFT JOIN checked for NULL. For a to-many join that is only as
 ## Count
 
 ```ts
-af.findAll(null, null, [af.count()]).toSql()
+af.findAll([af.count()]).toSql()
 // → SELECT COUNT(*) FROM ref_data.account_master
 ```
 
 `countAll()` counts the rows of a group, `COUNT(*)`, where `.count()` of a column skips rows where it is missing:
-`f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category())`. `.std()` and `.var()` give the sample standard
+`f.findAll([f.category(), countAll()]).groupBy(f.category())`. `.std()` and `.var()` give the sample standard
 deviation and variance, and `.std(0)` / `.var(0)` the population ones, as in pandas. `.min()` and `.max()` also work on
 text and dates.
 
@@ -243,7 +257,7 @@ An expression has the aggregates a column has: `f.price().times(f.quantity()).su
 `f.price().gt(10).all()` is true for a group where every row holds.
 
 `.having(...)` keeps the groups that satisfy a condition on an aggregate or a grouping column:
-`f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1))`. An aggregate compares
+`f.findAll([f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1))`. An aggregate compares
 as a column does (`eq`, `ne`, `lt`, `lte`, `gt`, `gte`), and `contains`, `startsWith` and `endsWith` also work on an
 expression that holds text, such as `f.name().toUpperCase().startsWith('AC')` or a joined text. The GraphQL runner
 throws `GraphQLClientComputationError` for `having`.
@@ -259,11 +273,11 @@ text literally. The GraphQL runner cannot push a negation or a regular expressio
 
 `.countDistinct()` counts the different non-NULL values (`COUNT(DISTINCT column)`); use it with `.groupBy()` to count per group. The GraphQL runner does not compute aggregates on the client.
 
-`.join(separator, orderBy)` on a string attribute joins the values of a group into one text (`STRING_AGG`): `cf.findAll(null, null, [cf.category(), cf.name().join(', ', [cf.name().ascending()])]).groupBy(cf.category())`. `orderBy` is the order they are joined in; without it the order is not defined. Missing values are skipped.
+`.join(separator, orderBy)` on a string attribute joins the values of a group into one text (`STRING_AGG`): `cf.findAll([cf.category(), cf.name().join(', ', [cf.name().ascending()])]).groupBy(cf.category())`. `orderBy` is the order they are joined in; without it the order is not defined. Missing values are skipped.
 
 ### Grouping
 
-With no `.groupBy()`, a query that selects aggregates is grouped by its other columns, as a DataFrame's `groupby(columns).agg(...)` is: `cf.findAll(null, null, [cf.category(), cf.id().count()])` counts per category. A query that selects only aggregates over the root's own columns is not grouped, so the aggregate covers every row. An aggregate read through a to-many association is computed for each row of the root, as Legend does, so the root's primary key is grouped by too: `ef.findAll(null, null, [ef.name(), ef.employees().id().count()])` gives each employee the count of their own reports, 0 for none. An explicit `.groupBy()` is used as given.
+With no `.groupBy()`, a query that selects aggregates is grouped by its other columns, as a DataFrame's `groupby(columns).agg(...)` is: `cf.findAll([cf.category(), cf.id().count()])` counts per category. A query that selects only aggregates over the root's own columns is not grouped, so the aggregate covers every row. An aggregate read through a to-many association is computed for each row of the root, as Legend does, so the root's primary key is grouped by too: `ef.findAll([ef.name(), ef.employees().id().count()])` gives each employee the count of their own reports, 0 for none. An explicit `.groupBy()` is used as given.
 
 ## Constant columns
 
@@ -272,7 +286,7 @@ With no `.groupBy()`, a query that selects aggregates is grouped by its other co
 ```ts
 import { constant } from 'data-finder-ts';
 
-cf.findAll(null, null, [cf.name(), constant('EU').alias('Region')])
+cf.findAll([cf.name(), constant('EU').alias('Region')])
 ```
 
 The GraphQL runner fills a constant in itself rather than reading it from the server, so a query needs at least one real field too.
@@ -286,8 +300,8 @@ A condition (a comparison, a null check, `isIn`, `exists`, or `.and()` / `.or()`
 ```ts
 import { when } from 'data-finder-ts';
 
-cf.findAll(null, null, [cf.name(), when(cf.category().eq('Technology')).then('tech').otherwise('other')])
-cf.findAll(null, null, [when(cf.id().lt(2)).then('low').when(cf.id().lt(4)).then('mid').otherwise('high')])
+cf.findAll([cf.name(), when(cf.category().eq('Technology')).then('tech').otherwise('other')])
+cf.findAll([when(cf.id().lt(2)).then('low').when(cf.id().lt(4)).then('mid').otherwise('high')])
 ```
 
 The object `when(...)` returns has a `then` method, so don't `await` it before calling `.then(value)`. The GraphQL runner does not compute either on the client.
@@ -297,7 +311,7 @@ The object `when(...)` returns has a `then` method, so don't `await` it before c
 `.orElse(default)` (`COALESCE` in SQL) selects the value, or `default` when it is NULL. It works on any attribute, including one reached through an association (for example a manager that may not exist). The default is a string, number or boolean.
 
 ```ts
-ef.findAll(null, null, [ef.name(), ef.manager().name().orElse('nobody')])
+ef.findAll([ef.name(), ef.manager().name().orElse('nobody')])
 ```
 
 The GraphQL runner does not compute functions on the client, so it reports `GraphQLClientComputationError` for an `orElse` column, as for the other functions.
@@ -311,7 +325,7 @@ await import('./generated/TradeFinder'); // registers TradeRelatedFinder
 const { AccountFinder } = await import('./generated/AccountFinder');
 
 const af = new AccountFinder();
-af.findAll(null, null, [af.name(), af.trades().symbol()]).toRows();
+af.findAll([af.name(), af.trades().symbol()]).toRows();
 ```
 
 ## Implementing QueryRunner

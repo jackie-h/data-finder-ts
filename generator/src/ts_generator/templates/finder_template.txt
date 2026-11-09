@@ -386,6 +386,18 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
     return new CountAllOperation('{{table_qualified_name(rcm.property_mappings[0].target.table)}}');
   }
 
+{% if not rcm.milestone_mapping %}
+  /**
+   * Returns data matching the optional filter. The class has no milestoning, so a query has no dates: give one to
+   * the property that reaches a milestoned class, as in `findAll([f.product(undefined, { businessDate }).id()])`.
+   */
+  findAll(
+    displayColumns: (Attribute | RelationalOperationElement)[],
+    filterOp: Operation = new NoOperation(),
+  ): FinderResult {
+    return convertInputsAndSelect(null, null, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
+  }
+{% else %}
   findAll(
     businessDate: Date | string | null,
     processingTime: Date | string | null,
@@ -398,6 +410,7 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
     return convertInputsAndSelect(businessDate, processingTime, displayColumns, {{rcm.clazz.name}}Finder._table, filterOp);
 {% endif %}
   }
+{% endif %}
 {% if rcm.milestone_mapping and (has_bitemporal(rcm.milestone_mapping) or has_business_date_and_processing(rcm.milestone_mapping) or has_business_date_range(rcm.milestone_mapping) or has_uni_business_temporal(rcm.milestone_mapping)) %}
 
   /**

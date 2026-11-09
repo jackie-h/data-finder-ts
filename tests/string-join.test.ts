@@ -64,7 +64,7 @@ describe('against DuckDB', () => {
   afterAll(() => { conn.disconnectSync(); instance.closeSync(); });
 
   it('per group in an order', async () => {
-    const query = f.findAll(null, null, [f.category(), f.name().join(', ', [f.name().ascending()])])
+    const query = f.findAll([f.category(), f.name().join(', ', [f.name().ascending()])])
       .groupBy(f.category()).orderBy(f.category().ascending());
     expect(query.toSql()).toContain("STRING_AGG(t0.name, ', ' ORDER BY t0.name ASC)");
     expect(await query.toRows()).toEqual([
@@ -75,7 +75,7 @@ describe('against DuckDB', () => {
   });
 
   it('descending', async () => {
-    const rows = await f.findAll(null, null, [f.category(), f.name().join('|', [f.name().descending()])])
+    const rows = await f.findAll([f.category(), f.name().join('|', [f.name().descending()])])
       .groupBy(f.category()).orderBy(f.category().ascending()).toRows();
     expect(rows).toEqual([
       ['Finance', 'Gamma LLC|Delta Ltd'],
@@ -85,18 +85,18 @@ describe('against DuckDB', () => {
   });
 
   it('of the whole result', async () => {
-    const rows = await f.findAll(null, null, [f.category().join('/', [f.id().ascending()])]).toRows();
+    const rows = await f.findAll([f.category().join('/', [f.id().ascending()])]).toRows();
     expect(rows).toEqual([['Technology/Manufacturing/Technology/Finance/Finance']]);
   });
 
   it('without an order joins every value', async () => {
-    const query = f.findAll(null, null, [f.category(), f.name().join(',')], f.category().eq('Manufacturing')).groupBy(f.category());
+    const query = f.findAll([f.category(), f.name().join(',')], f.category().eq('Manufacturing')).groupBy(f.category());
     expect(query.toSql()).toContain("STRING_AGG(t0.name, ',')");
     expect(await query.toRows()).toEqual([['Manufacturing', 'Acme Industries']]);
   });
 
   it('with no groupBy, groups by the other columns', async () => {
-    const rows = await f.findAll(null, null, [f.category(), f.name().join('+', [f.name().ascending()])])
+    const rows = await f.findAll([f.category(), f.name().join('+', [f.name().ascending()])])
       .orderBy(f.category().ascending()).toRows();
     expect(rows[0]).toEqual(['Finance', 'Delta Ltd+Gamma LLC']);
   });

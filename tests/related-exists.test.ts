@@ -38,26 +38,26 @@ const names = (rows: unknown[][]) => rows.map(r => r[0]);
 
 describe('RelatedFinder.exists / notExists', () => {
   it('manager().exists() keeps employees that have a manager', async () => {
-    const rows = await ef.findAll(null, null, [ef.firstName()], ef.manager().exists())
+    const rows = await ef.findAll([ef.firstName()], ef.manager().exists())
       .orderBy(ef.firstName().ascending()).toRows();
     expect(names(rows)).toEqual(['Bob', 'Carol', 'Dave']);
   });
 
   it('manager().notExists() keeps employees without a manager', async () => {
-    const rows = await ef.findAll(null, null, [ef.firstName()], ef.manager().notExists()).toRows();
+    const rows = await ef.findAll([ef.firstName()], ef.manager().notExists()).toRows();
     expect(names(rows)).toEqual(['Alice']);
   });
 
   it('works through a reverse association', async () => {
     // exists() is a LEFT JOIN ... IS NOT NULL, so a to-many join repeats a row per match (Alice has two reports).
-    const withReports = await ef.findAll(null, null, [ef.firstName()], ef.employees().exists()).toRows();
+    const withReports = await ef.findAll([ef.firstName()], ef.employees().exists()).toRows();
     expect(new Set(names(withReports))).toEqual(new Set(['Alice', 'Bob']));
-    const withProjects = await ef.findAll(null, null, [ef.firstName()], ef.projects().exists()).toRows();
+    const withProjects = await ef.findAll([ef.firstName()], ef.projects().exists()).toRows();
     expect(names(withProjects)).toEqual(['Bob']);
   });
 
   it('combines with other filters via and', async () => {
-    const rows = await ef.findAll(null, null, [ef.firstName()],
+    const rows = await ef.findAll([ef.firstName()],
       ef.manager().exists().and(ef.department().eq('Engineering')),
     ).orderBy(ef.firstName().ascending()).toRows();
     expect(names(rows)).toEqual(['Bob', 'Carol']);

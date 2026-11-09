@@ -39,22 +39,22 @@ describe('against DuckDB', () => {
   afterAll(() => { conn.disconnectSync(); instance.closeSync(); });
 
   it('of the whole result', async () => {
-    const query = f.findAll(null, null, [f.category().countDistinct()]);
+    const query = f.findAll([f.category().countDistinct()]);
     expect(query.toSql()).toContain('COUNT(DISTINCT t0.category)');
     expect(await query.toRows()).toEqual([[3n]]);
   });
 
   it('is less than count where values repeat', async () => {
-    expect(await f.findAll(null, null, [f.category().count(), f.category().countDistinct()]).toRows()).toEqual([[5n, 3n]]);
+    expect(await f.findAll([f.category().count(), f.category().countDistinct()]).toRows()).toEqual([[5n, 3n]]);
   });
 
   it('per group', async () => {
-    const rows = await f.findAll(null, null, [f.category(), f.name().countDistinct()])
+    const rows = await f.findAll([f.category(), f.name().countDistinct()])
       .groupBy(f.category()).orderBy(f.category().ascending()).toRows();
     expect(rows).toEqual([['Finance', 2n], ['Manufacturing', 1n], ['Technology', 2n]]);
   });
 
   it('with a filter', async () => {
-    expect(await f.findAll(null, null, [f.category().countDistinct()], f.name().startsWith('Acme')).toRows()).toEqual([[2n]]);
+    expect(await f.findAll([f.category().countDistinct()], f.name().startsWith('Acme')).toRows()).toEqual([[2n]]);
   });
 });

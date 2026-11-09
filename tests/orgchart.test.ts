@@ -38,7 +38,7 @@ describe('EmployeeFinder (orgchart, self-referential)', () => {
   it('finds an employee by id', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.id(), ef.name()], ef.id().eq(2)).toRows();
+    const rows = await ef.findAll([ef.id(), ef.name()], ef.id().eq(2)).toRows();
     expect(rows.length).toBe(1);
     expect(rows[0][1]).toBe('Bob');
   });
@@ -46,9 +46,7 @@ describe('EmployeeFinder (orgchart, self-referential)', () => {
   it('traverses manager() to get the manager name', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(
-      null, null,
-      [ef.name(), ef.manager().name()],
+    const rows = await ef.findAll([ef.name(), ef.manager().name()],
       ef.id().eq(2),
     ).toRows();
     expect(rows.length).toBe(1);
@@ -59,9 +57,7 @@ describe('EmployeeFinder (orgchart, self-referential)', () => {
   it('traverses manager().manager() two hops up', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(
-      null, null,
-      [ef.name(), ef.manager().name(), ef.manager().manager().name()],
+    const rows = await ef.findAll([ef.name(), ef.manager().name(), ef.manager().manager().name()],
       ef.id().eq(4),
     ).toRows();
     expect(rows.length).toBe(1);
@@ -73,9 +69,7 @@ describe('EmployeeFinder (orgchart, self-referential)', () => {
   it('traverses employees() reverse to list direct reports', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(
-      null, null,
-      [ef.name(), ef.employees().name()],
+    const rows = await ef.findAll([ef.name(), ef.employees().name()],
       ef.id().eq(1),
     ).toRows();
     expect(rows.length).toBe(2);
@@ -87,7 +81,7 @@ describe('EmployeeFinder (orgchart, self-referential)', () => {
   it('manager name for Dave is Bob', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.name(), ef.manager().name()], ef.name().eq('Dave')).toRows();
+    const rows = await ef.findAll([ef.name(), ef.manager().name()], ef.name().eq('Dave')).toRows();
     expect(rows[0][0]).toBe('Dave');
     expect(rows[0][1]).toBe('Bob');
   });
@@ -95,14 +89,14 @@ describe('EmployeeFinder (orgchart, self-referential)', () => {
   it('filters by manager name to find all direct reports', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.name()], ef.manager().name().eq('Bob')).toRows();
+    const rows = await ef.findAll([ef.name()], ef.manager().name().eq('Bob')).toRows();
     expect(rows.map(r => r[0])).toEqual(['Dave']);
   });
 
   it('filters by manager Alice returns Bob and Carol ordered', async () => {
     const { EmployeeFinder } = await import('./generated_examples/orgchart/EmployeeFinder');
     const ef = new EmployeeFinder();
-    const rows = await ef.findAll(null, null, [ef.name()], ef.manager().name().eq('Alice'))
+    const rows = await ef.findAll([ef.name()], ef.manager().name().eq('Alice'))
       .orderBy(ef.name().ascending()).toRows();
     expect(rows.map(r => r[0])).toEqual(['Bob', 'Carol']);
   });

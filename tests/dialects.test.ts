@@ -139,7 +139,7 @@ describe('DuckDB runs what it is given', () => {
   const run = async (text: string) => (await conn.runAndReadAll(text)).getRows();
 
   it('the default (Postgres) SQL for a plain query', async () => {
-    const query = f.findAll(null, null, [f.name(), f.id().times(2).alias('Double')], f.category().eq('Technology')).orderBy(f.id().ascending());
+    const query = f.findAll([f.name(), f.id().times(2).alias('Double')], f.category().eq('Technology')).orderBy(f.id().ascending());
     expect((await run(query.toSql())).map(r => r[0])).toEqual(['Acme Corp', 'Beta Corp']);
   });
 

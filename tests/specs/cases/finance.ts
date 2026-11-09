@@ -25,11 +25,11 @@ export function _call_with_a_time_then_plain(f: any) {
 }
 export function _branch_accounts_exist_or_not(f: any) {
   const accounts = f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT });
-  return f.findAll(null, null, [f.city()], accounts.exists().or(accounts.notExists())).orderBy(f.city().ascending());
+  return f.findAll([f.city()], accounts.exists().or(accounts.notExists())).orderBy(f.city().ascending());
 }
 export function _branch_value_read_through_the_accounts_that_exist(f: any) {
   const accounts = f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT });
-  return f.findAll(null, null, [f.city(), accounts.name()], accounts.exists()).orderBy(accounts.name().ascending());
+  return f.findAll([f.city(), accounts.name()], accounts.exists()).orderBy(accounts.name().ascending());
 }
 
 export const ACCOUNT_FINDER_SPECS: SpecCase<AccountFinder>[] = [
@@ -720,7 +720,7 @@ export const TRADE_NAVIGATION_DATE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
 export const BRANCH_FINDER_SPECS: SpecCase<BranchFinder>[] = [
   {
     name: 'non_milestoned_root_reads_a_milestoned_navigation_at_the_time_it_is_given',
-    query: f => f.findAll(null, null, [f.city(), f.accounts(undefined, { processingTime: _AT }).name()]).orderBy(f.city().ascending()),
+    query: f => f.findAll([f.city(), f.accounts(undefined, { processingTime: _AT }).name()]).orderBy(f.city().ascending()),
     expected: { columns: ['City', 'Accounts Name'], rows: [
         ['London', null],
         ['New York', 'Acme Corp'],
@@ -728,7 +728,7 @@ export const BRANCH_FINDER_SPECS: SpecCase<BranchFinder>[] = [
   },
   {
     name: 'non_milestoned_root_reads_the_earlier_version_at_an_earlier_time',
-    query: f => f.findAll(null, null, [f.city(), f.accounts(undefined, { processingTime: _BOTH_AT }).name()]).orderBy(f.city().ascending()),
+    query: f => f.findAll([f.city(), f.accounts(undefined, { processingTime: _BOTH_AT }).name()]).orderBy(f.city().ascending()),
     expected: { columns: ['City', 'Accounts Name'], rows: [
         ['London', 'Acme Ltd'],
         ['New York', null],
@@ -739,21 +739,21 @@ export const BRANCH_FINDER_SPECS: SpecCase<BranchFinder>[] = [
 export const BRANCH_EXISTS_FINDER_SPECS: SpecCase<BranchFinder>[] = [
   {
     name: 'exists_to_many_is_one_row_however_many_rows_match',
-    query: f => f.findAll(null, null, [f.city()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
+    query: f => f.findAll([f.city()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
     expected: { columns: ['City'], rows: [
         ['New York'],
       ], sql: 'SELECT DISTINCT t2.BRANCH_ID AS "BRANCH_ID" FROM ref_data.account_master AS t2', skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
   },
   {
     name: 'exists_to_many_counts_a_row_once',
-    query: f => f.findAll(null, null, [countAll()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
+    query: f => f.findAll([countAll()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
     expected: { columns: ['Count'], rows: [
         [1],
       ], skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
   },
   {
     name: 'not_exists_to_many_is_a_row_with_no_match',
-    query: f => f.findAll(null, null, [f.city()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).notExists()),
+    query: f => f.findAll([f.city()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).notExists()),
     expected: { columns: ['City'], rows: [
         ['London'],
       ], skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
@@ -768,7 +768,7 @@ export const BRANCH_EXISTS_FINDER_SPECS: SpecCase<BranchFinder>[] = [
   },
   {
     name: 'the_step_is_milestoned_inside_the_sub_select_with_the_time_it_is_given',
-    query: f => f.findAll(null, null, [f.city()], f.accounts(undefined, { processingTime: _BOTH_AT }).exists()),
+    query: f => f.findAll([f.city()], f.accounts(undefined, { processingTime: _BOTH_AT }).exists()),
     expected: { columns: ['City'], rows: [
         ['London'],
       ], sql: 'FROM ref_data.account_master AS t2 WHERE t2.in_z <=', unexpectedSql: 't1.in_z', skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
@@ -786,14 +786,14 @@ export const BRANCH_EXISTS_FINDER_SPECS: SpecCase<BranchFinder>[] = [
 export const DESK_EXISTS_FINDER_SPECS: SpecCase<DeskFinder>[] = [
   {
     name: 'exists_to_many_is_one_row_however_many_rows_match',
-    query: f => f.findAll(null, null, [f.name()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
+    query: f => f.findAll([f.name()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Equities'],
       ], sql: 'SELECT DISTINCT t2.DESK_ID AS "DESK_ID" FROM ref_data.account_master AS t2', skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
   },
   {
     name: 'not_exists_to_many_is_a_row_with_no_match',
-    query: f => f.findAll(null, null, [f.name()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).notExists()).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.accounts(undefined, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).notExists()).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Credit'],
         ['Rates'],
@@ -801,19 +801,19 @@ export const DESK_EXISTS_FINDER_SPECS: SpecCase<DeskFinder>[] = [
   },
   {
     name: 'a_step_given_a_value_filters_inside_the_sub_select',
-    query: f => f.findAll(null, null, [f.name()], f.accounts({ name: 'Beta Inc' }, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
+    query: f => f.findAll([f.name()], f.accounts({ name: 'Beta Inc' }, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Equities'],
       ], sql: 'FROM ref_data.account_master AS t2 WHERE t2.ACCT_NAME = \'Beta Inc\' AND t2.in_z <=', skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
   },
   {
     name: 'a_step_given_a_value_that_matches_no_current_row_is_no_row',
-    query: f => f.findAll(null, null, [f.name()], f.accounts({ name: 'Acme Ltd' }, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
+    query: f => f.findAll([f.name()], f.accounts({ name: 'Acme Ltd' }, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).exists()),
     expected: { columns: ['Name'], rows: [], sql: 'SELECT DISTINCT', skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },
   },
   {
     name: 'not_exists_with_a_step_given_a_value',
-    query: f => f.findAll(null, null, [f.name()], f.accounts({ name: 'Beta Inc' }, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).notExists()).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.accounts({ name: 'Beta Inc' }, { processingTime: _MSFT_WITH_LIVE_ACCOUNT_AT }).notExists()).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Credit'],
         ['Rates'],
@@ -821,7 +821,7 @@ export const DESK_EXISTS_FINDER_SPECS: SpecCase<DeskFinder>[] = [
   },
   {
     name: 'the_step_is_milestoned_inside_the_sub_select',
-    query: f => f.findAll(null, null, [f.name()], f.accounts(undefined, { processingTime: _BOTH_AT }).exists()),
+    query: f => f.findAll([f.name()], f.accounts(undefined, { processingTime: _BOTH_AT }).exists()),
     expected: { columns: ['Name'], rows: [
         ['Rates'],
       ], sql: 'FROM ref_data.account_master AS t2 WHERE t2.in_z <=', unexpectedSql: 't1.in_z', skipGraphql: 'exists/not_exists are not yet generated for GraphQL finders' },

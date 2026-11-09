@@ -41,7 +41,7 @@ const succeeded = (rows: (string | null)[][], cols: [string, string][], extra: o
 
 const f = new CompanyFinder();
 const config = { host: 'https://dbc-1.cloud.databricks.com', warehouseId: 'wh-9', token: 'tok', pollIntervalMs: 1 };
-const query = () => f.findAll(null, null, [f.name().alias('Company')], f.category().eq('Technology')).orderBy(f.name().descending());
+const query = () => f.findAll([f.name().alias('Company')], f.category().eq('Technology')).orderBy(f.name().descending());
 
 afterEach(() => clearRunner());
 
@@ -68,7 +68,7 @@ describe('what it sends', () => {
   it('sends the HAVING of a grouped query', async () => {
     const { fetch, requests } = fake(() => ({ body: succeeded([], [['Category', 'STRING'], ['Count', 'BIGINT']]) }));
     registerRunner(new DatabricksConnect({ ...config, fetch }));
-    await f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1)).toRows();
+    await f.findAll([f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1)).toRows();
     expect(requests[0].body!.statement).toContain('GROUP BY t0.category HAVING COUNT(*) > 1');
   });
 

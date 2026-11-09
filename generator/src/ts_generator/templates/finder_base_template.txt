@@ -72,12 +72,19 @@ export abstract class {{rcm.clazz.name}}FinderBase {
   abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinderBase;
 {% endfor %}
   abstract count(): CountAllOperation;
+{% if rcm.milestone_mapping %}
   abstract findAll(
     businessDate: Date | string | null,
     processingTime: Date | string | null,
     displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
     filterOp?: Operation,
   ): FinderResult;
+{% else %}
+  abstract findAll(
+    displayColumns: (Attribute | import('@model/relational').RelationalOperationElement)[],
+    filterOp?: Operation,
+  ): FinderResult;
+{% endif %}
 {% if rcm.milestone_mapping and (has_bitemporal(rcm.milestone_mapping) or has_business_date_and_processing(rcm.milestone_mapping) or has_business_date_range(rcm.milestone_mapping) or has_uni_business_temporal(rcm.milestone_mapping)) %}
   abstract findForDateRange(
     businessDateFrom: Date | string,

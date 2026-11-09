@@ -286,10 +286,6 @@ class Translator:
                 return f"new DateOnly('{y:04d}-{m:02d}-{d:02d}T00:00:00Z')"
             return 'new Date(Date.UTC(' + ', '.join(str(x) for x in [y, m - 1, d, *rest]) + '))'
         args = [self.expr(a) for a in node.args]
-        if func.attr == 'find_all' and node.args and isinstance(node.args[0], ast.List):
-            # data-finder 0.1.20: a class with no milestoning has no dates to give, find_all(columns, filter);
-            # the port still takes the two null dates
-            args = ['null', 'null'] + args
         name = method_name(func.attr)
         if func.attr in ('std', 'var') and node.keywords:
             # std(ddof=0): the degrees of freedom are the one argument

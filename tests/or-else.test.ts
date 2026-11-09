@@ -40,12 +40,12 @@ describe('against DuckDB', () => {
   afterAll(() => { conn.disconnectSync(); instance.closeSync(); });
 
   it('replaces a missing manager', async () => {
-    const query = f.findAll(null, null, [f.name(), f.manager().name().orElse('nobody')]).orderBy(f.id().ascending());
+    const query = f.findAll([f.name(), f.manager().name().orElse('nobody')]).orderBy(f.id().ascending());
     expect(query.toSql()).toContain("COALESCE(t1.name, 'nobody')");
     expect(await query.toRows()).toEqual([['Alice', 'nobody'], ['Bob', 'Alice'], ['Carol', 'Alice'], ['Dave', 'Bob']]);
   });
 
   it('leaves a value that is there', async () => {
-    expect(await f.findAll(null, null, [f.name().orElse('nobody')], f.name().eq('Bob')).toRows()).toEqual([['Bob']]);
+    expect(await f.findAll([f.name().orElse('nobody')], f.name().eq('Bob')).toRows()).toEqual([['Bob']]);
   });
 });

@@ -157,18 +157,18 @@ describe('filtering on arithmetic', () => {
   afterAll(() => { conn.disconnectSync(); instance.closeSync(); });
 
   it('on arithmetic', async () => {
-    const query = f.findAll(null, null, [f.id()], f.id().times(2).gte(8)).orderBy(f.id().ascending());
+    const query = f.findAll([f.id()], f.id().times(2).gte(8)).orderBy(f.id().ascending());
     expect(query.toSql()).toContain('t0.id * 2 >= 8');
     expect((await query.toRows()).map(r => Number(r[0]))).toEqual([4, 5]);
   });
 
   it('comparing two expressions', async () => {
-    const rows = await f.findAll(null, null, [f.id()], f.name().length().gt(f.category().length().plus(1))).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.id()], f.name().length().gt(f.category().length().plus(1))).orderBy(f.id().ascending()).toRows();
     expect(rows.map(r => Number(r[0]))).toEqual([2, 4, 5]);
   });
 
   it('combined with another filter', async () => {
-    const rows = await f.findAll(null, null, [f.id()], f.name().toUpperCase().eq('DELTA LTD').or(f.id().times(1).eq(1))).orderBy(f.id().ascending()).toRows();
+    const rows = await f.findAll([f.id()], f.name().toUpperCase().eq('DELTA LTD').or(f.id().times(1).eq(1))).orderBy(f.id().ascending()).toRows();
     expect(rows.map(r => Number(r[0]))).toEqual([1, 5]);
   });
 });

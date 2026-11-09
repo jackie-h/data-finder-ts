@@ -98,14 +98,14 @@ describe('alias against DuckDB', () => {
 
   it('names the result columns', async () => {
     const f = new CompanyFinder();
-    const sql = f.findAll(null, null, [f.name().alias('Company'), f.id().count().alias('N')]).groupBy(f.name()).toSql();
+    const sql = f.findAll([f.name().alias('Company'), f.id().count().alias('N')]).groupBy(f.name()).toSql();
     const result = await conn.runAndReadAll(sql);
     expect(result.columnNames()).toEqual(['Company', 'N']);
   });
 
   it('works through a finder with a filter and sort on the original', async () => {
     const f = new CompanyFinder();
-    const rows = await f.findAll(null, null, [f.name().alias('Company')], f.name().isIn(['Acme Corp', 'Gamma LLC']))
+    const rows = await f.findAll([f.name().alias('Company')], f.name().isIn(['Acme Corp', 'Gamma LLC']))
       .orderBy(f.name().ascending()).toRows();
     expect(rows).toEqual([['Acme Corp'], ['Gamma LLC']]);
   });
@@ -128,7 +128,7 @@ describe('alias against GraphQL', () => {
 
   it('reads the column and names it', async () => {
     const f = new GraphQLCompanyFinder(endpoint);
-    const rows = await f.findAll(null, null, [f.name().alias('Company'), f.category()]).orderBy(f.name().ascending()).limit(1).toRows();
+    const rows = await f.findAll([f.name().alias('Company'), f.category()]).orderBy(f.name().ascending()).limit(1).toRows();
     expect(rows).toEqual([['Acme Corp', 'Technology']]);
     expect(runner.lastColumns).toEqual(['Company', 'Category']);
   });

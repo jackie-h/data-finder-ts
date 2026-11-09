@@ -29,21 +29,19 @@ afterAll(() => {
 
 describe('PositionFinder — date functions', () => {
   it('week() extracts ISO week number', async () => {
-    const rows = await pf.findAll(null, null, [pf.tradeDate().week()], pf.id().eq(1)).toRows();
+    const rows = await pf.findAll([pf.tradeDate().week()], pf.id().eq(1)).toRows();
     // 2024-03-15 is ISO week 11
     expect(Number(rows[0][0])).toBe(11);
   });
 
   it('addYears(1) adds one year to date', async () => {
-    const rows = await pf.findAll(null, null, [pf.tradeDate().addYears(1)], pf.id().eq(1)).toRows();
+    const rows = await pf.findAll([pf.tradeDate().addYears(1)], pf.id().eq(1)).toRows();
     const result = String(rows[0][0]);
     expect(result).toContain('2025-03-15');
   });
 
   it('diffYears() computes difference in years', async () => {
-    const rows = await pf.findAll(
-      null, null,
-      [pf.tradeDate().diffYears(new Date('2026-03-15'))],
+    const rows = await pf.findAll([pf.tradeDate().diffYears(new Date('2026-03-15'))],
       pf.id().eq(1),
     ).toRows();
     expect(Number(rows[0][0])).toBe(2);

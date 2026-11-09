@@ -6,7 +6,7 @@ import type { EmployeeFinder } from '../../generated_examples/orgchart/EmployeeF
 export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'all_employees',
-    query: f => f.findAll(null, null, [f.id(), f.name()]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.name()]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Name'], rows: [
         [1, 'Alice'],
         [2, 'Bob'],
@@ -16,14 +16,14 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'manager_name_for_bob',
-    query: f => f.findAll(null, null, [f.name(), f.manager().name()], f.name().eq('Bob')),
+    query: f => f.findAll([f.name(), f.manager().name()], f.name().eq('Bob')),
     expected: { columns: ['Name', 'Manager Name'], rows: [
         ['Bob', 'Alice'],
       ] },
   },
   {
     name: 'fill_null_replaces_a_missing_manager',
-    query: f => f.findAll(null, null, [f.name(), f.manager().name().orElse('nobody')]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name(), f.manager().name().orElse('nobody')]).orderBy(f.id().ascending()),
     expected: { columns: ['Name', 'Or Else Manager Name'], rows: [
         ['Alice', 'nobody'],
         ['Bob', 'Alice'],
@@ -33,7 +33,7 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'concat_with_a_missing_part_is_missing',
-    query: f => f.findAll(null, null, [f.name().concat(' reports to ').concat(f.manager().name())]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name().concat(' reports to ').concat(f.manager().name())]).orderBy(f.id().ascending()),
     expected: { columns: ['Expression'], rows: [
         [null],
         ['Bob reports to Alice'],
@@ -43,7 +43,7 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'filter_on_a_function_of_a_related_column',
-    query: f => f.findAll(null, null, [f.name()], f.manager().name().toUpperCase().eq('ALICE')).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], f.manager().name().toUpperCase().eq('ALICE')).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Bob'],
         ['Carol'],
@@ -51,7 +51,7 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'a_condition_on_a_related_column_as_a_column',
-    query: f => f.findAll(null, null, [f.name(), f.manager().name().isNull()]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name(), f.manager().name().isNull()]).orderBy(f.id().ascending()),
     expected: { columns: ['Name', 'Expression'], rows: [
         ['Alice', true],
         ['Bob', false],
@@ -61,7 +61,7 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'a_comparison_with_a_missing_value_is_missing',
-    query: f => f.findAll(null, null, [f.name(), f.manager().name().eq('Alice')]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name(), f.manager().name().eq('Alice')]).orderBy(f.id().ascending()),
     expected: { columns: ['Name', 'Expression'], rows: [
         ['Alice', null],
         ['Bob', true],
@@ -71,21 +71,21 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'alias_names_a_column_reached_through_an_association',
-    query: f => f.findAll(null, null, [f.name().alias('Employee'), f.manager().name().alias('Boss')], f.name().eq('Bob')),
+    query: f => f.findAll([f.name().alias('Employee'), f.manager().name().alias('Boss')], f.name().eq('Bob')),
     expected: { columns: ['Employee', 'Boss'], rows: [
         ['Bob', 'Alice'],
       ] },
   },
   {
     name: 'fill_null_leaves_a_value_that_is_there',
-    query: f => f.findAll(null, null, [f.name().orElse('nobody')], f.name().eq('Bob')),
+    query: f => f.findAll([f.name().orElse('nobody')], f.name().eq('Bob')),
     expected: { columns: ['Or Else Name'], rows: [
         ['Bob'],
       ] },
   },
   {
     name: 'if_on_a_related_column_with_a_fallback',
-    query: f => f.findAll(null, null, [f.name(), when(f.manager().name().isNull()).then('top').otherwise(f.manager().name())]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name(), when(f.manager().name().isNull()).then('top').otherwise(f.manager().name())]).orderBy(f.id().ascending()),
     expected: { columns: ['Name', 'Expression'], rows: [
         ['Alice', 'top'],
         ['Bob', 'Alice'],
@@ -95,7 +95,7 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'if_whose_condition_is_missing_takes_otherwise',
-    query: f => f.findAll(null, null, [f.name(), when(f.manager().name().eq('Alice')).then('alice').otherwise('other')]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name(), when(f.manager().name().eq('Alice')).then('alice').otherwise('other')]).orderBy(f.id().ascending()),
     expected: { columns: ['Name', 'Expression'], rows: [
         ['Alice', 'other'],
         ['Bob', 'alice'],
@@ -105,14 +105,14 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'manager_name_for_dave',
-    query: f => f.findAll(null, null, [f.name(), f.manager().name()], f.name().eq('Dave')),
+    query: f => f.findAll([f.name(), f.manager().name()], f.name().eq('Dave')),
     expected: { columns: ['Name', 'Manager Name'], rows: [
         ['Dave', 'Bob'],
       ] },
   },
   {
     name: 'filter_by_manager_alice',
-    query: f => f.findAll(null, null, [f.name()], f.manager().name().eq('Alice')).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name()], f.manager().name().eq('Alice')).orderBy(f.name().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Bob'],
         ['Carol'],
@@ -120,7 +120,7 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'filter_by_manager_bob',
-    query: f => f.findAll(null, null, [f.name()], f.manager().name().eq('Bob')),
+    query: f => f.findAll([f.name()], f.manager().name().eq('Bob')),
     expected: { columns: ['Name'], rows: [
         ['Dave'],
       ] },
@@ -130,7 +130,7 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
 export const ORGCHART_AGGREGATE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'count_of_reports_for_each_employee',
-    query: f => f.findAll(null, null, [f.name(), f.employees().id().count()]).orderBy(f.name().ascending()),
+    query: f => f.findAll([f.name(), f.employees().id().count()]).orderBy(f.name().ascending()),
     expected: { columns: ['Name', 'Employees Id Count'], rows: [
         ['Alice', 2],
         ['Bob', 1],
@@ -140,7 +140,7 @@ export const ORGCHART_AGGREGATE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'count_of_reports_alone_is_still_for_each_employee',
-    query: f => f.findAll(null, null, [f.employees().id().count()]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.employees().id().count()]).orderBy(f.id().ascending()),
     expected: { columns: ['Employees Id Count'], rows: [
         [2],
         [1],
@@ -150,7 +150,7 @@ export const ORGCHART_AGGREGATE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'explicit_group_by_is_used_as_given',
-    query: f => f.findAll(null, null, [f.manager().name(), f.id().count()]).groupBy(f.manager().name()).orderBy(f.manager().name().ascending()),
+    query: f => f.findAll([f.manager().name(), f.id().count()]).groupBy(f.manager().name()).orderBy(f.manager().name().ascending()),
     expected: { columns: ['Manager Name', 'Id Count'], rows: [
         ['Alice', 2],
         ['Bob', 1],
@@ -159,7 +159,7 @@ export const ORGCHART_AGGREGATE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'aggregate_over_a_to_one_association_groups_by_the_plain_columns',
-    query: f => f.findAll(null, null, [f.manager().name(), f.id().count()]).orderBy(f.manager().name().ascending()),
+    query: f => f.findAll([f.manager().name(), f.id().count()]).orderBy(f.manager().name().ascending()),
     expected: { columns: ['Manager Name', 'Id Count'], rows: [
         ['Alice', 2],
         ['Bob', 1],
@@ -171,7 +171,7 @@ export const ORGCHART_AGGREGATE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
 export const ORGCHART_EXISTS_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   {
     name: 'exists_to_many_is_one_row_however_many_rows_match',
-    query: f => f.findAll(null, null, [f.name()], f.employees().exists()).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], f.employees().exists()).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Alice'],
         ['Bob'],
@@ -179,14 +179,14 @@ export const ORGCHART_EXISTS_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'exists_to_many_counts_a_row_once',
-    query: f => f.findAll(null, null, [countAll()], f.employees().exists()),
+    query: f => f.findAll([countAll()], f.employees().exists()),
     expected: { columns: ['Count'], rows: [
         [2],
       ], skipGraphql: 'The GraphQL finder has no exists on a to-many association' },
   },
   {
     name: 'not_exists_to_many_is_a_row_with_no_match',
-    query: f => f.findAll(null, null, [f.name()], f.employees().notExists()).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], f.employees().notExists()).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Carol'],
         ['Dave'],
@@ -194,7 +194,7 @@ export const ORGCHART_EXISTS_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'exists_and_not_exists_on_one_step_cover_every_row_once',
-    query: f => f.findAll(null, null, [f.name()], f.employees().exists().or(f.employees().notExists())).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], f.employees().exists().or(f.employees().notExists())).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Alice'],
         ['Bob'],
@@ -204,7 +204,7 @@ export const ORGCHART_EXISTS_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'exists_to_many_through_a_to_one_step_is_one_row',
-    query: f => f.findAll(null, null, [f.name()], f.manager().employees().exists()).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], f.manager().employees().exists()).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Bob'],
         ['Carol'],
@@ -213,7 +213,7 @@ export const ORGCHART_EXISTS_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'reading_a_value_through_the_step_keeps_a_row_for_each_match',
-    query: f => f.findAll(null, null, [f.name(), f.employees().name()], f.employees().exists()).orderBy(f.id().ascending(), f.employees().name().ascending()),
+    query: f => f.findAll([f.name(), f.employees().name()], f.employees().exists()).orderBy(f.id().ascending(), f.employees().name().ascending()),
     expected: { columns: ['Name', 'Employees Name'], rows: [
         ['Alice', 'Bob'],
         ['Alice', 'Carol'],

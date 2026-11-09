@@ -106,6 +106,7 @@ export class {{cm.clazz.name}}Finder {
 
 {% endif %}
 {% endfor %}
+{% if cm.query.milestone %}
   /** Returns data matching the optional filter. */
   findAll(
     businessDate: Date | string | null,
@@ -115,6 +116,15 @@ export class {{cm.clazz.name}}Finder {
   ): FinderResult {
     return convertInputsAndSelect(businessDate, processingTime, displayColumns, this._query, filterOp);
   }
+{% else %}
+  /** Returns data matching the optional filter. The query has no milestoning, so it has no dates. */
+  findAll(
+    displayColumns: (Attribute | RelationalOperationElement)[],
+    filterOp: Operation = new NoOperation(),
+  ): FinderResult {
+    return convertInputsAndSelect(null, null, displayColumns, this._query, filterOp);
+  }
+{% endif %}
 
   /** Returns data for all records whose business date falls within the given range. */
   findForDateRange(

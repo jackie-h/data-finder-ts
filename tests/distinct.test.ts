@@ -37,16 +37,16 @@ describe('the SQL', () => {
 
 type Case = [string, (f: CompanyFinder) => ReturnType<CompanyFinder['findAll']>, unknown[][]];
 const cases: Case[] = [
-  ['distinct removes repeated rows', f => f.findAll(null, null, [f.category()]).distinct().orderBy(f.category().ascending()),
+  ['distinct removes repeated rows', f => f.findAll([f.category()]).distinct().orderBy(f.category().ascending()),
     [['Finance'], ['Manufacturing'], ['Technology']]],
-  ['without distinct rows repeat', f => f.findAll(null, null, [f.category()]).orderBy(f.category().ascending()),
+  ['without distinct rows repeat', f => f.findAll([f.category()]).orderBy(f.category().ascending()),
     [['Finance'], ['Finance'], ['Manufacturing'], ['Technology'], ['Technology']]],
-  ['distinct keeps rows that differ in any column', f => f.findAll(null, null, [f.category(), f.name()]).distinct()
+  ['distinct keeps rows that differ in any column', f => f.findAll([f.category(), f.name()]).distinct()
     .orderBy(f.category().ascending(), f.name().ascending()).limit(3),
     [['Finance', 'Delta Ltd'], ['Finance', 'Gamma LLC'], ['Manufacturing', 'Acme Industries']]],
-  ['distinct with a filter', f => f.findAll(null, null, [f.category()], f.name().startsWith('Acme')).distinct()
+  ['distinct with a filter', f => f.findAll([f.category()], f.name().startsWith('Acme')).distinct()
     .orderBy(f.category().ascending()), [['Manufacturing'], ['Technology']]],
-  ['distinct applies before the limit', f => f.findAll(null, null, [f.category()]).distinct()
+  ['distinct applies before the limit', f => f.findAll([f.category()]).distinct()
     .orderBy(f.category().ascending()).limit(2), [['Finance'], ['Manufacturing']]],
 ];
 

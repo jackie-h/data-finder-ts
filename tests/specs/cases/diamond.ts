@@ -5,7 +5,7 @@ import type { RecordFinder } from '../../generated_examples/diamond/RecordFinder
 export const DIAMOND_FINDER_SPECS: SpecCase<RecordFinder>[] = [
   {
     name: 'all_records',
-    query: f => f.findAll(null, null, [f.id(), f.recordName()]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.recordName()]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Record Name'], rows: [
         [1, 'Alpha'],
         [2, 'Beta'],
@@ -14,35 +14,35 @@ export const DIAMOND_FINDER_SPECS: SpecCase<RecordFinder>[] = [
   },
   {
     name: 'filter_by_auditable_id',
-    query: f => f.findAll(null, null, [f.recordName()], f.id().eq(2)),
+    query: f => f.findAll([f.recordName()], f.id().eq(2)),
     expected: { columns: ['Record Name'], rows: [
         ['Beta'],
       ] },
   },
   {
     name: 'filter_by_created_at',
-    query: f => f.findAll(null, null, [f.recordName()], f.createdAt().eq('2024-03-01')),
+    query: f => f.findAll([f.recordName()], f.createdAt().eq('2024-03-01')),
     expected: { columns: ['Record Name'], rows: [
         ['Gamma'],
       ] },
   },
   {
     name: 'filter_by_updated_at',
-    query: f => f.findAll(null, null, [f.recordName()], f.updatedAt().eq('2024-06-01')),
+    query: f => f.findAll([f.recordName()], f.updatedAt().eq('2024-06-01')),
     expected: { columns: ['Record Name'], rows: [
         ['Alpha'],
       ] },
   },
   {
     name: 'filter_by_version',
-    query: f => f.findAll(null, null, [f.recordName(), f.version()], f.version().eq(1)),
+    query: f => f.findAll([f.recordName(), f.version()], f.version().eq(1)),
     expected: { columns: ['Record Name', 'Version'], rows: [
         ['Beta', 1],
       ] },
   },
   {
     name: 'full_hierarchy_projection',
-    query: f => f.findAll(null, null, [f.id(), f.createdAt(), f.updatedAt(), f.version(), f.recordName()], f.recordName().eq('Alpha')),
+    query: f => f.findAll([f.id(), f.createdAt(), f.updatedAt(), f.version(), f.recordName()], f.recordName().eq('Alpha')),
     expected: { columns: ['Id', 'Created At', 'Updated At', 'Version', 'Record Name'], rows: [
         [1, '2024-01-01', '2024-06-01', 3, 'Alpha'],
       ] },

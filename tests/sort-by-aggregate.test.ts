@@ -69,20 +69,20 @@ describe('against DuckDB', () => {
   const plain = (rows: unknown[][]) => rows.map(r => r.map(v => typeof v === 'bigint' ? Number(v) : v));
 
   it('an aggregate descending then a column', async () => {
-    const query = f.findAll(null, null, [f.category(), f.id().count()]).groupBy(f.category())
+    const query = f.findAll([f.category(), f.id().count()]).groupBy(f.category())
       .orderBy(f.id().count().descending(), f.category().ascending());
     expect(query.toSql()).toContain('ORDER BY COUNT(t0.id) DESC, t0.category ASC');
     expect(plain(await query.toRows())).toEqual([['Finance', 2], ['Technology', 2], ['Manufacturing', 1]]);
   });
 
   it('an aggregate ascending', async () => {
-    const rows = await f.findAll(null, null, [f.category(), f.id().count()]).groupBy(f.category())
+    const rows = await f.findAll([f.category(), f.id().count()]).groupBy(f.category())
       .orderBy(f.id().count().ascending(), f.category().descending()).toRows();
     expect(plain(rows)).toEqual([['Manufacturing', 1], ['Technology', 2], ['Finance', 2]]);
   });
 
   it('an aggregate with no groupBy', async () => {
-    const rows = await f.findAll(null, null, [f.category(), f.id().count().alias('N')])
+    const rows = await f.findAll([f.category(), f.id().count().alias('N')])
       .orderBy(f.id().count().alias('N').descending(), f.category().ascending()).toRows();
     expect(plain(rows)).toEqual([['Finance', 2], ['Technology', 2], ['Manufacturing', 1]]);
   });

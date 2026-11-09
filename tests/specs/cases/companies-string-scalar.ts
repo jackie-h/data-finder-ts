@@ -5,98 +5,98 @@ import type { CompanyFinder } from '../../generated_examples/companies/CompanyFi
 export const COMPANIES_STRING_SCALAR_SPECS: SpecCase<CompanyFinder>[] = [
   {
     name: 'upper',
-    query: f => f.findAll(null, null, [f.name().toUpperCase()], f.id().eq(2)),
+    query: f => f.findAll([f.name().toUpperCase()], f.id().eq(2)),
     expected: { columns: ['Upper Name'], rows: [
         ['BETA CORP'],
       ] },
   },
   {
     name: 'lower',
-    query: f => f.findAll(null, null, [f.name().toLowerCase()], f.id().eq(3)),
+    query: f => f.findAll([f.name().toLowerCase()], f.id().eq(3)),
     expected: { columns: ['Lower Name'], rows: [
         ['hello world'],
       ] },
   },
   {
     name: 'strip',
-    query: f => f.findAll(null, null, [f.name().trim()], f.id().eq(1)),
+    query: f => f.findAll([f.name().trim()], f.id().eq(1)),
     expected: { columns: ['Trim Name'], rows: [
         ['Acme Corp'],
       ] },
   },
   {
     name: 'lstrip',
-    query: f => f.findAll(null, null, [f.name().trimStart()], f.id().eq(1)),
+    query: f => f.findAll([f.name().trimStart()], f.id().eq(1)),
     expected: { columns: ['Trim Start Name'], rows: [
         ['Acme Corp  '],
       ] },
   },
   {
     name: 'rstrip',
-    query: f => f.findAll(null, null, [f.name().trimEnd()], f.id().eq(1)),
+    query: f => f.findAll([f.name().trimEnd()], f.id().eq(1)),
     expected: { columns: ['Trim End Name'], rows: [
         ['  Acme Corp'],
       ] },
   },
   {
     name: 'length',
-    query: f => f.findAll(null, null, [f.name().length()], f.id().eq(2)),
+    query: f => f.findAll([f.name().length()], f.id().eq(2)),
     expected: { columns: ['Length Name'], rows: [
         [9],
       ] },
   },
   {
     name: 'reverse',
-    query: f => f.findAll(null, null, [f.name().reverse()], f.id().eq(2)),
+    query: f => f.findAll([f.name().reverse()], f.id().eq(2)),
     expected: { columns: ['Reverse Name'], rows: [
         ['proc ateb'],
       ] },
   },
   {
     name: 'left_four',
-    query: f => f.findAll(null, null, [f.name().left(4)], f.id().eq(2)),
+    query: f => f.findAll([f.name().left(4)], f.id().eq(2)),
     expected: { columns: ['Left Name'], rows: [
         ['beta'],
       ] },
   },
   {
     name: 'right_four',
-    query: f => f.findAll(null, null, [f.name().right(4)], f.id().eq(2)),
+    query: f => f.findAll([f.name().right(4)], f.id().eq(2)),
     expected: { columns: ['Right Name'], rows: [
         ['corp'],
       ] },
   },
   {
     name: 'repeat_twice',
-    query: f => f.findAll(null, null, [f.category().repeat(2)], f.id().eq(1)),
+    query: f => f.findAll([f.category().repeat(2)], f.id().eq(1)),
     expected: { columns: ['Repeat Category'], rows: [
         ['TechnologyTechnology'],
       ] },
   },
   {
     name: 'replace',
-    query: f => f.findAll(null, null, [f.name().replace('corp', 'inc')], f.id().eq(2)),
+    query: f => f.findAll([f.name().replace('corp', 'inc')], f.id().eq(2)),
     expected: { columns: ['Replace Name'], rows: [
         ['beta inc'],
       ] },
   },
   {
     name: 'substring_from_six',
-    query: f => f.findAll(null, null, [f.name().substring(6)], f.id().eq(3)),
+    query: f => f.findAll([f.name().substring(6)], f.id().eq(3)),
     expected: { columns: ['Substring Name'], rows: [
         ['World'],
       ] },
   },
   {
     name: 'substring_zero_five',
-    query: f => f.findAll(null, null, [f.name().substring(0, 5)], f.id().eq(3)),
+    query: f => f.findAll([f.name().substring(0, 5)], f.id().eq(3)),
     expected: { columns: ['Substring Name'], rows: [
         ['Hello'],
       ] },
   },
   {
     name: 'expression_is_in',
-    query: f => f.findAll(null, null, [f.id()], f.name().substring(0, 4).isIn(['beta', 'Hell'])).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.name().substring(0, 4).isIn(['beta', 'Hell'])).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [2],
         [3],
@@ -104,35 +104,35 @@ export const COMPANIES_STRING_SCALAR_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'expression_is_not_in',
-    query: f => f.findAll(null, null, [f.id()], f.name().substring(0, 4).isNotIn(['beta', 'Hell'])).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.name().substring(0, 4).isNotIn(['beta', 'Hell'])).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
       ], skipGraphql: 'The GraphQL finder cannot filter on a string function' },
   },
   {
     name: 'slice_stop_only',
-    query: f => f.findAll(null, null, [f.name().left(4)], f.id().eq(2)),
+    query: f => f.findAll([f.name().left(4)], f.id().eq(2)),
     expected: { columns: ['Left Name'], rows: [
         ['beta'],
       ] },
   },
   {
     name: 'slice_negative_start',
-    query: f => f.findAll(null, null, [f.name().right(4)], f.id().eq(2)),
+    query: f => f.findAll([f.name().right(4)], f.id().eq(2)),
     expected: { columns: ['Right Name'], rows: [
         ['corp'],
       ] },
   },
   {
     name: 'slice_reverse',
-    query: f => f.findAll(null, null, [f.name().reverse()], f.id().eq(2)),
+    query: f => f.findAll([f.name().reverse()], f.id().eq(2)),
     expected: { columns: ['Reverse Name'], rows: [
         ['proc ateb'],
       ] },
   },
   {
     name: 'mul_operator',
-    query: f => f.findAll(null, null, [f.name().repeat(2)], f.id().eq(2)),
+    query: f => f.findAll([f.name().repeat(2)], f.id().eq(2)),
     expected: { columns: ['Repeat Name'], rows: [
         ['beta corpbeta corp'],
       ] },
