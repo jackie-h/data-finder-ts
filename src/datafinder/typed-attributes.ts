@@ -247,6 +247,9 @@ export class IntegerAttribute extends NumericAttribute {
     return new IntegerConstantOperation(Number(value));
   }
 
+  /** An integer column gives whole numbers, so `power` of it by a whole number is one too. */
+  isInteger(): boolean { return true; }
+
   /** Filter to rows where this attribute equals `value`. */
   eq(value: number | Comparand): ComparisonOperation {
     return this.compared(ComparisonOperator.EQUAL, value, () => new IntegerConstantOperation((value as number)));

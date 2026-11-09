@@ -325,6 +325,10 @@ export class ScalarFunctionOperation extends UnaryOperation implements Sortable 
     readonly displayName?: string,
     readonly secondArg?: number,
     readonly extraArgs: (string | number | boolean)[] = [],
+    /** The type the result is cast to, where the database's function gives another: an integer power is a `BIGINT`. */
+    readonly cast?: string,
+    /** Whether the result is a whole number, which an integer power of it is too. */
+    readonly integer: boolean = false,
   ) { super(element); }
 
   /** This expression as an operand of a comparison. */

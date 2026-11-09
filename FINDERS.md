@@ -140,6 +140,8 @@ The result of a function has the functions of its type, so they chain: `cf.name(
 
 A numeric column or expression has `.sin()`, `.cos()`, `.tan()`, `.asin()`, `.acos()`, `.atan()`, `.atan2(x)`, `.exp()` and `.log()` (the natural logarithm, `LN` in SQL). Angles are in radians. They are named "Sin Price" and so on, and chain like any other function.
 
+`.power(n)` of an integer column by a whole, non-negative `n` is an integer (SQL's `POWER` gives a double, so it is written `CAST(POWER(id, 2) AS BIGINT)`); `abs`, `ceil`, `floor` and `mod` keep an integer an integer and so does `length()`. Any other power is a double.
+
 ### Comparing with another column
 
 A column's comparisons (`eq`, `ne`, `gt`, `lt`, `gte`, `lte`) take another column or an expression as well as a value: `tf.price().gt(tf.cost().times(1.075))`, `tf.commitDate().lt(tf.receiptDate())`. `ne` is on every type. The date differences (`diffDays`, `diffMonths`, `diffYears`, and `diffHours`, `diffMinutes` and `diffSeconds` on a timestamp) take a column too: `tf.startDate().diffDays(tf.endDate())`.

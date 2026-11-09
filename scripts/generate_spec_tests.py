@@ -84,7 +84,6 @@ COLUMN_LABELS = {
 # Expectations of features the port does not have yet: generated, but skipped, with the reason.
 # Each is removed with the change that ports its feature.
 PENDING: dict[str, str] = {
-    'integer_power_is_an_integer': 'the type of an arithmetic result is not ported yet',
     'a_date_given_to_the_property_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
     'a_date_given_to_a_property_of_the_embedded_address_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
     'a_date_before_any_row_of_the_table_on_the_way_finds_no_country': 'dates through the tables a property passes are not ported yet',
