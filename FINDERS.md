@@ -246,6 +246,11 @@ as a column does (`eq`, `ne`, `lt`, `lte`, `gt`, `gte`), and `contains`, `starts
 expression that holds text, such as `f.name().toUpperCase().startsWith('AC')` or a joined text. The GraphQL runner
 throws `GraphQLClientComputationError` for `having`.
 
+`.not()` negates a condition, `f.name().startsWith('Acme').not()` (a negation of a negation is the condition itself), and
+`.matches(pattern)` is a regular expression searched anywhere in the text: `f.name().matches('^(Acme|Beta) .*p$')`. It is
+`REGEXP_MATCHES` in DuckDB, `~` in Postgres and `RLIKE` in Databricks; `contains`, `startsWith` and `endsWith` match their
+text literally. The GraphQL runner cannot push a negation or a regular expression and throws `GraphQLPushdownError`.
+
 `.countDistinct()` counts the different non-NULL values (`COUNT(DISTINCT column)`); use it with `.groupBy()` to count per group. The GraphQL runner does not compute aggregates on the client.
 
 `.join(separator, orderBy)` on a string attribute joins the values of a group into one text (`STRING_AGG`): `cf.findAll(null, null, [cf.category(), cf.name().join(', ', [cf.name().ascending()])]).groupBy(cf.category())`. `orderBy` is the order they are joined in; without it the order is not defined. Missing values are skipped.

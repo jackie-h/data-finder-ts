@@ -19,6 +19,7 @@ import {
   IsNotNullOperation,
   InOperation,
   NotInOperation,
+  NotOperation,
   AggregateOperation,
   AggregateOperator,
   ScalarFunctionOperation,
@@ -115,6 +116,7 @@ const COMPARISON_OPERATOR_STR: Record<ComparisonOperator, string> = {
   [ComparisonOperator.GREATER_THAN_OR_EQUAL_TO]: ' >= ',
   [ComparisonOperator.LIKE]: ' LIKE ',
   [ComparisonOperator.NOT_LIKE]: ' NOT LIKE ',
+  [ComparisonOperator.MATCHES]: ' MATCHES ',   // written by the dialect, see buildFilter
 };
 
 const AGGREGATE_SQL_NAMES: Partial<Record<AggregateOperator, string>> = {
@@ -244,7 +246,7 @@ class RenderedSql extends RelationalOperationElement {
 function isCondition(op: unknown): boolean {
   return op instanceof ComparisonOperation || op instanceof LogicalOperation || op instanceof IsNullOperation
     || op instanceof IsNotNullOperation || op instanceof InOperation || op instanceof NotInOperation
-    || op instanceof ExistsOperation || op instanceof NotExistsOperation;
+    || op instanceof ExistsOperation || op instanceof NotExistsOperation || op instanceof NotOperation;
 }
 
 function sqlOperationToString(operation: RelationalOperationElement, d: SqlDialect): string {
@@ -506,7 +508,7 @@ function walkRefs(
   } else if (op instanceof ScalarFunctionOperation || op instanceof DateExtractOperation || op instanceof DateTruncOperation ||
              op instanceof DateArithmeticOperation ||
              op instanceof IsNullOperation || op instanceof IsNotNullOperation ||
-             op instanceof InOperation || op instanceof NotInOperation) {
+             op instanceof InOperation || op instanceof NotInOperation || op instanceof NotOperation) {
     walkRefs((op as UnaryOperation).element, visit, visitExists);
   } else if (op instanceof Alias) {
     walkRefs(op.element, visit, visitExists);
@@ -1114,6 +1116,7 @@ class SQLQueryGenerator {
       }
       return sql;
     }
+    if (op instanceof NotOperation) return 'NOT (' + this.buildFilter(op.element) + ')';
     if (op instanceof IsNotNullOperation) return this.buildFilter(op.element) + ' IS NOT NULL';
     if (op instanceof IsNullOperation) return this.buildFilter(op.element) + ' IS NULL';
     if (op instanceof LogicalOperation) {
@@ -1122,6 +1125,9 @@ class SQLQueryGenerator {
       if (needsParentheses(op, op.left)) left = '(' + left + ')';
       if (needsParentheses(op, op.right)) right = '(' + right + ')';
       return left + LOGICAL_OPERATOR_STR[op.operator] + right;
+    }
+    if (op instanceof ComparisonOperation && op.operator === ComparisonOperator.MATCHES) {
+      return this._dialect.regexMatches(this.buildFilter(op.left), this.buildFilter(op.right));
     }
     if (op instanceof ComparisonOperation) {
       let sql = this.buildFilter(op.left) + COMPARISON_OPERATOR_STR[op.operator] + this.buildFilter(op.right);
