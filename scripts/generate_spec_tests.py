@@ -84,14 +84,8 @@ COLUMN_LABELS = {
 # Expectations of features the port does not have yet: generated, but skipped, with the reason.
 # Each is removed with the change that ports its feature.
 PENDING: dict[str, str] = {
-    'expression_is_in': 'isIn on an expression is not ported yet',
-    'expression_is_not_in': 'isIn on an expression is not ported yet',
     'integer_power_is_an_integer': 'the type of an arithmetic result is not ported yet',
     'aggregate_over_a_window_keeps_every_row': 'an aggregate over a window is not told from a grouping aggregate yet',
-    'filter_on_a_year': 'comparing a date part, a difference or a moved date is not ported yet',
-    'filter_on_a_month_in_a_list': 'comparing a date part, a difference or a moved date is not ported yet',
-    'filter_on_a_difference': 'comparing a date part, a difference or a moved date is not ported yet',
-    'filter_on_a_moved_datetime': 'comparing a date part, a difference or a moved date is not ported yet',
     'a_date_given_to_the_property_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
     'a_date_given_to_a_property_of_the_embedded_address_reaches_the_table_on_the_way': 'dates through the tables a property passes are not ported yet',
     'a_date_before_any_row_of_the_table_on_the_way_finds_no_country': 'dates through the tables a property passes are not ported yet',
