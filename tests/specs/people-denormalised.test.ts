@@ -27,6 +27,6 @@ describe('PERSON_DENORMALISED_FINDER_SPECS', () => {
   const f = new PersonFinder();
 
   for (const c of PERSON_DENORMALISED_FINDER_SPECS) {
-    it.skipIf(c.expected.pending !== undefined)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
