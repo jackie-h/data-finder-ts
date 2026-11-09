@@ -230,6 +230,8 @@ ef.findAll([ef.firstName(), ef.projects({ code: 'ALPHA' }).name()])
 
 A related-finder accessor takes the dates it is read at as a second argument, when they are not the query's: `tf.account(undefined, { processingTime: '2023-12-01 12:00:00' }).name()`. The first argument is the property values to filter by (see Filtering a join by property). The dates are used for the milestoned table the navigation reaches and for every step below it unless that step is given its own. A date given to a navigation is a point in time, so it ends a range the query asked for. `businessDate` and `processingTime` take a `Date` or a string.
 
+A GraphQL finder takes them too: `branch.accounts(undefined, { processingTime })` sends `accounts(asOf: "...")` with the relation, using the argument names of the milestone the related query declares. A query with no milestone takes no date and the accessor throws a `TypeError`; one relation selected at two different dates throws `GraphQLUnsupportedError`. A class with no milestone has a `findAll(columns, filter)` with no dates, so a date is given to the relation that reaches the milestoned query.
+
 ### Existence filters
 
 `exists()` and `notExists()` on a related finder keep only rows that do (or don't) have a match through that join:

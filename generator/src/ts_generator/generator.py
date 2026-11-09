@@ -111,15 +111,18 @@ def _scheme_milestoning_columns(table: Table) -> list:
     return [c for c in table.columns if c.name in names]
 
 
-def parent_expr(join: Join, parent: str) -> str:
+def parent_expr(join: Join, parent: str, with_dates: bool = False) -> str:
     """The parent step of the join to a property's class: ``parent`` itself, or, when the property is mapped through
-    other tables first, ``parent`` followed by a step through each of them."""
+    other tables first, ``parent`` followed by a step through each of them. ``with_dates`` gives each of those steps the
+    ``dates`` the property was asked for with."""
     if not join.via:
         return parent
     # The columns of a step through a class-less table are written without key flags, as the data-finder specs run them
     # (their expected SQL has the join's own order, not the key-first order the flags would give).
     hops = ", ".join(f"[{column_code(lhs, False)}, {table_code(rhs.table)}, {column_code(rhs, False)}]" for lhs, rhs in join.via)
-    return f"viaJoins({parent}, [{hops}])"
+    dates = (", dates?.businessDate == null ? null : convertDate(dates.businessDate)"
+             ", dates?.processingTime == null ? null : convertProcessingDate(dates.processingTime)") if with_dates else ""
+    return f"viaJoins({parent}, [{hops}]{dates})"
 
 
 def display_name(prop: Property) -> str:

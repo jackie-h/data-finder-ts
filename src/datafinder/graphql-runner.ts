@@ -336,6 +336,8 @@ interface FieldNode {
   children: Map<string, FieldNode>;
   many: boolean;
   filters?: Record<string, unknown>;
+  /** The dates the relation is read at, by argument name. */
+  args?: Record<string, string>;
 }
 
 function filtersToWhere(filters: Record<string, unknown>): string {
@@ -362,11 +364,16 @@ export function buildFieldsStr(
       else if (JSON.stringify(node.filters) !== JSON.stringify(seg.filters)) {
         throw new GraphQLUnsupportedError(`The relation ${seg.name} is selected with different filters`);
       }
+      if (node.args === undefined) node.args = seg.args;
+      else if (JSON.stringify(node.args) !== JSON.stringify(seg.args)) {
+        throw new GraphQLUnsupportedError(`The relation ${seg.name} is selected at different dates`);
+      }
       children = node.children;
     }
   }
 
   const render = (children: Map<string, FieldNode>): string => [...children].map(([name, node]) => {
+    const arguments_ = Object.entries(node.args ?? {}).map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
     let args = '';
     if (node.filters && Object.keys(node.filters).length > 0) {
       if (!node.many) {
@@ -377,8 +384,9 @@ export function buildFieldsStr(
         throw new GraphQLPushdownError(
           'The endpoint declares no filter convention, so a relation cannot be filtered on the server');
       }
-      args = `(${convention.filterArg}: ${filtersToWhere(node.filters)})`;
+      arguments_.push(`${convention.filterArg}: ${filtersToWhere(node.filters)}`);
     }
+    if (arguments_.length > 0) args = `(${arguments_.join(', ')})`;
     return node.children.size > 0 ? `${name}${args} { ${render(node.children)} }` : `${name}${args}`;
   }).join(' ');
 

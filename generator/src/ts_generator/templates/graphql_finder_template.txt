@@ -1,4 +1,5 @@
-import { GraphQLQuery, GraphQLEndpoint, associationSegment{% if milestone_class(cm.query.milestone) %}, {{milestone_class(cm.query.milestone)}}{% endif %} } from '@model/graphql_mapping';
+import { GraphQLQuery, GraphQLEndpoint, associationSegment, GraphQLBiTemporalMilestone, GraphQLBusinessDateMilestone, GraphQLProcessingMilestone } from '@model/graphql_mapping';
+import type { NavigationDates } from '@datafinder/finder';
 import { NoOperation, Operation, RelationalOperationElement } from '@model/relational';
 import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
 import type { Attribute } from '@datafinder/attribute';
@@ -49,8 +50,8 @@ class {{target_cm.clazz.name}}RelatedFinder {
 
 {% elif is_association_mapping(tpm) and class_mappings_by_name.get(tpm.property.type.name) %}
   /** {{display_name(tpm.property)}} */
-  {{to_ts_name(tpm.property)}}(filter?: {{tpm.property.type.name}}Filter): {{tpm.property.type.name}}RelatedFinder {
-    const segment = associationSegment('{{association_name(tpm)}}', {{association_many(tpm)}}, filter ?? {}, {{tpm.property.type.name}}RelatedFinder.FIELDS);
+  {{to_ts_name(tpm.property)}}(filter?: {{tpm.property.type.name}}Filter, dates?: NavigationDates): {{tpm.property.type.name}}RelatedFinder {
+    const segment = associationSegment('{{association_name(tpm)}}', {{association_many(tpm)}}, filter ?? {}, {{tpm.property.type.name}}RelatedFinder.FIELDS, {{milestone_expr(class_mappings_by_name.get(tpm.property.type.name).query.milestone)}}, dates);
     return new {{tpm.property.type.name}}RelatedFinder(this.parentField + '.' + segment, this.displayPrefix + ' {{association_display(tpm)}}');
   }
 
@@ -96,9 +97,9 @@ export class {{cm.clazz.name}}Finder {
 
 {% elif is_association_mapping(pm) and class_mappings_by_name.get(pm.property.type.name) %}
   /** {{display_name(pm.property)}} */
-  {{to_ts_name(pm.property)}}(filter?: {{pm.property.type.name}}Filter): {{pm.property.type.name}}RelatedFinder {
-    if (filter) {
-      const segment = associationSegment('{{association_name(pm)}}', {{association_many(pm)}}, filter, {{pm.property.type.name}}RelatedFinder.FIELDS);
+  {{to_ts_name(pm.property)}}(filter?: {{pm.property.type.name}}Filter, dates?: NavigationDates): {{pm.property.type.name}}RelatedFinder {
+    if (filter || dates) {
+      const segment = associationSegment('{{association_name(pm)}}', {{association_many(pm)}}, filter ?? {}, {{pm.property.type.name}}RelatedFinder.FIELDS, {{milestone_expr(class_mappings_by_name.get(pm.property.type.name).query.milestone)}}, dates);
       return new {{pm.property.type.name}}RelatedFinder(segment, '{{association_display(pm)}}');
     }
     return this._{{to_ts_name(pm.property)}};
