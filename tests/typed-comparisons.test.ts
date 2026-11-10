@@ -4,12 +4,16 @@
  */
 import { describe, expect, it } from 'vitest';
 import { concat, Table } from '../src/model/relational';
-import { DateAttribute, DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
+import { DateAttribute, DecimalAttribute, DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
+import {
+  DecimalFunctionOperation, DoubleFunctionOperation, IntegerFunctionOperation, StringFunctionOperation,
+} from '../src/datafinder';
 
 const t = new Table('t', []);
 const name = new StringAttribute('Name', 'name', 'VARCHAR', t);
 const age = new IntegerAttribute('Age', 'age', 'INT', t);
 const price = new DoubleAttribute('Price', 'price', 'DOUBLE', t);
+const cost = new DecimalAttribute('Cost', 'cost', 'DECIMAL', t);
 const born = new DateAttribute('Born', 'born', 'DATE', t);
 
 describe('typed comparisons', () => {
@@ -22,6 +26,23 @@ describe('typed comparisons', () => {
     expect(born.diffDays(new Date('2000-01-01')).lt(30)).toBeDefined();
     expect(age.plus(1).gt(price)).toBeDefined();
     expect(name.eq(concat(name, 'x'))).toBeDefined();
+  });
+
+  it('a function gives the type it is typed as', () => {
+    expect(name.toUpperCase()).toBeInstanceOf(StringFunctionOperation);
+    expect(name.length()).toBeInstanceOf(IntegerFunctionOperation);
+    expect(age.abs()).toBeInstanceOf(IntegerFunctionOperation); // an integer stays an integer
+    expect(cost.abs()).toBeInstanceOf(DecimalFunctionOperation); // a decimal a decimal
+    expect(price.abs()).toBeInstanceOf(DoubleFunctionOperation);
+    expect(age.sqrt()).toBeInstanceOf(DoubleFunctionOperation); // a root is a double
+    expect(age.power(2)).toBeInstanceOf(IntegerFunctionOperation);
+    expect(age.power(-1)).toBeInstanceOf(DoubleFunctionOperation);
+    expect(cost.power(2)).toBeInstanceOf(DoubleFunctionOperation);
+    expect(age.orElse(0)).toBeInstanceOf(IntegerFunctionOperation);
+    expect(name.toUpperCase().eq('X')).toBeDefined();
+    expect(name.length().gt(3)).toBeDefined();
+    expect(price.round(2).lte(age.abs())).toBeDefined();
+    expect(born.orElse('2000-01-01').lt(born)).toBeDefined();
   });
 
   it('refuses a comparison across types', () => {
@@ -45,6 +66,20 @@ describe('typed comparisons', () => {
     concat(name, 'x').lte('a');
     // @ts-expect-error isIn takes values of the type
     born.year().isIn(['2000']);
+    // @ts-expect-error a text function has no order
+    name.toUpperCase().gt('a');
+    // @ts-expect-error a length is a number
+    name.length().eq('3');
+    // @ts-expect-error text is not a number
+    name.toUpperCase().plus(1);
+    // @ts-expect-error a text function has no numeric functions
+    name.toUpperCase().abs();
+    // @ts-expect-error a number's default is a number
+    age.orElse('none');
+    // @ts-expect-error text is not a number, whatever function it went through
+    price.eq(name.toLowerCase());
+    // @ts-expect-error a root is a number
+    age.sqrt().eq('2');
     };
     expect(refused).toBeTypeOf('function');
     expect('gt' in concat(name, 'x')).toBe(false);

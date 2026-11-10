@@ -938,7 +938,7 @@ class SQLQueryGenerator {
         op.window ? this._rewriteWindowSpec(op.window) : undefined);
     }
     if (op instanceof ScalarFunctionOperation) {
-      return new ScalarFunctionOperation(this._rewriteOperation(op.element), op.func, op.displayName, op.secondArg, op.extraArgs, op.cast, op.integer);
+      return new ScalarFunctionOperation(this._rewriteOperation(op.element), op.func, op.displayName, op.secondArg, op.extraArgs, op.cast);
     }
     if (op instanceof DateExtractOperation) {
       return new DateExtractOperation(this._rewriteOperation(op.element), op.part, op.displayName);

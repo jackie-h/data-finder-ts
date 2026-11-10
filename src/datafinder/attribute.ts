@@ -109,13 +109,16 @@ export abstract class Attribute implements Aliasable {
     return new AggregateOperation(this.cwj(), AggregateOperator.COUNT_DISTINCT, this._displayName + ' Count Distinct');
   }
 
-  /** The value, or `defaultValue` when it is NULL: `name().orElse('N/A')`. Like `COALESCE` in SQL. */
-  orElse(defaultValue: string | number | boolean): ScalarFunctionOperation {
+  /** @internal The extra arguments of `COALESCE` for an `orElse` default, which is a string, a number or a boolean. */
+  protected orElseArguments(defaultValue: string | number | boolean): (string | number | boolean)[] {
     if (!['string', 'number', 'boolean'].includes(typeof defaultValue)) {
       throw new TypeError(`An orElse default is a string, number or boolean, not ${defaultValue === null ? 'null' : typeof defaultValue}`);
     }
-    return new ScalarFunctionOperation(this.cwj(), ScalarFunction.COALESCE, 'Or Else ' + this._displayName, undefined, [defaultValue]);
+    return [defaultValue];
   }
+
+  /** @internal The label of an `orElse` result. */
+  protected orElseLabel(): string { return 'Or Else ' + this._displayName; }
 
   /** Sort this attribute in ascending order. Pass to `orderBy` or a window function's `orderBy`. */
   ascending(): SortOperation {

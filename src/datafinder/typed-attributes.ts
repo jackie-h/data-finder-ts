@@ -1,5 +1,8 @@
 import { Attribute, AttributeValue, Comparand, comparandOperand } from './attribute';
-import { NumericFunctions, StringFunctions } from './scalar-functions';
+import {
+  NumericFunctions, StringFunctions, StringFunctionOperation, IntegerFunctionOperation, DoubleFunctionOperation,
+  DecimalFunctionOperation, DateFunctionOperation, BooleanFunctionOperation,
+} from './scalar-functions';
 import { Relation, Operand, DateValue } from '../model/relational';
 import {
   ComparisonOperation,
@@ -55,6 +58,11 @@ abstract class MinMax {
 
 export class StringAttribute extends Attribute {
   declare readonly valueType?: string;
+
+  /** The value, or `defaultValue` when it is NULL: `.orElse(...)`. Like `COALESCE` in SQL. */
+  orElse(defaultValue: string): StringFunctionOperation {
+    return new StringFunctionOperation(this.cwj(), ScalarFunction.COALESCE, this.orElseLabel(), undefined, this.orElseArguments(defaultValue));
+  }
 
   constructor(
     displayName: string,
@@ -146,10 +154,20 @@ export abstract class NumericAttribute extends Attribute {
   }
 }
 
-export interface NumericAttribute extends MinMax, NumericFunctions, Arithmetic {}
-applyMixins(NumericAttribute, [MinMax, NumericFunctions, Arithmetic]);
+export interface NumericAttribute extends MinMax, Arithmetic {}
+applyMixins(NumericAttribute, [MinMax, Arithmetic]);
 
 export class DoubleAttribute extends NumericAttribute {
+  /** @internal A function of this column that gives a double. */
+  sameType(func: ScalarFunction, label: string, secondArg?: number): DoubleFunctionOperation {
+    return new DoubleFunctionOperation(this.cwj(), func, label, secondArg);
+  }
+
+  /** The value, or `defaultValue` when it is NULL: `.orElse(0)`. Like `COALESCE` in SQL. */
+  orElse(defaultValue: number): DoubleFunctionOperation {
+    return new DoubleFunctionOperation(this.cwj(), ScalarFunction.COALESCE, this.orElseLabel(), undefined, this.orElseArguments(defaultValue));
+  }
+
   constructor(
     displayName: string,
     columnName: string,
@@ -191,10 +209,23 @@ export class DoubleAttribute extends NumericAttribute {
   }
 }
 
+export interface DoubleAttribute extends NumericFunctions<DoubleFunctionOperation> {}
+applyMixins(DoubleAttribute, [NumericFunctions]);
+
 export const FloatAttribute = DoubleAttribute;
 export type FloatAttribute = DoubleAttribute;
 
 export class DecimalAttribute extends NumericAttribute {
+  /** @internal A function of this column that gives a decimal. */
+  sameType(func: ScalarFunction, label: string, secondArg?: number): DecimalFunctionOperation {
+    return new DecimalFunctionOperation(this.cwj(), func, label, secondArg);
+  }
+
+  /** The value, or `defaultValue` when it is NULL: `.orElse(0)`. Like `COALESCE` in SQL. */
+  orElse(defaultValue: number): DecimalFunctionOperation {
+    return new DecimalFunctionOperation(this.cwj(), ScalarFunction.COALESCE, this.orElseLabel(), undefined, this.orElseArguments(defaultValue));
+  }
+
   constructor(
     displayName: string,
     columnName: string,
@@ -236,7 +267,20 @@ export class DecimalAttribute extends NumericAttribute {
   }
 }
 
+export interface DecimalAttribute extends NumericFunctions<DecimalFunctionOperation> {}
+applyMixins(DecimalAttribute, [NumericFunctions]);
+
 export class IntegerAttribute extends NumericAttribute {
+  /** @internal A function of this column that gives a integer. */
+  sameType(func: ScalarFunction, label: string, secondArg?: number): IntegerFunctionOperation {
+    return new IntegerFunctionOperation(this.cwj(), func, label, secondArg);
+  }
+
+  /** The value, or `defaultValue` when it is NULL: `.orElse(0)`. Like `COALESCE` in SQL. */
+  orElse(defaultValue: number): IntegerFunctionOperation {
+    return new IntegerFunctionOperation(this.cwj(), ScalarFunction.COALESCE, this.orElseLabel(), undefined, this.orElseArguments(defaultValue));
+  }
+
   constructor(
     displayName: string,
     columnName: string,
@@ -254,6 +298,7 @@ export class IntegerAttribute extends NumericAttribute {
 
   /** An integer column gives whole numbers, so `power` of it by a whole number is one too. */
   isInteger(): boolean { return true; }
+
 
   /** Filter to rows where this attribute equals `value`. */
   eq(value: Operand<number>): ComparisonOperation {
@@ -281,8 +326,16 @@ export class IntegerAttribute extends NumericAttribute {
   }
 }
 
+export interface IntegerAttribute extends NumericFunctions<IntegerFunctionOperation> {}
+applyMixins(IntegerAttribute, [NumericFunctions]);
+
 export class BooleanAttribute extends Attribute {
   declare readonly valueType?: boolean;
+
+  /** The value, or `defaultValue` when it is NULL: `.orElse(...)`. Like `COALESCE` in SQL. */
+  orElse(defaultValue: boolean): BooleanFunctionOperation {
+    return new BooleanFunctionOperation(this.cwj(), ScalarFunction.COALESCE, this.orElseLabel(), undefined, this.orElseArguments(defaultValue));
+  }
 
   constructor(
     displayName: string,
@@ -336,6 +389,11 @@ function temporalConstant(value: Date | string): DateConstantOperation | DateTim
 
 export class DateAttribute extends Attribute {
   declare readonly valueType?: DateValue;
+
+  /** The value, or `defaultValue` when it is NULL: `.orElse(...)`. Like `COALESCE` in SQL. */
+  orElse(defaultValue: string): DateFunctionOperation {
+    return new DateFunctionOperation(this.cwj(), ScalarFunction.COALESCE, this.orElseLabel(), undefined, this.orElseArguments(defaultValue));
+  }
 
   constructor(
     displayName: string,
@@ -421,6 +479,11 @@ export class DateAttribute extends Attribute {
 
 export class DateTimeAttribute extends Attribute {
   declare readonly valueType?: DateValue;
+
+  /** The value, or `defaultValue` when it is NULL: `.orElse(...)`. Like `COALESCE` in SQL. */
+  orElse(defaultValue: string): DateFunctionOperation {
+    return new DateFunctionOperation(this.cwj(), ScalarFunction.COALESCE, this.orElseLabel(), undefined, this.orElseArguments(defaultValue));
+  }
 
   constructor(
     displayName: string,
