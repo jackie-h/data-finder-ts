@@ -5,16 +5,16 @@ import { constant, when } from '../src/datafinder';
 import { DateAttribute, DateTimeAttribute, DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, DateOnly, JoinOperation, JoinTreeNodeOperation, NoOperation, Table, concat } from '../src/model/relational';
 
-const text = new StringAttribute('Name', 'name', 'VARCHAR', 't');
-const other = new StringAttribute('Other', 'other', 'VARCHAR', 't');
-const n = new IntegerAttribute('Id', 'id', 'INT', 't');
-const price = new DoubleAttribute('Price', 'price', 'DOUBLE', 't');
-const day = new DateAttribute('Day', 'day', 'DATE', 't');
-const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', 't');
-const table = new Table('t', ['name', 'other', 'id', 'price', 'day', 'at'].map(c => new Column(c, 'VARCHAR', 't')));
+const text = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
+const other = new StringAttribute('Other', 'other', 'VARCHAR', new Table('t', []));
+const n = new IntegerAttribute('Id', 'id', 'INT', new Table('t', []));
+const price = new DoubleAttribute('Price', 'price', 'DOUBLE', new Table('t', []));
+const day = new DateAttribute('Day', 'day', 'DATE', new Table('t', []));
+const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', new Table('t', []));
+const table = new Table('t', ['name', 'other', 'id', 'price', 'day', 'at'].map(c => new Column(c, 'VARCHAR', new Table('t', []))));
 
-const join = new JoinOperation('Child', new Table('u', []), new Column('id', 'INT', 't'), new Column('fk', 'INT', 'u'));
-const child = new StringAttribute('Child Name', 'name', 'VARCHAR', 'u', new JoinTreeNodeOperation(join));
+const join = new JoinOperation('Child', new Table('u', []), new Column('id', 'INT', new Table('t', [])), new Column('fk', 'INT', new Table('u', [])));
+const child = new StringAttribute('Child Name', 'name', 'VARCHAR', new Table('u', []), new JoinTreeNodeOperation(join));
 
 type Query = (dialect: DialectName) => string;
 const q = (columns: Parameters<typeof toSql>[2], filter: Parameters<typeof toSql>[4] = new NoOperation(),

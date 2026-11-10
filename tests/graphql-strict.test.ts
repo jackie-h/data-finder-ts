@@ -1,3 +1,4 @@
+import { Table } from '@model/relational';
 /**
  * The GraphQL runner pushes filters, sorts and limits to the server and fails when it cannot.
  * Mirrors datafinder_graphql/tests/test_graphql_strict.py from the Python project.
@@ -25,9 +26,9 @@ import {
 
 const CONVENTION = new GraphQLFilterConvention('where', 'order_by', 'limit');
 
-const name = () => new StringAttribute('Account Name', 'account.name', 'STRING', 'trades');
-const price = () => new DoubleAttribute('Price', 'price', 'DOUBLE', 'trades');
-const projectsName = () => new StringAttribute('Project Name', 'projects[].name', 'STRING', 'employees');
+const name = () => new StringAttribute('Account Name', 'account.name', 'STRING', new Table('trades', []));
+const price = () => new DoubleAttribute('Price', 'price', 'DOUBLE', new Table('trades', []));
+const projectsName = () => new StringAttribute('Project Name', 'projects[].name', 'STRING', new Table('employees', []));
 const fieldComparedToField = () =>
   new ComparisonOperation(price().cwj(), ComparisonOperator.EQUAL, price().cwj());
 
@@ -130,7 +131,7 @@ describe('to-many relations', () => {
 
 describe('filtering a relation', () => {
   const filteredProjectsName = (filters: Record<string, unknown>) =>
-    new StringAttribute('Project Name', formatPathSegment('projects', true, filters) + '.name', 'STRING', 'employees');
+    new StringAttribute('Project Name', formatPathSegment('projects', true, filters) + '.name', 'STRING', new Table('employees', []));
 
   it('sends a filtered to-many relation a where argument', () => {
     expect(buildFieldsStr([filteredProjectsName({ code: 'ALPHA' })], CONVENTION))
@@ -143,7 +144,7 @@ describe('filtering a relation', () => {
   });
 
   it('fails to filter a to-one relation, which takes no arguments on a server', () => {
-    const attr = new StringAttribute('Account Name', formatPathSegment('account', false, { name: 'Acme' }) + '.name', 'STRING', 'trades');
+    const attr = new StringAttribute('Account Name', formatPathSegment('account', false, { name: 'Acme' }) + '.name', 'STRING', new Table('trades', []));
     expect(() => buildFieldsStr([attr], CONVENTION)).toThrow(GraphQLPushdownError);
     expect(() => buildFieldsStr([attr], CONVENTION)).toThrow(/to-one relation account/);
   });
@@ -159,17 +160,17 @@ describe('filtering a relation', () => {
 
   it('sends the dates a relation is read at as its arguments', () => {
     const dated = (date: string) => new StringAttribute('Account Name',
-      formatPathSegment('account', false, {}, { asOf: date }) + '.name', 'STRING', 'trades');
+      formatPathSegment('account', false, {}, { asOf: date }) + '.name', 'STRING', new Table('trades', []));
     expect(buildFieldsStr([dated('2021-06-01T00:00:00')], CONVENTION)).toBe('account(asOf: "2021-06-01T00:00:00") { name }');
     const filtered = new StringAttribute('Project Name',
-      formatPathSegment('projects', true, { code: 'ALPHA' }, { asOf: '2021-06-01' }) + '.name', 'STRING', 'employees');
+      formatPathSegment('projects', true, { code: 'ALPHA' }, { asOf: '2021-06-01' }) + '.name', 'STRING', new Table('employees', []));
     expect(buildFieldsStr([filtered], CONVENTION))
       .toBe('projects(asOf: "2021-06-01", where: { code: { _eq: "ALPHA" } }) { name }');
   });
 
   it('fails when one relation is selected at different dates', () => {
     const dated = (date: string) => new StringAttribute('Account Name',
-      formatPathSegment('account', false, {}, { asOf: date }) + '.name', 'STRING', 'trades');
+      formatPathSegment('account', false, {}, { asOf: date }) + '.name', 'STRING', new Table('trades', []));
     expect(() => buildFieldsStr([dated('2021-06-01'), dated('2022-06-01')], CONVENTION)).toThrow(/different dates/);
   });
 });

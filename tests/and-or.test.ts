@@ -4,9 +4,9 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, ExistsOperation, JoinOperation, JoinTreeNodeOperation, NoOperation, NotExistsOperation, Operation, Table } from '../src/model/relational';
 
-const table = new Table('trades', [new Column('symbol', 'VARCHAR', 'trades'), new Column('price', 'INT', 'trades')]);
-const symbol = new StringAttribute('Symbol', 'symbol', 'VARCHAR', 'trades');
-const price = new IntegerAttribute('Price', 'price', 'INT', 'trades');
+const table = new Table('trades', [new Column('symbol', 'VARCHAR', new Table('trades', [])), new Column('price', 'INT', new Table('trades', []))]);
+const symbol = new StringAttribute('Symbol', 'symbol', 'VARCHAR', new Table('trades', []));
+const price = new IntegerAttribute('Price', 'price', 'INT', new Table('trades', []));
 const where = (op: Operation) => toSql(null, null, [symbol], table, op).split(' WHERE ')[1];
 
 describe('or', () => {
@@ -38,7 +38,7 @@ describe('or', () => {
   });
 
   it('exists and notExists combine with or', () => {
-    const node = new JoinTreeNodeOperation(new JoinOperation('Child', new Table('child', []), new Column('id', 'INT', 'trades'), new Column('fk', 'INT', 'child')));
+    const node = new JoinTreeNodeOperation(new JoinOperation('Child', new Table('child', []), new Column('id', 'INT', new Table('trades', [])), new Column('fk', 'INT', new Table('child', []))));
     expect(new ExistsOperation(node).or(price.eq(1)).operator).toBe('OR');
     expect(new NotExistsOperation(node).or(price.eq(1)).operator).toBe('OR');
   });

@@ -10,19 +10,19 @@ import { Column, NoOperation, Table } from '../src/model/relational';
 
 describe('the SQL', () => {
   it('a default', () => {
-    const attr = new StringAttribute('Name', 'name', 'VARCHAR', 't');
-    expect(toSql(null, null, [attr.orElse('N/A')], new Table('t', [new Column('name', 'VARCHAR', 't')]), new NoOperation()))
+    const attr = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
+    expect(toSql(null, null, [attr.orElse('N/A')], new Table('t', [new Column('name', 'VARCHAR', new Table('t', []))]), new NoOperation()))
       .toBe(`SELECT COALESCE(t0.name, 'N/A') AS "Or Else Name" FROM t AS t0`);
   });
 
   it('a number', () => {
-    const attr = new IntegerAttribute('Age', 'age', 'INT', 't');
-    expect(toSql(null, null, [attr.orElse(0)], new Table('t', [new Column('age', 'INT', 't')]), new NoOperation()))
+    const attr = new IntegerAttribute('Age', 'age', 'INT', new Table('t', []));
+    expect(toSql(null, null, [attr.orElse(0)], new Table('t', [new Column('age', 'INT', new Table('t', []))]), new NoOperation()))
       .toBe(`SELECT COALESCE(t0.age, 0) AS "Or Else Age" FROM t AS t0`);
   });
 
   it('a default is a string, number or boolean', () => {
-    expect(() => new StringAttribute('Name', 'name', 'VARCHAR', 't').orElse(new Date() as never)).toThrow(TypeError);
+    expect(() => new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', [])).orElse(new Date() as never)).toThrow(TypeError);
   });
 });
 

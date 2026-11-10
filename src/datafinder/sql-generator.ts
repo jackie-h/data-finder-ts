@@ -54,6 +54,9 @@ import {
   ArithmeticOperator,
   containsAggregate,
   containsAggregateOrWindow,
+  Relation,
+  NamedRelation,
+  TableAlias,
 } from '../model/relational';
 import {
   MilestonedTable,
@@ -68,11 +71,6 @@ import {
 } from '../model/milestoning';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
 import { DialectName, SqlDialect, dialectOf } from './dialect';
-
-/** A name for a relation in a query: a table's name, or the query that stands for it, written `(SELECT ...)`. */
-class TableAlias {
-  constructor(readonly table: string | QuerySpecification, readonly alias: string) {}
-}
 
 class TableAliasColumn extends RelationalOperationElement {
   constructor(readonly column: Column, readonly tableAlias: TableAlias) { super(); }
@@ -89,7 +87,7 @@ class Join {
   condition(): string {
     let [first, second] = [this.source, this.target];
     if (second.column.primaryKey && !first.column.primaryKey) [first, second] = [second, first];
-    return first.tableAlias.alias + '.' + first.column.name + ' = ' + second.tableAlias.alias + '.' + second.column.name;
+    return first.tableAlias.name + '.' + first.column.name + ' = ' + second.tableAlias.name + '.' + second.column.name;
   }
 }
 
@@ -252,7 +250,7 @@ function isCondition(op: unknown): boolean {
 
 function sqlOperationToString(operation: RelationalOperationElement, d: SqlDialect): string {
   if (operation instanceof TableAliasColumn) {
-    return operation.tableAlias.alias + '.' + operation.column.name;
+    return operation.tableAlias.name + '.' + operation.column.name;
   }
   if (operation instanceof WindowFunctionOperation) {
     const fn = WINDOW_SQL_NAMES[operation.func];
@@ -372,14 +370,14 @@ function processingPredicate(
     return snapshotAttribute(mc, joinNode).eq(processingDatetime);
   }
   if (!hasProcessingRange(mc)) return null;
-  const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
-  const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
+  const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.ownerRelation, joinNode);
+  const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.ownerRelation, joinNode);
   return new LogicalOperation(startAt.lte(processingDatetime), LogicalOperator.AND, openEndClause(endAt, processingDatetime, mc.infiniteDatetime));
 }
 
 function snapshotAttribute(mc: SingleProcessingDatetimeColumn, joinNode?: JoinTreeNodeOperation): DateTimeAttribute {
   const column = mc.processingDatetimeColumn;
-  return new DateTimeAttribute('processing_datetime', column.name, column.type, column.table!.qualifiedName, joinNode);
+  return new DateTimeAttribute('processing_datetime', column.name, column.type, column.ownerRelation, joinNode);
 }
 
 /** The table's processing range overlaps the processing range, or its processing snapshot column is within it. */
@@ -394,8 +392,8 @@ function processingRangePredicate(
     return new LogicalOperation(snapshot.gte(processingFrom), LogicalOperator.AND, snapshot.lte(processingTo));
   }
   if (!hasProcessingRange(mc)) return null;
-  const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.table!.qualifiedName, joinNode);
-  const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.table!.qualifiedName, joinNode);
+  const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.ownerRelation, joinNode);
+  const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.ownerRelation, joinNode);
   return new LogicalOperation(startAt.lte(processingTo), LogicalOperator.AND, openEndClause(endAt, processingFrom, mc.infiniteDatetime));
 }
 
@@ -407,12 +405,12 @@ function businessPredicate(
 ): Operation | null {
   if (businessDate === null) return null;
   if (mc instanceof BusinessDateRangeColumns) {
-    const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
-    const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
+    const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.ownerRelation, joinNode);
+    const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.ownerRelation, joinNode);
     return new LogicalOperation(dateFrom.lte(businessDate), LogicalOperator.AND, openEndClause(dateTo, businessDate, mc.infiniteDatetime));
   }
   if (mc instanceof BusinessDateAndProcessingTemporalColumns || mc instanceof SingleBusinessDateColumn) {
-    const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
+    const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.ownerRelation, joinNode);
     return businessAtt.eq(businessDate);
   }
   return null;
@@ -427,12 +425,12 @@ function businessRangePredicate(
 ): Operation | null {
   if (businessDateFrom === null || businessDateTo === null) return null;
   if (mc instanceof BusinessDateRangeColumns) {
-    const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.table!.qualifiedName, joinNode);
-    const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.table!.qualifiedName, joinNode);
+    const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.ownerRelation, joinNode);
+    const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.ownerRelation, joinNode);
     return new LogicalOperation(dateFrom.lte(businessDateTo), LogicalOperator.AND, openEndClause(dateTo, businessDateFrom, mc.infiniteDatetime));
   }
   if (mc instanceof BusinessDateAndProcessingTemporalColumns || mc instanceof SingleBusinessDateColumn) {
-    const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.table!.qualifiedName, joinNode);
+    const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.ownerRelation, joinNode);
     return new LogicalOperation(businessAtt.gte(businessDateFrom), LogicalOperator.AND, businessAtt.lte(businessDateTo));
   }
   return null;
@@ -543,7 +541,7 @@ function walkWindowSpec(window: WindowSpecification, visit: RefVisitor, visitExi
 function buildJoinFilterFromProperties(
   node: JoinTreeNodeOperation | undefined,
   filter: Record<string, unknown>,
-  columnMap: Record<string, [string, string, string]>,
+  columnMap: Record<string, [string, string, Relation]>,
 ): Operation {
   const ops: Operation[] = [];
   for (const [key, value] of Object.entries(filter)) {
@@ -771,7 +769,7 @@ class SQLQueryGenerator {
     this._joinFilters = query.joinFilters;
     this._subSelects = query.subSelects;
     if (this._rootTable !== undefined) {
-      this._from.add(this._tableAliasForTable(this._rootTable.qualifiedName, this._rootTable.qualifiedName));
+      this._from.add(this._tableAliasForTable(this._rootTable));
     }
     this.processSelect([...query.columns]);
     this._where = this.buildFilter(this._guarded(query.filter));
@@ -829,13 +827,13 @@ class SQLQueryGenerator {
   }
 
   private _columnToString(column: Column): string {
-    return this._tableAliasForTable(column.owner!, column.owner!).alias + '.' + column.name;
+    return this._tableAliasForTable(column.ownerRelation).name + '.' + column.name;
   }
 
   private _attrToColString(attr: Attribute): string {
     const { column, parent } = this._resolve(attr);
-    const ta = this._tableAliasForTable(column.owner!, parent ?? column.owner!);
-    return ta.alias + '.' + column.name;
+    const ta = this._tableAliasForTable(column.ownerRelation, parent);
+    return ta.name + '.' + column.name;
   }
 
   private _collectRequiredJoins(op: RelationalOperationElement | null | undefined, out: Map<JoinTreeNodeOperation, JoinTreeNodeOperation>): void {
@@ -915,10 +913,10 @@ class SQLQueryGenerator {
   private _rewriteOperation(op: RelationalOperationElement): RelationalOperationElement {
     if (op instanceof Attribute || op instanceof ColumnWithJoin) {
       const { column, parent } = this._resolve(op);
-      return new TableAliasColumn(column, this._tableAliasForTable(column.owner!, parent ?? column.owner!));
+      return new TableAliasColumn(column, this._tableAliasForTable(column.ownerRelation, parent));
     }
     if (op instanceof Column) {
-      const ta = this._tableAliasForTable(op.owner!, op.owner!);
+      const ta = this._tableAliasForTable(op.ownerRelation);
       return new TableAliasColumn(op, ta);
     }
     if (op instanceof AggregateOperation) {
@@ -991,9 +989,9 @@ class SQLQueryGenerator {
       const { column, parent: node } = this._resolve(col);
       let ta: TableAlias;
       if (node !== undefined) {
-        ta = this._tableAliasForTable(column.owner!, node);
+        ta = this._tableAliasForTable(column.ownerRelation, node);
       } else {
-        ta = this._tableAliasForTable(column.owner!, column.owner!);
+        ta = this._tableAliasForTable(column.ownerRelation);
         this._from.add(ta);
       }
       this._select.push(new Alias(new TableAliasColumn(column, ta), col.displayName()));
@@ -1018,9 +1016,9 @@ class SQLQueryGenerator {
       const node = colNested.parent;
       let ta: TableAlias;
       if (node !== undefined) {
-        ta = this._tableAliasForTable(colNested.column.owner!, node);
+        ta = this._tableAliasForTable(colNested.column.ownerRelation, node);
       } else {
-        ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
+        ta = this._tableAliasForTable(colNested.column.ownerRelation);
         this._from.add(ta);
       }
       const alias = col.displayName ?? col.operator + ' ' + findColumn(col).column.name;
@@ -1037,7 +1035,7 @@ class SQLQueryGenerator {
       // rewritten as a whole: either side may be a column or an expression
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? findColumn(col).column.name));
     } else if (col instanceof Column) {
-      const ta = this._tableAliasForTable(col.owner!, col.owner!);
+      const ta = this._tableAliasForTable(col.ownerRelation);
       this._from.add(ta);
       this._select.push(new Alias(new TableAliasColumn(col, ta), col.name));
     } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation) {
@@ -1045,9 +1043,9 @@ class SQLQueryGenerator {
       const node = colNested.parent;
       let ta: TableAlias;
       if (node !== undefined) {
-        ta = this._tableAliasForTable(colNested.column.owner!, node);
+        ta = this._tableAliasForTable(colNested.column.ownerRelation, node);
       } else {
-        ta = this._tableAliasForTable(colNested.column.owner!, colNested.column.owner!);
+        ta = this._tableAliasForTable(colNested.column.ownerRelation);
         this._from.add(ta);
       }
       const alias = (col as DateExtractOperation).displayName ?? findColumn(col as RelationalOperationElement).column.name;
@@ -1073,7 +1071,7 @@ class SQLQueryGenerator {
     } else if (col instanceof ConstantOperation) {
       this._select.push(new Alias(col, 'Constant'));
     } else if (col instanceof CountAllOperation) {
-      if (col.table !== '') this._from.add(this._tableAliasForTable(col.table, col.table));
+      if (col.table !== '') this._from.add(this._tableAliasForTable(new Table(col.table, [])));
       this._select.push(new Alias(col, 'Count'));
     }
   }
@@ -1085,13 +1083,13 @@ class SQLQueryGenerator {
 
     const join = node.join;
     const left = join.left;
-    const srcTa = this._tableAliasForTable(left.owner!, node.parent ?? left.owner!);
+    const srcTa = this._tableAliasForTable(left.ownerRelation, node.parent);
     if (node.parent === undefined) this._from.add(srcTa);
     const sc = new TableAliasColumn(left, srcTa);
     const right = join.right;
-    const tc = new TableAliasColumn(right, this._tableAliasForTable(right.owner!, node));
+    const tc = new TableAliasColumn(right, this._tableAliasForTable(right.ownerRelation, node));
     // a sub-select carries the step's filter itself, so it is not repeated in the ON clause
-    const queryFilter = tc.tableAlias.table instanceof QuerySpecification ? undefined : this._joinFilters.get(node);
+    const queryFilter = tc.tableAlias.relation instanceof QuerySpecification ? undefined : this._joinFilters.get(node);
     const filterOp = join.filter !== undefined && queryFilter !== undefined
       ? new LogicalOperation(join.filter as Operation, LogicalOperator.AND, queryFilter)
       : join.filter ?? queryFilter;
@@ -1158,34 +1156,38 @@ class SQLQueryGenerator {
       const { column, parent: node } = this._resolve(op);
       let ta: TableAlias;
       if (node !== undefined) {
-        ta = this._tableAliasForTable(column.owner!, node);
+        ta = this._tableAliasForTable(column.ownerRelation, node);
         this._addJoin(node);
       } else {
-        ta = this._tableAliasForTable(column.owner!, column.owner!);
+        ta = this._tableAliasForTable(column.ownerRelation);
       }
-      return ta.alias + '.' + column.name;
+      return ta.name + '.' + column.name;
     }
     if (op instanceof Column) {
-      const ta = this._tableAliasForTable(op.owner!, op.owner!);
-      return ta.alias + '.' + op.name;
+      const ta = this._tableAliasForTable(op.ownerRelation);
+      return ta.name + '.' + op.name;
     }
     throw new Error('Unknown operation in buildFilter: ' + op.constructor.name);
   }
 
-  private _tableAliasForTable(table: string, key: unknown): TableAlias {
-    if (this._tableAliasesByTable.has(key)) {
-      return this._tableAliasesByTable.get(key)!;
+  /** The alias a relation is read under: one per join node, and one per table (by its qualified name) outside a join. */
+  private _tableAliasForTable(table: Relation, key?: JoinTreeNodeOperation): TableAlias {
+    if (!(table instanceof NamedRelation)) throw new TypeError('A relation read by name needs a name: ' + table.constructor.name);
+    const cacheKey = key ?? table.qualifiedName;
+    if (this._tableAliasesByTable.has(cacheKey)) {
+      return this._tableAliasesByTable.get(cacheKey)!;
     }
     const subSelect = key instanceof JoinTreeNodeOperation ? this._subSelects.get(key) : undefined;
     const ta = new TableAlias(subSelect ?? table, 't' + this._tableAliasIncr++);
-    this._tableAliasesByTable.set(key, ta);
+    this._tableAliasesByTable.set(cacheKey, ta);
     return ta;
   }
 
   /** What follows FROM or JOIN: the table's name, or the query in parentheses, written by a generator of its own that numbers its aliases after this one's. */
   private _relationSql(alias: TableAlias): string {
-    const relation = alias.table;
-    if (typeof relation === 'string') return relation;
+    const relation = alias.relation;
+    if (relation instanceof Table) return relation.qualifiedName;
+    if (!(relation instanceof QuerySpecification)) throw new TypeError('Cannot read ' + relation.constructor.name + ' in a query');
     const nested = new SQLQueryGenerator(this._dialect, this._tableAliasIncr);
     nested.generate(relation);
     this._tableAliasIncr = nested._tableAliasIncr;
@@ -1194,13 +1196,13 @@ class SQLQueryGenerator {
 
   buildQueryString(): string {
     const joins = this._join.map(j =>
-      ' LEFT OUTER JOIN ' + this._relationSql(j.target.tableAlias) + ' AS ' + j.target.tableAlias.alias +
+      ' LEFT OUTER JOIN ' + this._relationSql(j.target.tableAlias) + ' AS ' + j.target.tableAlias.name +
       ' ON (' + j.condition() +
       (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
     return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca, this._dialect)).join(',') +
-      ' FROM ' + Array.from(this._from).map(ta => this._relationSql(ta) + ' AS ' + ta.alias).join(',') +
+      ' FROM ' + Array.from(this._from).map(ta => this._relationSql(ta) + ' AS ' + ta.name).join(',') +
       joins.join('') +
       this._buildWhere() +
       this._buildGroupBy() +

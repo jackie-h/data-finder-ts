@@ -1,6 +1,6 @@
 import { GraphQLQuery, GraphQLEndpoint, associationSegment, GraphQLBiTemporalMilestone, GraphQLBusinessDateMilestone, GraphQLProcessingMilestone } from '@model/graphql_mapping';
 import type { NavigationDates } from '@datafinder/finder';
-import { NoOperation, Operation, RelationalOperationElement } from '@model/relational';
+import { NoOperation, Operation, RelationalOperationElement, Table } from '@model/relational';
 import { convertInputsAndSelect, convertInputsAndSelectForDateRange, FinderResult } from '@datafinder/runner';
 import type { Attribute } from '@datafinder/attribute';
 {% if attr_types %}
@@ -36,7 +36,7 @@ class {{target_cm.clazz.name}}RelatedFinder {
   constructor(private readonly parentField: string, private readonly displayPrefix: string) {
 {% for tpm in target_cm.property_mappings %}
 {% if is_primitive_mapping(tpm) %}
-    this._{{to_ts_name(tpm.property)}} = new {{tpm.property.type.name}}Attribute(displayPrefix + ' {{display_name(tpm.property)}}', parentField + '.{{tpm.target.name}}', '{{type_str(tpm.property.type)}}', '{{cm.query.name}}');
+    this._{{to_ts_name(tpm.property)}} = new {{tpm.property.type.name}}Attribute(displayPrefix + ' {{display_name(tpm.property)}}', parentField + '.{{tpm.target.name}}', '{{type_str(tpm.property.type)}}', new Table('{{cm.query.name}}', []));
 {% endif %}
 {% endfor %}
   }
@@ -81,7 +81,7 @@ export class {{cm.clazz.name}}Finder {
 {% endif %}
 {% for pm in cm.property_mappings %}
 {% if is_primitive_mapping(pm) %}
-    this._{{to_ts_name(pm.property)}} = new {{pm.property.type.name}}Attribute('{{display_name(pm.property)}}', '{{pm.target.name}}', '{{type_str(pm.property.type)}}', '{{cm.query.name}}');
+    this._{{to_ts_name(pm.property)}} = new {{pm.property.type.name}}Attribute('{{display_name(pm.property)}}', '{{pm.target.name}}', '{{type_str(pm.property.type)}}', this._query);
 {% elif is_association_mapping(pm) and class_mappings_by_name.get(pm.property.type.name) %}
     this._{{to_ts_name(pm.property)}} = new {{pm.property.type.name}}RelatedFinder('{{association_path(pm)}}', '{{association_display(pm)}}');
 {% endif %}

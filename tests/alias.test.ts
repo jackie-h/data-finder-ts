@@ -16,9 +16,9 @@ import { csvTable, startGraphQLServer } from './csv-graphql-server';
 import type { Attribute } from '../src/datafinder/attribute';
 
 const select = (...columns: (Attribute | RelationalOperationElement)[]) =>
-  toSql(null, null, columns, new Table('t', [new Column('a', 'INT', 't')]), new NoOperation());
-const id = new IntegerAttribute('Id', 'id', 'INT', 't');
-const name = new StringAttribute('Name', 'name', 'VARCHAR', 't');
+  toSql(null, null, columns, new Table('t', [new Column('a', 'INT', new Table('t', []))]), new NoOperation());
+const id = new IntegerAttribute('Id', 'id', 'INT', new Table('t', []));
+const name = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
 
 describe('alias in SQL', () => {
   it('an attribute takes the alias as its name', () => {
@@ -67,9 +67,9 @@ describe('alias in SQL', () => {
 });
 
 describe('alias of a condition', () => {
-  const a = new StringAttribute('A', 'a', 'VARCHAR', 't');
-  const b = new IntegerAttribute('B', 'b', 'INT', 't');
-  const table = new Table('t', [new Column('a', 'VARCHAR', 't'), new Column('b', 'INT', 't')]);
+  const a = new StringAttribute('A', 'a', 'VARCHAR', new Table('t', []));
+  const b = new IntegerAttribute('B', 'b', 'INT', new Table('t', []));
+  const table = new Table('t', [new Column('a', 'VARCHAR', new Table('t', [])), new Column('b', 'INT', new Table('t', []))]);
 
   it('a condition can be named', () => {
     const sql = toSql(null, null, [a.isNull().alias('Missing'), a.isNotNull().alias('There'), b.gt(1).alias('Big'),

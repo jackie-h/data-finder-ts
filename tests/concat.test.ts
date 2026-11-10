@@ -9,9 +9,9 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { ConcatOperation, Column, NoOperation, Table, concat } from '../src/model/relational';
 
-const a = new StringAttribute('A', 'a', 'VARCHAR', 't');
-const b = new StringAttribute('B', 'b', 'VARCHAR', 't');
-const table = new Table('t', [new Column('a', 'VARCHAR', 't'), new Column('b', 'VARCHAR', 't')]);
+const a = new StringAttribute('A', 'a', 'VARCHAR', new Table('t', []));
+const b = new StringAttribute('B', 'b', 'VARCHAR', new Table('t', []));
+const table = new Table('t', [new Column('a', 'VARCHAR', new Table('t', [])), new Column('b', 'VARCHAR', new Table('t', []))]);
 const select = (...columns: Parameters<typeof toSql>[2]) => toSql(null, null, columns, table, new NoOperation());
 
 describe('the SQL', () => {
@@ -44,7 +44,7 @@ describe('the SQL', () => {
   });
 
   it('a column of numbers still adds', () => {
-    const n = new IntegerAttribute('N', 'n', 'INT', 't');
+    const n = new IntegerAttribute('N', 'n', 'INT', new Table('t', []));
     expect(select(n.plus(1))).toBe('SELECT t0.n + 1 AS "Expression" FROM t AS t0');
   });
 

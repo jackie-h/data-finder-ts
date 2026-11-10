@@ -1,3 +1,4 @@
+import { Table } from '@model/relational';
 /**
  * E2E tests: finance model mapped to GraphQL, queried through a mock HTTP server.
  * Mirrors datafinder_graphql/tests/test_graphql_e2e.py from the Python project.
@@ -17,8 +18,8 @@ import { NoOperation } from '../src/model/relational';
 
 class AccountGraphQLFinder {
   private readonly _query: GraphQLQuery;
-  private readonly _id = new IntegerAttribute('Id', 'id', 'INT', 'accounts');
-  private readonly _name = new StringAttribute('Name', 'name', 'STRING', 'accounts');
+  private readonly _id = new IntegerAttribute('Id', 'id', 'INT', new Table('accounts', []));
+  private readonly _name = new StringAttribute('Name', 'name', 'STRING', new Table('accounts', []));
 
   constructor(query: GraphQLQuery) { this._query = query; }
 
@@ -32,8 +33,8 @@ class AccountGraphQLFinder {
 
 class InstrumentGraphQLFinder {
   private readonly _query: GraphQLQuery;
-  private readonly _symbol = new StringAttribute('Symbol', 'symbol', 'STRING', 'instruments');
-  private readonly _price = new FloatAttribute('Price', 'price', 'FLOAT', 'instruments');
+  private readonly _symbol = new StringAttribute('Symbol', 'symbol', 'STRING', new Table('instruments', []));
+  private readonly _price = new FloatAttribute('Price', 'price', 'FLOAT', new Table('instruments', []));
 
   constructor(query: GraphQLQuery) { this._query = query; }
 
@@ -47,8 +48,8 @@ class InstrumentGraphQLFinder {
 
 class TradeGraphQLFinder {
   private readonly _query: GraphQLQuery;
-  private readonly _symbol = new StringAttribute('Symbol', 'symbol', 'STRING', 'trades');
-  private readonly _price = new FloatAttribute('Price', 'price', 'FLOAT', 'trades');
+  private readonly _symbol = new StringAttribute('Symbol', 'symbol', 'STRING', new Table('trades', []));
+  private readonly _price = new FloatAttribute('Price', 'price', 'FLOAT', new Table('trades', []));
 
   constructor(query: GraphQLQuery) { this._query = query; }
 
@@ -62,10 +63,10 @@ class TradeGraphQLFinder {
 
 class ContractualPositionGraphQLFinder {
   private readonly _query: GraphQLQuery;
-  private readonly _businessDate = new StringAttribute('Business Date', 'businessDate', 'STRING', 'contractualPositions');
-  private readonly _instrument = new StringAttribute('Instrument', 'instrument', 'STRING', 'contractualPositions');
-  private readonly _counterparty = new IntegerAttribute('Counterparty', 'counterparty', 'INT', 'contractualPositions');
-  private readonly _quantity = new FloatAttribute('Quantity', 'quantity', 'FLOAT', 'contractualPositions');
+  private readonly _businessDate = new StringAttribute('Business Date', 'businessDate', 'STRING', new Table('contractualPositions', []));
+  private readonly _instrument = new StringAttribute('Instrument', 'instrument', 'STRING', new Table('contractualPositions', []));
+  private readonly _counterparty = new IntegerAttribute('Counterparty', 'counterparty', 'INT', new Table('contractualPositions', []));
+  private readonly _quantity = new FloatAttribute('Quantity', 'quantity', 'FLOAT', new Table('contractualPositions', []));
 
   constructor(query: GraphQLQuery) { this._query = query; }
 

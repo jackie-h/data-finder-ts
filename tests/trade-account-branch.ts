@@ -29,20 +29,20 @@ const branchTable = new Table('ref_data.branch', []);
 
 export const accountJoin = new JoinOperation(
   'Account', accountTable,
-  new Column('account_id', 'INT', 'trading.trades'), new Column('ID', 'INT', 'ref_data.account_master'),
+  new Column('account_id', 'INT', new Table('trading.trades', [])), new Column('ID', 'INT', new Table('ref_data.account_master', [])),
 );
 export const accountNode = new JoinTreeNodeOperation(accountJoin);
 export const branchNode = new JoinTreeNodeOperation(
   new JoinOperation(
     'Branch', branchTable,
-    new Column('BRANCH_ID', 'INT', 'ref_data.account_master'), new Column('ID', 'INT', 'ref_data.branch'),
+    new Column('BRANCH_ID', 'INT', new Table('ref_data.account_master', [])), new Column('ID', 'INT', new Table('ref_data.branch', [])),
   ),
   accountNode,
 );
 
-export const symbol = new StringAttribute('Symbol', 'sym', 'VARCHAR', 'trading.trades');
-export const accountName = new StringAttribute('Account Name', 'ACCT_NAME', 'VARCHAR', 'ref_data.account_master', accountNode);
-export const branchCity = new StringAttribute('Branch City', 'CITY', 'VARCHAR', 'ref_data.branch', branchNode);
+export const symbol = new StringAttribute('Symbol', 'sym', 'VARCHAR', new Table('trading.trades', []));
+export const accountName = new StringAttribute('Account Name', 'ACCT_NAME', 'VARCHAR', new Table('ref_data.account_master', []), accountNode);
+export const branchCity = new StringAttribute('Branch City', 'CITY', 'VARCHAR', new Table('ref_data.branch', []), branchNode);
 
 export const find = (
   processingAt: string,

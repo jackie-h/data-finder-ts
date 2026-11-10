@@ -3,7 +3,7 @@ import { DoubleAttribute } from '../src/datafinder/typed-attributes';
 import { toSql } from '../src/datafinder/sql-generator';
 import { Column, NoOperation, Table } from '../src/model/relational';
 
-const price = new DoubleAttribute('Price', 'price', 'DOUBLE', 't');
+const price = new DoubleAttribute('Price', 'price', 'DOUBLE', new Table('t', []));
 const sql = (column: any) => toSql(null, null, [column], new Table('t', [new Column('price', 'DOUBLE')]), new NoOperation());
 
 describe('trigonometric and exponential functions', () => {

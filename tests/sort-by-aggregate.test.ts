@@ -9,9 +9,9 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, NoOperation, SortDirection, Table } from '../src/model/relational';
 
-const key = new StringAttribute('Category', 'category', 'VARCHAR', 't');
-const n = new IntegerAttribute('Id', 'id', 'INT', 't');
-const table = new Table('t', [new Column('category', 'VARCHAR', 't'), new Column('id', 'INT', 't')]);
+const key = new StringAttribute('Category', 'category', 'VARCHAR', new Table('t', []));
+const n = new IntegerAttribute('Id', 'id', 'INT', new Table('t', []));
+const table = new Table('t', [new Column('category', 'VARCHAR', new Table('t', [])), new Column('id', 'INT', new Table('t', []))]);
 
 describe('the SQL', () => {
   it('orders by an aggregate', () => {

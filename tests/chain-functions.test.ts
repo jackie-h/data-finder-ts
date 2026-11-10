@@ -18,9 +18,9 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { ComparisonOperation, Column, NoOperation, Table } from '../src/model/relational';
 
-const name = new StringAttribute('Name', 'name', 'VARCHAR', 't');
-const price = new IntegerAttribute('Price', 'price', 'INT', 't');
-const table = new Table('t', [new Column('name', 'VARCHAR', 't'), new Column('price', 'INT', 't')]);
+const name = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
+const price = new IntegerAttribute('Price', 'price', 'INT', new Table('t', []));
+const table = new Table('t', [new Column('name', 'VARCHAR', new Table('t', [])), new Column('price', 'INT', new Table('t', []))]);
 const select = (...columns: Parameters<typeof toSql>[2]) => toSql(null, null, columns, table, new NoOperation());
 const where = (op: ComparisonOperation) => toSql(null, null, [name], table, op).split(' WHERE ')[1];
 

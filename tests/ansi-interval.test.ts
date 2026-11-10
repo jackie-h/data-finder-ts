@@ -4,9 +4,9 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { DateAttribute, DateTimeAttribute } from '../src/datafinder/typed-attributes';
 import { Column, NoOperation, Table } from '../src/model/relational';
 
-const day = new DateAttribute('Day', 'day', 'DATE', 't');
-const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', 't');
-const table = new Table('t', [new Column('day', 'DATE', 't'), new Column('at', 'TIMESTAMP', 't')]);
+const day = new DateAttribute('Day', 'day', 'DATE', new Table('t', []));
+const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', new Table('t', []));
+const table = new Table('t', [new Column('day', 'DATE', new Table('t', [])), new Column('at', 'TIMESTAMP', new Table('t', []))]);
 const sql = (column: Parameters<typeof toSql>[2][number]) => toSql(null, null, [column], table, new NoOperation());
 
 describe('an interval is quoted', () => {

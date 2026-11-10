@@ -1,4 +1,4 @@
-import { DateOnly } from './relational';
+import { DateOnly, NamedRelation, RelationalOperationElement } from './relational';
 
 /** The GraphQL argument names an endpoint uses for server-side push-down of filters, sorts and limits. */
 export class GraphQLFilterConvention {
@@ -36,12 +36,15 @@ export type GraphQLMilestone =
   | GraphQLBusinessDateMilestone
   | GraphQLBiTemporalMilestone;
 
-export class GraphQLQuery {
+/** A named query of a GraphQL endpoint: the relation its fields are read from. */
+export class GraphQLQuery extends NamedRelation {
   constructor(
-    readonly name: string,
+    name: string,
     readonly endpoint: GraphQLEndpoint,
     readonly milestone?: GraphQLMilestone,
-  ) {}
+  ) { super(name); }
+
+  get columns(): readonly RelationalOperationElement[] { return []; }
 }
 
 export class GraphQLField {

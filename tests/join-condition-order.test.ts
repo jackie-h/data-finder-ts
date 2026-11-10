@@ -11,8 +11,8 @@ import { Column, JoinOperation, JoinTreeNodeOperation, NoOperation, Table } from
 function sql(keyOnTarget: boolean): string {
   const person = new Table('person', []);
   const firm = new Table('firm', []);
-  const join = new JoinOperation('Firm', firm, new Column('FIRMID', 'INT', 'person'), new Column('ID', 'INT', 'firm', keyOnTarget));
-  const name = new StringAttribute('Name', 'NAME', 'VARCHAR', 'firm', new JoinTreeNodeOperation(join));
+  const join = new JoinOperation('Firm', firm, new Column('FIRMID', 'INT', new Table('person', [])), new Column('ID', 'INT', new Table('firm', []), keyOnTarget));
+  const name = new StringAttribute('Name', 'NAME', 'VARCHAR', new Table('firm', []), new JoinTreeNodeOperation(join));
   return toSql(null, null, [name], person, new NoOperation());
 }
 
@@ -27,8 +27,8 @@ describe('the SQL', () => {
 
   it('a key on the source stays first', () => {
     const person = new Table('person', []);
-    const join = new JoinOperation('Firm', new Table('firm', []), new Column('ID', 'INT', 'person', true), new Column('FIRMID', 'INT', 'firm'));
-    const name = new StringAttribute('Name', 'NAME', 'VARCHAR', 'firm', new JoinTreeNodeOperation(join));
+    const join = new JoinOperation('Firm', new Table('firm', []), new Column('ID', 'INT', new Table('person', []), true), new Column('FIRMID', 'INT', new Table('firm', [])));
+    const name = new StringAttribute('Name', 'NAME', 'VARCHAR', new Table('firm', []), new JoinTreeNodeOperation(join));
     expect(toSql(null, null, [name], person, new NoOperation()).endsWith('ON (t0.ID = t1.FIRMID)')).toBe(true);
   });
 });

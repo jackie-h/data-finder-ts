@@ -14,10 +14,10 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { DoubleAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { ArithmeticOperation, Column, NoOperation, Table } from '../src/model/relational';
 
-const a = new DoubleAttribute('A', 'a', 'DOUBLE', 't');
-const b = new DoubleAttribute('B', 'b', 'DOUBLE', 't');
+const a = new DoubleAttribute('A', 'a', 'DOUBLE', new Table('t', []));
+const b = new DoubleAttribute('B', 'b', 'DOUBLE', new Table('t', []));
 const select = (...columns: Parameters<typeof toSql>[2]) =>
-  toSql(null, null, columns, new Table('t', [new Column('a', 'DOUBLE', 't'), new Column('b', 'DOUBLE', 't')]), new NoOperation());
+  toSql(null, null, columns, new Table('t', [new Column('a', 'DOUBLE', new Table('t', [])), new Column('b', 'DOUBLE', new Table('t', []))]), new NoOperation());
 const one = (expression: ArithmeticOperation) => select(expression).replace(/^SELECT (.*) AS "Expression" FROM t AS t0$/, '$1');
 
 describe('the SQL', () => {
@@ -62,15 +62,15 @@ describe('the SQL', () => {
   });
 
   it('a function that gives text is not a number', () => {
-    const upper = new StringAttribute('Name', 'name', 'VARCHAR', 't').toUpperCase();
+    const upper = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', [])).toUpperCase();
     expect(() => (upper as unknown as { plus(n: number): unknown }).plus(1)).toThrow(/does not give a number/);
     expect(() => a.plus(upper as never)).toThrow(/does not give a number/);
   });
 
   it('a result can be named, sorted and compared', () => {
     expect(select(a.times(2).alias('Double'))).toBe('SELECT t0.a * 2 AS "Double" FROM t AS t0');
-    expect(toSql(null, null, [a], new Table('t', [new Column('a', 'DOUBLE', 't')]), a.times(2).gte(8)).split(' WHERE ')[1]).toBe('t0.a * 2 >= 8');
-    expect(toSql(null, null, [a], new Table('t', [new Column('a', 'DOUBLE', 't')]), new NoOperation(), [a.times(2).descending()]))
+    expect(toSql(null, null, [a], new Table('t', [new Column('a', 'DOUBLE', new Table('t', []))]), a.times(2).gte(8)).split(' WHERE ')[1]).toBe('t0.a * 2 >= 8');
+    expect(toSql(null, null, [a], new Table('t', [new Column('a', 'DOUBLE', new Table('t', []))]), new NoOperation(), [a.times(2).descending()]))
       .toContain('ORDER BY t0.a * 2 DESC');
   });
 });

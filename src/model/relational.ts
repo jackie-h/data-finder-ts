@@ -422,19 +422,44 @@ export class DateDiffOperation extends UnaryOperation implements Sortable {
 }
 
 export class Column extends RelationalOperationElement {
-  table?: Table;
+  /**
+   * The relation the column belongs to, as in Legend. A Table gives the columns it is made of their owner, so a column
+   * that is only in a table's list needs none.
+   */
+  owner?: Relation;
   /** Whether the column may hold NULL. As in Legend, a primary key is never null. */
   readonly nullable: boolean;
 
   constructor(
     readonly name: string,
     readonly type: string,
-    readonly owner?: string,
+    owner?: Relation,
     readonly primaryKey: boolean = false,
     nullable: boolean = true,
   ) {
     super();
+    if (typeof owner === 'string') {
+      throw new TypeError(`A column is owned by a Relation, not by the name '${owner}': give the table`);
+    }
+    this.owner = owner;
     this.nullable = nullable && !primaryKey;
+  }
+
+  /** The relation the column belongs to. Throws when it has none: it is not a column of any relation. */
+  get ownerRelation(): Relation {
+    if (this.owner === undefined) {
+      throw new Error(`Column '${this.name}' has no owner: it is not a column of any relation, so there is nothing to read it from`);
+    }
+    return this.owner;
+  }
+
+  /** What the owner is called where it is read: a table's qualified name. */
+  get ownerName(): string {
+    const owner = this.ownerRelation;
+    if (!(owner instanceof NamedRelation)) {
+      throw new TypeError(`Column '${this.name}' belongs to ${owner.constructor.name}, which has no name to read it by`);
+    }
+    return owner.qualifiedName;
   }
 }
 
@@ -497,7 +522,7 @@ export class Table extends NamedRelation {
         throw new Error(`Duplicate column name '${col.name}' in table '${name}'`);
       }
       this._columnsByName.set(col.name, col);
-      col.table = this;
+      col.owner = this;
     }
     schema?.tables.push(this);
   }
@@ -513,12 +538,23 @@ export class Table extends NamedRelation {
   }
 }
 
+/**
+ * A relation under a name where it is used, as in Legend and as ANSI SQL's `<table reference>` with its
+ * `<correlation name>`: `(query) AS t1`. It has the columns of the relation it names; what reads those columns says
+ * which alias they belong to by its name. A table is already named, so this is for a relation that is not: a query.
+ */
+export class TableAlias extends NamedRelation {
+  constructor(readonly relation: Relation, name: string) { super(name); }
+
+  get columns(): readonly RelationalOperationElement[] { return this.relation.columns; }
+}
+
 export class JoinOperation {
   filter?: RelationalOperationElement;
   /** Property-equality filters on the join target (property id -> value), set by a related finder given a filter. */
   filterKwargs: Record<string, unknown> = {};
-  /** Maps property ids to [column, type, table] for `filterKwargs`. */
-  filterColumnMap: Record<string, [string, string, string]> = {};
+  /** Maps property ids to [column, type, owner] for `filterKwargs`. */
+  filterColumnMap: Record<string, [string, string, Relation]> = {};
 
   constructor(
     readonly name: string,

@@ -1,5 +1,6 @@
 import {
   Column,
+  Relation,
   ComparisonOperation,
   ComparisonOperator,
   AggregateOperation,
@@ -39,7 +40,7 @@ export function comparandOperand(value: Comparand): RelationalOperationElement {
 export abstract class Attribute implements Aliasable {
   private readonly _displayName: string;
   private readonly _column: Column;
-  private readonly _owner: string;
+  private readonly _owner: Relation;
   private readonly _parent?: JoinTreeNodeOperation;
   private readonly _embedded?: Attribute;
   private readonly _optional: boolean;
@@ -48,7 +49,7 @@ export abstract class Attribute implements Aliasable {
     displayName: string,
     columnName: string,
     columnDbType: string,
-    owner: string,
+    owner: Relation,
     parent?: JoinTreeNodeOperation,
     embedded?: Attribute,
     nullable: boolean = true,
@@ -63,7 +64,7 @@ export abstract class Attribute implements Aliasable {
   }
 
   column(): Column { return this._column; }
-  owner(): string { return this._owner; }
+  owner(): Relation { return this._owner; }
   parent(): JoinTreeNodeOperation | undefined { return this._parent; }
   displayName(): string { return this._displayName; }
 

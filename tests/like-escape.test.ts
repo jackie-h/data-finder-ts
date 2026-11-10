@@ -9,9 +9,9 @@ import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attri
 import { GraphQLFilterConvention } from '../src/model/graphql_mapping';
 import { Column, Operation, Table, escapeLike } from '../src/model/relational';
 
-const table = new Table('notes', [new Column('id', 'INTEGER', 'notes'), new Column('text', 'VARCHAR', 'notes')]);
-const id = new IntegerAttribute('Id', 'id', 'INTEGER', 'notes');
-const text = new StringAttribute('Text', 'text', 'VARCHAR', 'notes');
+const table = new Table('notes', [new Column('id', 'INTEGER', new Table('notes', [])), new Column('text', 'VARCHAR', new Table('notes', []))]);
+const id = new IntegerAttribute('Id', 'id', 'INTEGER', new Table('notes', []));
+const text = new StringAttribute('Text', 'text', 'VARCHAR', new Table('notes', []));
 
 describe('escapeLike', () => {
   it('escapes %, _ and the escape character', () => {

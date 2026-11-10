@@ -9,9 +9,9 @@ import { StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, NoOperation, Table } from '../src/model/relational';
 
 describe('the SQL', () => {
-  const a = new StringAttribute('A', 'a', 'VARCHAR', 't');
-  const b = new StringAttribute('B', 'b', 'VARCHAR', 't');
-  const table = new Table('t', [new Column('a', 'VARCHAR', 't'), new Column('b', 'VARCHAR', 't')]);
+  const a = new StringAttribute('A', 'a', 'VARCHAR', new Table('t', []));
+  const b = new StringAttribute('B', 'b', 'VARCHAR', new Table('t', []));
+  const table = new Table('t', [new Column('a', 'VARCHAR', new Table('t', [])), new Column('b', 'VARCHAR', new Table('t', []))]);
 
   it('counts distinct', () => {
     expect(toSql(null, null, [a.countDistinct()], table, new NoOperation()))

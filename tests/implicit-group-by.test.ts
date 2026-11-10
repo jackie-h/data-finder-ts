@@ -18,14 +18,14 @@ import { DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/dataf
 import { Column, CountAllOperation, JoinOperation, JoinTreeNodeOperation, NoOperation, Table } from '../src/model/relational';
 
 function firmAndEmployeeAges(many = true, rootKey = true) {
-  const root = new Table('firm', [new Column('ID', 'INT', 'firm', rootKey), new Column('LEGALNAME', 'VARCHAR', 'firm')]);
-  const join = new JoinOperation('Employees', new Table('person', []), new Column('ID', 'INT', 'firm'), new Column('FIRMID', 'INT', 'person'));
+  const root = new Table('firm', [new Column('ID', 'INT', new Table('firm', []), rootKey), new Column('LEGALNAME', 'VARCHAR', new Table('firm', []))]);
+  const join = new JoinOperation('Employees', new Table('person', []), new Column('ID', 'INT', new Table('firm', [])), new Column('FIRMID', 'INT', new Table('person', [])));
   const node = new JoinTreeNodeOperation(join, undefined, many);
   return {
     root,
-    name: new StringAttribute('Legal Name', 'LEGALNAME', 'VARCHAR', 'firm'),
-    age: new IntegerAttribute('Employees Age', 'AGE', 'INT', 'person', node),
-    price: new DoubleAttribute('Price', 'PRICE', 'DOUBLE', 'firm'),
+    name: new StringAttribute('Legal Name', 'LEGALNAME', 'VARCHAR', new Table('firm', [])),
+    age: new IntegerAttribute('Employees Age', 'AGE', 'INT', new Table('person', []), node),
+    price: new DoubleAttribute('Price', 'PRICE', 'DOUBLE', new Table('firm', [])),
   };
 }
 
@@ -79,7 +79,7 @@ describe('the SQL', () => {
 
   it('a plain column that is the root key is grouped once', () => {
     const { root, age } = firmAndEmployeeAges();
-    const key = new IntegerAttribute('Id', 'ID', 'INT', 'firm');
+    const key = new IntegerAttribute('Id', 'ID', 'INT', new Table('firm', []));
     expect(toSql(null, null, [key, age.average()], root, new NoOperation()).endsWith('GROUP BY t0.ID')).toBe(true);
   });
 

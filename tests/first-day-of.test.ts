@@ -8,9 +8,9 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { DateAttribute, DateTimeAttribute } from '../src/datafinder/typed-attributes';
 import { Column, DateOnly, DateTruncOperation, NoOperation, Table } from '../src/model/relational';
 
-const date = new DateAttribute('Day', 'day', 'DATE', 't');
-const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', 't');
-const table = new Table('t', [new Column('day', 'DATE', 't'), new Column('at', 'TIMESTAMP', 't')]);
+const date = new DateAttribute('Day', 'day', 'DATE', new Table('t', []));
+const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', new Table('t', []));
+const table = new Table('t', [new Column('day', 'DATE', new Table('t', [])), new Column('at', 'TIMESTAMP', new Table('t', []))]);
 const select = (...columns: Parameters<typeof toSql>[2]) => toSql(null, null, columns, table, new NoOperation());
 
 describe('the SQL', () => {

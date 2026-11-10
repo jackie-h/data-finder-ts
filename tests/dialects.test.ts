@@ -17,10 +17,10 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { DateAttribute, DoubleAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, DatePart, NoOperation, SortDirection, Table } from '../src/model/relational';
 
-const name = new StringAttribute('Name', 'name', 'VARCHAR', 't');
-const price = new DoubleAttribute('Price', 'price', 'DOUBLE', 't');
-const day = new DateAttribute('Day', 'day', 'DATE', 't');
-const table = new Table('t', [new Column('name', 'VARCHAR', 't'), new Column('price', 'DOUBLE', 't'), new Column('day', 'DATE', 't')]);
+const name = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
+const price = new DoubleAttribute('Price', 'price', 'DOUBLE', new Table('t', []));
+const day = new DateAttribute('Day', 'day', 'DATE', new Table('t', []));
+const table = new Table('t', [new Column('name', 'VARCHAR', new Table('t', [])), new Column('price', 'DOUBLE', new Table('t', [])), new Column('day', 'DATE', new Table('t', []))]);
 const sql = (dialect: 'postgres' | 'duckdb' | 'databricks', column: Parameters<typeof toSql>[2][number], orderBy: Parameters<typeof toSql>[5] = []) =>
   toSql(null, null, [column], table, new NoOperation(), orderBy, [], undefined, null, false, undefined, undefined, dialect);
 

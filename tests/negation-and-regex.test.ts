@@ -10,31 +10,31 @@ const sql = (select: RelationalOperationElement, condition: RelationalOperationE
 
 describe('negating a condition', () => {
   it('writes NOT around the condition', () => {
-    const name = new StringAttribute('N', 'N', 'VARCHAR', 't');
+    const name = new StringAttribute('N', 'N', 'VARCHAR', new Table('t', []));
     expect(sql(name, name.startsWith('MEDIUM POLISHED').not())).toContain("NOT (t0.N LIKE 'MEDIUM POLISHED%')");
     expect(sql(name, name.eq('x').and(name.ne('y')).not())).toContain("NOT (t0.N = 'x' AND t0.N <> 'y')");
   });
 
   it('negating a negation is the condition again', () => {
-    const name = new StringAttribute('N', 'N', 'VARCHAR', 't');
+    const name = new StringAttribute('N', 'N', 'VARCHAR', new Table('t', []));
     const condition = name.eq('x');
     expect(condition.not().not()).toBe(condition);
   });
 
   it('a negated ordering comparison is not guarded against a missing value', () => {
-    const price = new DoubleAttribute('P', 'P', 'DOUBLE', 't', undefined, undefined, true, true);
+    const price = new DoubleAttribute('P', 'P', 'DOUBLE', new Table('t', []), undefined, undefined, true, true);
     expect(sql(price, price.gt(5))).toContain('IS NOT NULL');
     expect(sql(price, price.gt(5).not())).not.toContain('IS NOT NULL');
   });
 
   it('can be combined with other conditions', () => {
-    const name = new StringAttribute('N', 'N', 'VARCHAR', 't');
+    const name = new StringAttribute('N', 'N', 'VARCHAR', new Table('t', []));
     expect(sql(name, name.eq('a').or(name.contains('b').not()))).toContain("t0.N = 'a' OR NOT (t0.N LIKE '%b%')");
   });
 });
 
 describe('matching a regular expression', () => {
-  const name = new StringAttribute('N', 'N', 'VARCHAR', 't');
+  const name = new StringAttribute('N', 'N', 'VARCHAR', new Table('t', []));
 
   it('is written as the dialect writes it', () => {
     expect(sql(name, name.matches('Customer.*Complaints'), 'duckdb')).toContain("REGEXP_MATCHES(t0.N, 'Customer.*Complaints')");

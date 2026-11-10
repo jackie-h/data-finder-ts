@@ -76,7 +76,7 @@ function sortTarget(sort: SortOperation): string {
   }
   const joins: string[] = [];
   for (let node = column.parent; node !== undefined; node = node.parent) joins.push(node.join.name);
-  return JSON.stringify([column.column.owner, column.column.name, joins]);
+  return JSON.stringify([column.column.ownerName, column.column.name, joins]);
 }
 
 export class FinderResult {

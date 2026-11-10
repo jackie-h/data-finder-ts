@@ -13,25 +13,25 @@ const B = new Date('2017-06-10T00:00:00Z');
 const INFINITE = '9999-12-31 23:59:59';
 
 function bitemporal(name = 'trades', infinite: string | null = INFINITE): MilestonedTable {
-  return new MilestonedTable(name, [new Column('id', 'INT', name), new Column('fk', 'INT', name)], new BiTemporalColumns(
-    new Column('from_z', 'DATE', name), new Column('thru_z', 'DATE', name),
-    new Column('in_z', 'TIMESTAMP', name), new Column('out_z', 'TIMESTAMP', name), infinite ?? undefined,
+  return new MilestonedTable(name, [new Column('id', 'INT'), new Column('fk', 'INT')], new BiTemporalColumns(
+    new Column('from_z', 'DATE'), new Column('thru_z', 'DATE'),
+    new Column('in_z', 'TIMESTAMP'), new Column('out_z', 'TIMESTAMP'), infinite ?? undefined,
   ));
 }
 
 function processingOnly(name = 'trades'): MilestonedTable {
-  return new MilestonedTable(name, [new Column('id', 'INT', name), new Column('fk', 'INT', name)], new ProcessingTemporalColumns(
-    new Column('in_z', 'TIMESTAMP', name), new Column('out_z', 'TIMESTAMP', name), INFINITE,
+  return new MilestonedTable(name, [new Column('id', 'INT'), new Column('fk', 'INT')], new ProcessingTemporalColumns(
+    new Column('in_z', 'TIMESTAMP'), new Column('out_z', 'TIMESTAMP'), INFINITE,
   ));
 }
 
 function joined(target: Table): [Table, StringAttribute] {
-  const root = new Table('parent', [new Column('id', 'INT', 'parent')]);
-  const join = new JoinOperation('Child', target, new Column('id', 'INT', 'parent'), new Column('fk', 'INT', target.name));
-  return [root, new StringAttribute('Child Id', 'id', 'VARCHAR', target.name, new JoinTreeNodeOperation(join))];
+  const root = new Table('parent', [new Column('id', 'INT', new Table('parent', []))]);
+  const join = new JoinOperation('Child', target, new Column('id', 'INT', new Table('parent', [])), new Column('fk', 'INT', target));
+  return [root, new StringAttribute('Child Id', 'id', 'VARCHAR', target, new JoinTreeNodeOperation(join))];
 }
 
-const id = new IntegerAttribute('Id', 'id', 'INT', 'trades');
+const id = new IntegerAttribute('Id', 'id', 'INT', new Table('trades', []));
 
 describe('milestoning filter shape', () => {
   it('bitemporal WHERE is one flat AND with processing first', () => {
@@ -106,7 +106,7 @@ describe('needsParentheses', () => {
   });
 
   it('rendering follows the rule', () => {
-    const table = new Table('trades', [new Column('id', 'INT', 'trades')]);
+    const table = new Table('trades', [new Column('id', 'INT', new Table('trades', []))]);
     const [a, b, c, d] = [1, 2, 3, 4].map(cmp);
     const where = (o: LogicalOperation) => toSql(null, null, [id], table, o).split(' WHERE ')[1];
     expect(where(op(op(a, AND, b), AND, op(c, AND, d)))).toBe('t0.id = 1 AND t0.id = 2 AND t0.id = 3 AND t0.id = 4');

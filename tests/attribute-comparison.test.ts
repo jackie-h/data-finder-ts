@@ -11,13 +11,13 @@ const sql = (select: RelationalOperationElement, condition: RelationalOperationE
 
 type Kind = { left: any; right: any; value: unknown };
 const kinds: Record<string, Kind> = {
-  int: { left: new IntegerAttribute('I', 'I', 'INT', 't'), right: new IntegerAttribute('J', 'J', 'INT', 't'), value: 5 },
-  double: { left: new DoubleAttribute('D', 'D', 'DOUBLE', 't'), right: new DoubleAttribute('E', 'E', 'DOUBLE', 't'), value: 1.5 },
-  decimal: { left: new DecimalAttribute('N', 'N', 'DECIMAL', 't'), right: new DecimalAttribute('M', 'M', 'DECIMAL', 't'), value: 2.5 },
-  string: { left: new StringAttribute('S', 'S', 'VARCHAR', 't'), right: new StringAttribute('T', 'T', 'VARCHAR', 't'), value: 'x' },
-  date: { left: new DateAttribute('A', 'A', 'DATE', 't'), right: new DateAttribute('B', 'B', 'DATE', 't'), value: new Date('2024-01-02') },
-  datetime: { left: new DateTimeAttribute('U', 'U', 'TIMESTAMP', 't'), right: new DateTimeAttribute('V', 'V', 'TIMESTAMP', 't'), value: new Date('2024-01-02T03:04:05Z') },
-  boolean: { left: new BooleanAttribute('P', 'P', 'BOOLEAN', 't'), right: new BooleanAttribute('Q', 'Q', 'BOOLEAN', 't'), value: true },
+  int: { left: new IntegerAttribute('I', 'I', 'INT', new Table('t', [])), right: new IntegerAttribute('J', 'J', 'INT', new Table('t', [])), value: 5 },
+  double: { left: new DoubleAttribute('D', 'D', 'DOUBLE', new Table('t', [])), right: new DoubleAttribute('E', 'E', 'DOUBLE', new Table('t', [])), value: 1.5 },
+  decimal: { left: new DecimalAttribute('N', 'N', 'DECIMAL', new Table('t', [])), right: new DecimalAttribute('M', 'M', 'DECIMAL', new Table('t', [])), value: 2.5 },
+  string: { left: new StringAttribute('S', 'S', 'VARCHAR', new Table('t', [])), right: new StringAttribute('T', 'T', 'VARCHAR', new Table('t', [])), value: 'x' },
+  date: { left: new DateAttribute('A', 'A', 'DATE', new Table('t', [])), right: new DateAttribute('B', 'B', 'DATE', new Table('t', [])), value: new Date('2024-01-02') },
+  datetime: { left: new DateTimeAttribute('U', 'U', 'TIMESTAMP', new Table('t', [])), right: new DateTimeAttribute('V', 'V', 'TIMESTAMP', new Table('t', [])), value: new Date('2024-01-02T03:04:05Z') },
+  boolean: { left: new BooleanAttribute('P', 'P', 'BOOLEAN', new Table('t', [])), right: new BooleanAttribute('Q', 'Q', 'BOOLEAN', new Table('t', [])), value: true },
 };
 
 describe('comparing an attribute with another attribute', () => {
