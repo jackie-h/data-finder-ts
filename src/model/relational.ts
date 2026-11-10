@@ -327,30 +327,11 @@ export class ScalarFunctionOperation extends UnaryOperation implements Sortable 
     readonly extraArgs: (string | number | boolean)[] = [],
     /** The type the result is cast to, where the database's function gives another: an integer power is a `BIGINT`. */
     readonly cast?: string,
-    /** Whether the result is a whole number, which an integer power of it is too. */
-    readonly integer: boolean = false,
   ) { super(element); }
 
   /** This expression as an operand of a comparison. */
   comparisonOperand(): RelationalOperationElement { return this; }
-
-  arithmeticOperand(): RelationalOperationElement { return this; }
-
-  /** Only a function that gives a number can be used in arithmetic. */
-  assertNumeric(): void {
-    if (!NUMERIC_FUNCTIONS.has(this.func)) {
-      throw new TypeError(`${this.func} does not give a number, so it cannot be used in arithmetic`);
-    }
-  }
 }
-
-/** The functions that give a number, which arithmetic and `Numeric` functions apply to. */
-export const NUMERIC_FUNCTIONS: ReadonlySet<ScalarFunction> = new Set([
-  ScalarFunction.ABS, ScalarFunction.CEILING, ScalarFunction.FLOOR, ScalarFunction.MOD,
-  ScalarFunction.POWER, ScalarFunction.SQRT, ScalarFunction.ROUND, ScalarFunction.LENGTH,
-  ScalarFunction.SIN, ScalarFunction.COS, ScalarFunction.TAN, ScalarFunction.ASIN, ScalarFunction.ACOS,
-  ScalarFunction.ATAN, ScalarFunction.ATAN2, ScalarFunction.EXP, ScalarFunction.LOG,
-]);
 
 export class DateExtractOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
@@ -976,7 +957,7 @@ export abstract class Arithmetic {
       (other as unknown as Arithmetic).assertNumeric?.();
       operand = other.arithmeticOperand();
     } else {
-      throw new TypeError(`Arithmetic is between numbers and numeric columns, not ${other === null ? 'null' : typeof other}`);
+      throw new TypeError(`Arithmetic is between numbers and numeric columns, not ${other === null ? 'null' : typeof other === 'object' ? other.constructor.name : typeof other}`);
     }
     return new ArithmeticOperation(this.arithmeticOperand(), operator, operand);
   }
@@ -1064,9 +1045,6 @@ applyMixins(DateTruncOperation, [Equatable, Orderable]);
 
 export interface ArithmeticOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
 applyMixins(ArithmeticOperation, [Arithmetic, Equatable, Orderable]);
-
-export interface ScalarFunctionOperation extends Equatable<any>, Orderable<any>, Arithmetic, StringPredicates {}
-applyMixins(ScalarFunctionOperation, [Equatable, Orderable, Arithmetic, StringPredicates]);
 
 export interface AggregateOperation extends Arithmetic, Equatable<any>, Orderable<any>, StringPredicates {}
 applyMixins(AggregateOperation, [Arithmetic, Equatable, Orderable, StringPredicates]);

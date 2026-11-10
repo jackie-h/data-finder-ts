@@ -1,7 +1,10 @@
 export { Attribute } from './attribute';
 export { registerRelatedFinderClass, getRelatedFinderClass } from './finder-registry';
 export * from './typed-attributes';
-export { StringFunctionOperation, NumericFunctionOperation } from './scalar-functions';
+export {
+  StringFunctionOperation, NumericFunctionOperation, IntegerFunctionOperation, DoubleFunctionOperation,
+  DecimalFunctionOperation, DateFunctionOperation, BooleanFunctionOperation,
+} from './scalar-functions';
 export { constant, countAll } from './expressions';
 export { concat } from '../model/relational';
 export { when } from './conditional';

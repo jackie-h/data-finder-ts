@@ -15,20 +15,55 @@ import {
   ScalarFunction,
   ScalarFunctionOperation,
   applyMixins,
+  Equatable,
+  Orderable,
+  Arithmetic,
+  StringPredicates,
+  DateValue,
 } from '../model/relational';
 
-/** A function result that gives text, which has the string functions too: `f.name().toUpperCase().length()`. */
-export class StringFunctionOperation extends ScalarFunctionOperation {
+/** What a function result gives its own functions: it is their input, and their label is its own name. */
+abstract class FunctionResult extends ScalarFunctionOperation {
   functionInput(): RelationalOperationElement { return this; }
   functionLabel(): string { return labelOf(this); }
 }
 
-/** A function result that gives a number, which has the numeric functions too. */
-export class NumericFunctionOperation extends ScalarFunctionOperation {
-  functionInput(): RelationalOperationElement { return this; }
-  functionLabel(): string { return labelOf(this); }
-  isInteger(): boolean { return this.integer; }
+/** A function result that gives text, which has the string functions too: `f.name().toUpperCase().length()`. Compared for equality with text, as a text column is, and has no order. */
+export class StringFunctionOperation extends FunctionResult {}
+
+/** A function result that gives a number, which has the numeric functions too. The kinds are below. */
+export abstract class NumericFunctionOperation extends FunctionResult {
+  arithmeticOperand(): RelationalOperationElement { return this; }
 }
+
+/** A function that gives a whole number (`length`, or `abs` of an integer): compared with numbers. */
+export class IntegerFunctionOperation extends NumericFunctionOperation {
+  isInteger(): boolean { return true; }
+
+  sameType(func: ScalarFunction, label: string, secondArg?: number, extraArgs: (string | number | boolean)[] = []): IntegerFunctionOperation {
+    return new IntegerFunctionOperation(this, func, label, secondArg, extraArgs);
+  }
+}
+
+/** A function that gives a floating-point number (`sqrt`, `power`, or `abs` of a double). */
+export class DoubleFunctionOperation extends NumericFunctionOperation {
+  sameType(func: ScalarFunction, label: string, secondArg?: number, extraArgs: (string | number | boolean)[] = []): DoubleFunctionOperation {
+    return new DoubleFunctionOperation(this, func, label, secondArg, extraArgs);
+  }
+}
+
+/** A function that gives a decimal (`abs` of a decimal column). */
+export class DecimalFunctionOperation extends NumericFunctionOperation {
+  sameType(func: ScalarFunction, label: string, secondArg?: number, extraArgs: (string | number | boolean)[] = []): DecimalFunctionOperation {
+    return new DecimalFunctionOperation(this, func, label, secondArg, extraArgs);
+  }
+}
+
+/** A function that gives a date or timestamp (`orElse` of a date column): compared with dates. */
+export class DateFunctionOperation extends FunctionResult {}
+
+/** A function that gives a boolean (`orElse` of a boolean column): compared for equality. */
+export class BooleanFunctionOperation extends FunctionResult {}
 
 function labelOf(operation: ScalarFunctionOperation): string {
   return operation.displayName ?? operation.func.charAt(0) + operation.func.slice(1).toLowerCase();
@@ -41,11 +76,16 @@ function stringFunction(
   return new StringFunctionOperation(element, func, label, secondArg, extraArgs);
 }
 
-function numberFunction(
+export function integerFunction(
+  element: RelationalOperationElement, func: ScalarFunction, label: string, secondArg?: number, cast?: string,
+): IntegerFunctionOperation {
+  return new IntegerFunctionOperation(element, func, label, secondArg, [], cast);
+}
+
+export function doubleFunction(
   element: RelationalOperationElement, func: ScalarFunction, label: string, secondArg?: number,
-  integer: boolean = false, cast?: string,
-): NumericFunctionOperation {
-  return new NumericFunctionOperation(element, func, label, secondArg, [], cast, integer);
+): DoubleFunctionOperation {
+  return new DoubleFunctionOperation(element, func, label, secondArg);
 }
 
 /** Functions of text. */
@@ -81,8 +121,8 @@ export abstract class StringFunctions {
     return stringFunction(this.functionInput(), ScalarFunction.RTRIM, 'Trim End ' + this.functionLabel());
   }
   /** Return the number of characters in the string. */
-  length(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.LENGTH, 'Length ' + this.functionLabel(), undefined, true);
+  length(): IntegerFunctionOperation {
+    return integerFunction(this.functionInput(), ScalarFunction.LENGTH, 'Length ' + this.functionLabel());
   }
   /** Return the string with characters in reverse order. */
   reverse(): StringFunctionOperation {
@@ -115,90 +155,109 @@ export abstract class StringFunctions {
   }
 }
 
-/** Functions of a number. */
-export abstract class NumericFunctions {
+/**
+ * Functions of a number, where `R` is the kind of number the host is. `abs`, `ceil`, `floor`, `mod` and `round` keep
+ * it: an integer stays an integer, a decimal a decimal. `sqrt`, `power`, the logarithm, exponential and the
+ * trigonometric functions give a double, as SQL does. A host provides `functionInput()`, `functionLabel()` and
+ * `sameType()`, which makes a result of its own kind.
+ */
+export abstract class NumericFunctions<R extends NumericFunctionOperation> {
   /** @internal The expression the function applies to. */
   abstract functionInput(): RelationalOperationElement;
   /** @internal What a function of this is labelled after. */
   abstract functionLabel(): string;
-  /** @internal Whether this gives whole numbers, so a function that keeps the type does too. A column that is not an integer one gives no. */
+  /** @internal A function of this that gives a number of the same kind. */
+  abstract sameType(func: ScalarFunction, label: string, secondArg?: number): R;
+  /** @internal Whether this gives whole numbers, so a whole power of it does too. */
   isInteger(): boolean { return false; }
 
   /** Absolute value (distance from zero, always non-negative). */
-  abs(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.ABS, 'Abs ' + this.functionLabel(), undefined, this.isInteger());
+  abs(): R {
+    return this.sameType(ScalarFunction.ABS, 'Abs ' + this.functionLabel());
   }
   /** Round up to the nearest integer. */
-  ceil(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.CEILING, 'Ceil ' + this.functionLabel(), undefined, this.isInteger());
+  ceil(): R {
+    return this.sameType(ScalarFunction.CEILING, 'Ceil ' + this.functionLabel());
   }
   /** Round down to the nearest integer. */
-  floor(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.FLOOR, 'Floor ' + this.functionLabel(), undefined, this.isInteger());
+  floor(): R {
+    return this.sameType(ScalarFunction.FLOOR, 'Floor ' + this.functionLabel());
   }
   /** Square root. */
-  sqrt(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.SQRT, 'Sqrt ' + this.functionLabel());
+  sqrt(): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.SQRT, 'Sqrt ' + this.functionLabel());
   }
   /** Sine of the value (in radians). */
-  sin(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.SIN, 'Sin ' + this.functionLabel());
+  sin(): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.SIN, 'Sin ' + this.functionLabel());
   }
   /** Cosine of the value (in radians). */
-  cos(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.COS, 'Cos ' + this.functionLabel());
+  cos(): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.COS, 'Cos ' + this.functionLabel());
   }
   /** Tangent of the value (in radians). */
-  tan(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.TAN, 'Tan ' + this.functionLabel());
+  tan(): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.TAN, 'Tan ' + this.functionLabel());
   }
   /** Inverse sine, in radians. */
-  asin(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.ASIN, 'Asin ' + this.functionLabel());
+  asin(): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.ASIN, 'Asin ' + this.functionLabel());
   }
   /** Inverse cosine, in radians. */
-  acos(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.ACOS, 'Acos ' + this.functionLabel());
+  acos(): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.ACOS, 'Acos ' + this.functionLabel());
   }
   /** Inverse tangent, in radians. */
-  atan(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.ATAN, 'Atan ' + this.functionLabel());
+  atan(): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.ATAN, 'Atan ' + this.functionLabel());
   }
   /** atan2(value, `x`), in radians. */
-  atan2(x: number): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.ATAN2, 'Atan2 ' + this.functionLabel(), x);
+  atan2(x: number): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.ATAN2, 'Atan2 ' + this.functionLabel(), x);
   }
   /** e raised to the value. */
-  exp(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.EXP, 'Exp ' + this.functionLabel());
+  exp(): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.EXP, 'Exp ' + this.functionLabel());
   }
   /** Natural logarithm of the value. */
-  log(): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.LOG, 'Log ' + this.functionLabel());
+  log(): DoubleFunctionOperation {
+    return doubleFunction(this.functionInput(), ScalarFunction.LOG, 'Log ' + this.functionLabel());
   }
   /** Remainder after dividing by `n`. */
-  mod(n: number): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.MOD, 'Mod ' + this.functionLabel(), n, this.isInteger());
+  mod(n: number): R {
+    return this.sameType(ScalarFunction.MOD, 'Mod ' + this.functionLabel(), n);
   }
   /**
    * Raise to the power of `n`. An integer raised to a whole, non-negative `n` is an integer, as in JavaScript's `**`
    * on whole numbers; SQL's `POWER` gives a double, so the result is cast to `BIGINT`. Any other power is a double.
    */
-  power(n: number): NumericFunctionOperation {
+  power(n: number): IntegerFunctionOperation | DoubleFunctionOperation {
     const label = 'Power ' + this.functionLabel();
     if (this.isInteger() && Number.isInteger(n) && n >= 0) {
-      return numberFunction(this.functionInput(), ScalarFunction.POWER, label, n, true, 'BIGINT');
+      return integerFunction(this.functionInput(), ScalarFunction.POWER, label, n, 'BIGINT');
     }
-    return numberFunction(this.functionInput(), ScalarFunction.POWER, label, n);
+    return doubleFunction(this.functionInput(), ScalarFunction.POWER, label, n);
   }
   /** Round to `d` decimal places, or to the nearest integer when `d` is omitted. */
-  round(d?: number): NumericFunctionOperation {
-    return numberFunction(this.functionInput(), ScalarFunction.ROUND, 'Round ' + this.functionLabel(), d);
+  round(d?: number): R {
+    return this.sameType(ScalarFunction.ROUND, 'Round ' + this.functionLabel(), d);
   }
 }
 
-export interface StringFunctionOperation extends StringFunctions {}
-applyMixins(StringFunctionOperation, [StringFunctions]);
+export interface StringFunctionOperation extends Equatable<string>, StringPredicates, StringFunctions {}
+applyMixins(StringFunctionOperation, [Equatable, StringPredicates, StringFunctions]);
 
-export interface NumericFunctionOperation extends NumericFunctions {}
-applyMixins(NumericFunctionOperation, [NumericFunctions]);
+export interface IntegerFunctionOperation extends Equatable<number>, Orderable<number>, Arithmetic, NumericFunctions<IntegerFunctionOperation> {}
+applyMixins(IntegerFunctionOperation, [Equatable, Orderable, Arithmetic, NumericFunctions]);
+
+export interface DoubleFunctionOperation extends Equatable<number>, Orderable<number>, Arithmetic, NumericFunctions<DoubleFunctionOperation> {}
+applyMixins(DoubleFunctionOperation, [Equatable, Orderable, Arithmetic, NumericFunctions]);
+
+export interface DecimalFunctionOperation extends Equatable<number>, Orderable<number>, Arithmetic, NumericFunctions<DecimalFunctionOperation> {}
+applyMixins(DecimalFunctionOperation, [Equatable, Orderable, Arithmetic, NumericFunctions]);
+
+export interface DateFunctionOperation extends Equatable<DateValue>, Orderable<DateValue> {}
+applyMixins(DateFunctionOperation, [Equatable, Orderable]);
+
+export interface BooleanFunctionOperation extends Equatable<boolean> {}
+applyMixins(BooleanFunctionOperation, [Equatable]);

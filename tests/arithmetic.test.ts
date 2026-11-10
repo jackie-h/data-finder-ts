@@ -63,8 +63,9 @@ describe('the SQL', () => {
 
   it('a function that gives text is not a number', () => {
     const upper = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', [])).toUpperCase();
-    expect(() => (upper as unknown as { plus(n: number): unknown }).plus(1)).toThrow(/does not give a number/);
-    expect(() => a.plus(upper as never)).toThrow(/does not give a number/);
+    // text has no arithmetic: the compiler refuses it, and so does a call that gets past it
+    expect('plus' in upper).toBe(false);
+    expect(() => a.plus(upper as never)).toThrow(/not StringFunctionOperation/);
   });
 
   it('a result can be named, sorted and compared', () => {
