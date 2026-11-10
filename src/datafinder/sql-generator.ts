@@ -1,4 +1,4 @@
-import { Attribute } from './attribute';
+import { Attribute, Comparand } from './attribute';
 import {
   RelationalOperationElement,
   Operation,
@@ -639,7 +639,7 @@ function buildQuerySpecification(
   table: Table,
   op: RelationalOperationElement,
   orderBy: SortOperation[] = [],
-  groupBy: Attribute[] = [],
+  groupBy: Comparand[] = [],
   limit?: number,
   businessDateTo: Date | null = null,
   distinct: boolean = false,
@@ -808,7 +808,11 @@ class SQLQueryGenerator {
    * `GROUP BY 7` would be a column position.
    */
   private _groupByPartsFor(query: QuerySpecification): string[] {
-    if (query.groupBy.length > 0) return query.groupBy.map(a => this._attrToColString(a as Attribute));
+    if (query.groupBy.length > 0) {
+      return query.groupBy.map(g => g instanceof Attribute || g instanceof ColumnWithJoin
+        ? this._attrToColString(g as Attribute)
+        : sqlOperationToString(this._rewriteOperation(g), this._dialect));   // an expression, as a year of a date
+    }
     const aggregates = query.columns.filter(containsAggregate);
     if (aggregates.length === 0) return [];
     const perRoot = query.table !== undefined && aggregates.some(reachesToMany);
@@ -1249,7 +1253,7 @@ export function toSql(
   table: Table,
   op: RelationalOperationElement,
   orderBy: SortOperation[] = [],
-  groupBy: Attribute[] = [],
+  groupBy: Comparand[] = [],
   limit?: number,
   businessDateTo: Date | null = null,
   distinct: boolean = false,

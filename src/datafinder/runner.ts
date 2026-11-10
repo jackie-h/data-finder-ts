@@ -1,4 +1,4 @@
-import { Attribute } from './attribute';
+import { Attribute, Comparand } from './attribute';
 import { toSql } from './sql-generator';
 import { MilestonedTable, hasProcessingRange } from '../model/milestoning';
 import { DialectName, SqlDialect } from './dialect';
@@ -41,7 +41,7 @@ export interface QueryRunner {
     table: QueryTarget,
     op: RelationalOperationElement,
     orderBy?: SortOperation[],
-    groupBy?: Attribute[],
+    groupBy?: Comparand[],
     limit?: number,
     timeoutMs?: number,
     businessDateTo?: Date | null,
@@ -81,7 +81,7 @@ function sortTarget(sort: SortOperation): string {
 
 export class FinderResult {
   private _orderBy: SortOperation[] = [];
-  private _groupBy: Attribute[] = [];
+  private _groupBy: Comparand[] = [];
   private _limit?: number;
   private _distinct = false;
   private _offset?: number;
@@ -108,7 +108,7 @@ export class FinderResult {
     return this;
   }
 
-  groupBy(...attrs: Attribute[]): this {
+  groupBy(...attrs: Comparand[]): this {
     this._groupBy = attrs;
     return this;
   }
@@ -135,7 +135,8 @@ export class FinderResult {
 
   /**
    * Keep the groups for which every condition holds: `HAVING`. A condition tests an aggregate or a grouping column:
-   * `f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1))`.
+   * `f.findAll(null, null, [f.category(), countAll()]).groupBy(f.category()).having(countAll().gt(1))`. A group is a
+   * column, or an expression: `.groupBy(f.date().year())`.
    * Calls accumulate, as `and` does.
    */
   having(...conditions: Operation[]): this {
