@@ -271,11 +271,36 @@ export class AggregateOperation extends UnaryOperation implements Sortable {
   arithmeticOperand(): RelationalOperationElement { return this; }
   comparisonOperand(): RelationalOperationElement { return this; }
 
-  over(partitionBy?: RelationalOperationElement[], orderBy?: SortOperation[]): AggregateOperation {
-    return new AggregateOperation(this.element, this.operator, this.displayName,
+  /** The same aggregate over a window of rows instead of a group: it keeps its type. */
+  over(partitionBy?: RelationalOperationElement[], orderBy?: SortOperation[]): this {
+    const kind = this.constructor as new (...args: ConstructorParameters<typeof AggregateOperation>) => this;
+    return new kind(this.element, this.operator, this.displayName,
       new WindowSpecification(partitionBy ?? [], orderBy ?? []), this.separator, this.orderBy);
   }
 }
+
+/** The constructor of an aggregate, which an expression says it gives. */
+export type AggregateConstructor<A extends AggregateOperation> = new (
+  element: RelationalOperationElement, operator: AggregateOperator, displayName?: string,
+  window?: WindowSpecification, separator?: string, orderBy?: SortOperation[],
+) => A;
+
+/** An aggregate of an expression whose type is not known: it takes any comparison. */
+export class UntypedAggregateOperation extends AggregateOperation {}
+/** An aggregate that gives a whole number: a count, or the sum, minimum or maximum of integers. */
+export class IntegerAggregateOperation extends AggregateOperation {}
+/** An aggregate that gives a floating-point number: an average, a standard deviation, a variance, or the sum of doubles. */
+export class DoubleAggregateOperation extends AggregateOperation {}
+/** An aggregate that gives a decimal. */
+export class DecimalAggregateOperation extends AggregateOperation {}
+/** An aggregate that gives text: the minimum or maximum of text, or text joined. */
+export class StringAggregateOperation extends AggregateOperation {}
+/** An aggregate that gives a boolean: `all` or `any` of a condition. */
+export class BooleanAggregateOperation extends AggregateOperation {}
+/** An aggregate that gives a date. */
+export class DateAggregateOperation extends AggregateOperation {}
+/** An aggregate that gives a timestamp. */
+export class DateTimeAggregateOperation extends AggregateOperation {}
 
 export enum WindowFunction {
   ROW_NUMBER = 'ROW_NUMBER',
@@ -872,29 +897,37 @@ export abstract class StringPredicates {
 /**
  * Aggregates of an expression, as a column has them: `f.price().times(f.quantity()).sum()`, `constant(1).sum()`,
  * `when(f.price().gt(10)).then(5.0).otherwise(1.0).sum()`. Mixed into the expressions that have it.
+ *
+ * `A` is the aggregate that gives the expression's own type, the type of its `sum`, `min` and `max`: an integer
+ * expression has an `IntegerAggregateOperation` sum. An expression whose type is not known has an
+ * `UntypedAggregateOperation`. A count is an integer, and an average, standard deviation and variance are floating
+ * point, whatever the type. A host that knows its type gives `aggregateKind()`.
  */
-export abstract class Aggregates {
-  private _aggregate(operator: AggregateOperator, label: string): AggregateOperation {
-    return new AggregateOperation(this as unknown as RelationalOperationElement, operator, label + ' Expression');
+export abstract class Aggregates<A extends AggregateOperation = UntypedAggregateOperation> {
+  /** @internal The aggregate that gives the expression's own type. */
+  aggregateKind(): AggregateConstructor<A> { return UntypedAggregateOperation as unknown as AggregateConstructor<A>; }
+
+  private _aggregate<R extends AggregateOperation>(kind: AggregateConstructor<R>, operator: AggregateOperator, label: string): R {
+    return new kind(this as unknown as RelationalOperationElement, operator, label + ' Expression');
   }
 
   /** Sum of the values in the group. */
-  sum(): AggregateOperation { return this._aggregate(AggregateOperator.SUM, 'Sum'); }
+  sum(): A { return this._aggregate(this.aggregateKind(), AggregateOperator.SUM, 'Sum'); }
   /** Smallest value in the group. */
-  min(): AggregateOperation { return this._aggregate(AggregateOperator.MIN, 'Min'); }
+  min(): A { return this._aggregate(this.aggregateKind(), AggregateOperator.MIN, 'Min'); }
   /** Largest value in the group. */
-  max(): AggregateOperation { return this._aggregate(AggregateOperator.MAX, 'Max'); }
+  max(): A { return this._aggregate(this.aggregateKind(), AggregateOperator.MAX, 'Max'); }
   /** Arithmetic mean of the values in the group. */
-  average(): AggregateOperation { return this._aggregate(AggregateOperator.AVERAGE, 'Average'); }
+  average(): DoubleAggregateOperation { return this._aggregate(DoubleAggregateOperation, AggregateOperator.AVERAGE, 'Average'); }
   /** Number of non-null values in the group. */
-  count(): AggregateOperation { return this._aggregate(AggregateOperator.COUNT, 'Count'); }
+  count(): IntegerAggregateOperation { return this._aggregate(IntegerAggregateOperation, AggregateOperator.COUNT, 'Count'); }
   /** Standard deviation of the values in the group: the sample one by default, `ddof = 0` for the population one. */
-  std(ddof = 1): AggregateOperation {
-    return this._aggregate(sample(ddof) ? AggregateOperator.STDDEV_SAMP : AggregateOperator.STDDEV_POP, 'Std');
+  std(ddof = 1): DoubleAggregateOperation {
+    return this._aggregate(DoubleAggregateOperation, sample(ddof) ? AggregateOperator.STDDEV_SAMP : AggregateOperator.STDDEV_POP, 'Std');
   }
   /** Variance of the values in the group: the sample one by default, `ddof = 0` for the population one. */
-  var(ddof = 1): AggregateOperation {
-    return this._aggregate(sample(ddof) ? AggregateOperator.VAR_SAMP : AggregateOperator.VAR_POP, 'Var');
+  var(ddof = 1): DoubleAggregateOperation {
+    return this._aggregate(DoubleAggregateOperation, sample(ddof) ? AggregateOperator.VAR_SAMP : AggregateOperator.VAR_POP, 'Var');
   }
 }
 
@@ -904,12 +937,12 @@ export abstract class Aggregates {
  */
 export abstract class BooleanAggregates {
   /** True for a group where every row satisfies the condition. */
-  all(): AggregateOperation {
-    return new AggregateOperation(this as unknown as RelationalOperationElement, AggregateOperator.BOOL_AND, 'All Expression');
+  all(): BooleanAggregateOperation {
+    return new BooleanAggregateOperation(this as unknown as RelationalOperationElement, AggregateOperator.BOOL_AND, 'All Expression');
   }
   /** True for a group where at least one row satisfies the condition. */
-  any(): AggregateOperation {
-    return new AggregateOperation(this as unknown as RelationalOperationElement, AggregateOperator.BOOL_OR, 'Any Expression');
+  any(): BooleanAggregateOperation {
+    return new BooleanAggregateOperation(this as unknown as RelationalOperationElement, AggregateOperator.BOOL_OR, 'Any Expression');
   }
 }
 
@@ -1046,8 +1079,29 @@ applyMixins(DateTruncOperation, [Equatable, Orderable]);
 export interface ArithmeticOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
 applyMixins(ArithmeticOperation, [Arithmetic, Equatable, Orderable]);
 
-export interface AggregateOperation extends Arithmetic, Equatable<any>, Orderable<any>, StringPredicates {}
-applyMixins(AggregateOperation, [Arithmetic, Equatable, Orderable, StringPredicates]);
+export interface UntypedAggregateOperation extends Arithmetic, Equatable<any>, Orderable<any>, StringPredicates {}
+applyMixins(UntypedAggregateOperation, [Arithmetic, Equatable, Orderable, StringPredicates]);
+
+export interface IntegerAggregateOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
+applyMixins(IntegerAggregateOperation, [Arithmetic, Equatable, Orderable]);
+
+export interface DoubleAggregateOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
+applyMixins(DoubleAggregateOperation, [Arithmetic, Equatable, Orderable]);
+
+export interface DecimalAggregateOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
+applyMixins(DecimalAggregateOperation, [Arithmetic, Equatable, Orderable]);
+
+export interface StringAggregateOperation extends Equatable<string>, StringPredicates {}
+applyMixins(StringAggregateOperation, [Equatable, StringPredicates]);
+
+export interface BooleanAggregateOperation extends Equatable<boolean> {}
+applyMixins(BooleanAggregateOperation, [Equatable]);
+
+export interface DateAggregateOperation extends Equatable<DateValue>, Orderable<DateValue> {}
+applyMixins(DateAggregateOperation, [Equatable, Orderable]);
+
+export interface DateTimeAggregateOperation extends Equatable<DateValue>, Orderable<DateValue> {}
+applyMixins(DateTimeAggregateOperation, [Equatable, Orderable]);
 
 export interface CountAllOperation extends Equatable<number>, Orderable<number> {}
 applyMixins(CountAllOperation, [Equatable, Orderable]);
@@ -1060,9 +1114,6 @@ applyMixins(ConstantOperation, [Aggregates]);
 
 export interface ArithmeticOperation extends Aggregates {}
 applyMixins(ArithmeticOperation, [Aggregates]);
-
-export interface ScalarFunctionOperation extends Aggregates {}
-applyMixins(ScalarFunctionOperation, [Aggregates]);
 
 export interface CaseOperation extends Aggregates {}
 applyMixins(CaseOperation, [Aggregates]);

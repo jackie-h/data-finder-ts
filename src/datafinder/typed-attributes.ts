@@ -21,6 +21,13 @@ import {
   BooleanConstantOperation,
   DecimalConstantOperation,
   AggregateOperation,
+  AggregateConstructor,
+  IntegerAggregateOperation,
+  DoubleAggregateOperation,
+  DecimalAggregateOperation,
+  StringAggregateOperation,
+  DateAggregateOperation,
+  DateTimeAggregateOperation,
   AggregateOperator,
   SortOperation,
   ScalarFunction,
@@ -42,21 +49,25 @@ function diffOther(other: Date | Comparand): Date | RelationalOperationElement {
 }
 
 /** The smallest and largest value of a group, for a column that can be ordered but not summed. */
-abstract class MinMax {
+abstract class MinMax<A extends AggregateOperation> {
   abstract cwj(): ColumnWithJoin;
   abstract displayName(): string;
+  /** @internal The aggregate that gives this column's own type. */
+  abstract aggregateKind(): AggregateConstructor<A>;
 
   /** Smallest value in the group. */
-  min(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.MIN, 'Min ' + this.displayName());
+  min(): A {
+    return new (this.aggregateKind())(this.cwj(), AggregateOperator.MIN, 'Min ' + this.displayName());
   }
   /** Largest value in the group. */
-  max(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.MAX, 'Max ' + this.displayName());
+  max(): A {
+    return new (this.aggregateKind())(this.cwj(), AggregateOperator.MAX, 'Max ' + this.displayName());
   }
 }
 
 export class StringAttribute extends Attribute {
+  aggregateKind(): AggregateConstructor<StringAggregateOperation> { return StringAggregateOperation; }
+
   declare readonly valueType?: string;
 
   /** The value, or `defaultValue` when it is NULL: `.orElse(...)`. Like `COALESCE` in SQL. */
@@ -83,8 +94,8 @@ export class StringAttribute extends Attribute {
    * Join the values of a group into one text with `separator` between them. `orderBy` is the order they are
    * joined in (`[f.name().ascending()]`); without it the order is not defined. Missing values are skipped.
    */
-  join(separator: string = '', orderBy: SortOperation[] = []): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.STRING_AGG, 'Join ' + this.displayName(), undefined, separator, orderBy);
+  join(separator: string = '', orderBy: SortOperation[] = []): StringAggregateOperation {
+    return new StringAggregateOperation(this.cwj(), AggregateOperator.STRING_AGG, 'Join ' + this.displayName(), undefined, separator, orderBy);
   }
 
   /** Filter to rows where this attribute equals `value`. */
@@ -117,10 +128,10 @@ export class StringAttribute extends Attribute {
   }
 }
 
-export interface StringAttribute extends MinMax, StringFunctions {}
+export interface StringAttribute extends MinMax<StringAggregateOperation>, StringFunctions {}
 applyMixins(StringAttribute, [MinMax, StringFunctions]);
 
-export abstract class NumericAttribute extends Attribute {
+export abstract class NumericAttribute<A extends AggregateOperation = AggregateOperation> extends Attribute {
   declare readonly valueType?: number;
 
   constructor(
@@ -135,29 +146,31 @@ export abstract class NumericAttribute extends Attribute {
   ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
 
   /** Sum of all values in the group. */
-  sum(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.SUM, 'Sum ' + this.displayName());
+  sum(): A {
+    return new (this.aggregateKind())(this.cwj(), AggregateOperator.SUM, 'Sum ' + this.displayName());
   }
   /** Arithmetic mean of all values in the group. */
-  average(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.AVERAGE, 'Average ' + this.displayName());
+  average(): DoubleAggregateOperation {
+    return new DoubleAggregateOperation(this.cwj(), AggregateOperator.AVERAGE, 'Average ' + this.displayName());
   }
   /** Standard deviation of the values in the group: the sample one by default, `ddof = 0` for the population one, as `Series.std`. */
-  std(ddof = 1): AggregateOperation {
+  std(ddof = 1): DoubleAggregateOperation {
     const operator = sample(ddof) ? AggregateOperator.STDDEV_SAMP : AggregateOperator.STDDEV_POP;
-    return new AggregateOperation(this.cwj(), operator, 'Std ' + this.displayName());
+    return new DoubleAggregateOperation(this.cwj(), operator, 'Std ' + this.displayName());
   }
   /** Variance of the values in the group: the sample one by default, `ddof = 0` for the population one, as `Series.var`. */
-  var(ddof = 1): AggregateOperation {
+  var(ddof = 1): DoubleAggregateOperation {
     const operator = sample(ddof) ? AggregateOperator.VAR_SAMP : AggregateOperator.VAR_POP;
-    return new AggregateOperation(this.cwj(), operator, 'Var ' + this.displayName());
+    return new DoubleAggregateOperation(this.cwj(), operator, 'Var ' + this.displayName());
   }
 }
 
-export interface NumericAttribute extends MinMax, Arithmetic {}
+export interface NumericAttribute<A extends AggregateOperation = AggregateOperation> extends MinMax<A>, Arithmetic {}
 applyMixins(NumericAttribute, [MinMax, Arithmetic]);
 
-export class DoubleAttribute extends NumericAttribute {
+export class DoubleAttribute extends NumericAttribute<DoubleAggregateOperation> {
+  aggregateKind(): AggregateConstructor<DoubleAggregateOperation> { return DoubleAggregateOperation; }
+
   /** @internal A function of this column that gives a double. */
   sameType(func: ScalarFunction, label: string, secondArg?: number): DoubleFunctionOperation {
     return new DoubleFunctionOperation(this.cwj(), func, label, secondArg);
@@ -215,7 +228,9 @@ applyMixins(DoubleAttribute, [NumericFunctions]);
 export const FloatAttribute = DoubleAttribute;
 export type FloatAttribute = DoubleAttribute;
 
-export class DecimalAttribute extends NumericAttribute {
+export class DecimalAttribute extends NumericAttribute<DecimalAggregateOperation> {
+  aggregateKind(): AggregateConstructor<DecimalAggregateOperation> { return DecimalAggregateOperation; }
+
   /** @internal A function of this column that gives a decimal. */
   sameType(func: ScalarFunction, label: string, secondArg?: number): DecimalFunctionOperation {
     return new DecimalFunctionOperation(this.cwj(), func, label, secondArg);
@@ -270,7 +285,9 @@ export class DecimalAttribute extends NumericAttribute {
 export interface DecimalAttribute extends NumericFunctions<DecimalFunctionOperation> {}
 applyMixins(DecimalAttribute, [NumericFunctions]);
 
-export class IntegerAttribute extends NumericAttribute {
+export class IntegerAttribute extends NumericAttribute<IntegerAggregateOperation> {
+  aggregateKind(): AggregateConstructor<IntegerAggregateOperation> { return IntegerAggregateOperation; }
+
   /** @internal A function of this column that gives a integer. */
   sameType(func: ScalarFunction, label: string, secondArg?: number): IntegerFunctionOperation {
     return new IntegerFunctionOperation(this.cwj(), func, label, secondArg);
@@ -388,6 +405,8 @@ function temporalConstant(value: Date | string): DateConstantOperation | DateTim
 }
 
 export class DateAttribute extends Attribute {
+  aggregateKind(): AggregateConstructor<DateAggregateOperation> { return DateAggregateOperation; }
+
   declare readonly valueType?: DateValue;
 
   /** The value, or `defaultValue` when it is NULL: `.orElse(...)`. Like `COALESCE` in SQL. */
@@ -478,6 +497,8 @@ export class DateAttribute extends Attribute {
 }
 
 export class DateTimeAttribute extends Attribute {
+  aggregateKind(): AggregateConstructor<DateTimeAggregateOperation> { return DateTimeAggregateOperation; }
+
   declare readonly valueType?: DateValue;
 
   /** The value, or `defaultValue` when it is NULL: `.orElse(...)`. Like `COALESCE` in SQL. */
@@ -591,8 +612,8 @@ export class DateTimeAttribute extends Attribute {
   diffSeconds(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.SECOND, 'Diff Seconds ' + this.displayName()); }
 }
 
-export interface DateAttribute extends MinMax {}
+export interface DateAttribute extends MinMax<DateAggregateOperation> {}
 applyMixins(DateAttribute, [MinMax]);
 
-export interface DateTimeAttribute extends MinMax {}
+export interface DateTimeAttribute extends MinMax<DateTimeAggregateOperation> {}
 applyMixins(DateTimeAttribute, [MinMax]);

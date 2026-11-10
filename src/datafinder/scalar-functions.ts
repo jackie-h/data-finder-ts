@@ -20,6 +20,13 @@ import {
   Arithmetic,
   StringPredicates,
   DateValue,
+  Aggregates,
+  AggregateConstructor,
+  IntegerAggregateOperation,
+  DoubleAggregateOperation,
+  DecimalAggregateOperation,
+  DateAggregateOperation,
+  UntypedAggregateOperation,
 } from '../model/relational';
 
 /** What a function result gives its own functions: it is their input, and their label is its own name. */
@@ -38,6 +45,8 @@ export abstract class NumericFunctionOperation extends FunctionResult {
 
 /** A function that gives a whole number (`length`, or `abs` of an integer): compared with numbers. */
 export class IntegerFunctionOperation extends NumericFunctionOperation {
+  aggregateKind(): AggregateConstructor<IntegerAggregateOperation> { return IntegerAggregateOperation; }
+
   isInteger(): boolean { return true; }
 
   sameType(func: ScalarFunction, label: string, secondArg?: number, extraArgs: (string | number | boolean)[] = []): IntegerFunctionOperation {
@@ -47,6 +56,8 @@ export class IntegerFunctionOperation extends NumericFunctionOperation {
 
 /** A function that gives a floating-point number (`sqrt`, `power`, or `abs` of a double). */
 export class DoubleFunctionOperation extends NumericFunctionOperation {
+  aggregateKind(): AggregateConstructor<DoubleAggregateOperation> { return DoubleAggregateOperation; }
+
   sameType(func: ScalarFunction, label: string, secondArg?: number, extraArgs: (string | number | boolean)[] = []): DoubleFunctionOperation {
     return new DoubleFunctionOperation(this, func, label, secondArg, extraArgs);
   }
@@ -54,13 +65,17 @@ export class DoubleFunctionOperation extends NumericFunctionOperation {
 
 /** A function that gives a decimal (`abs` of a decimal column). */
 export class DecimalFunctionOperation extends NumericFunctionOperation {
+  aggregateKind(): AggregateConstructor<DecimalAggregateOperation> { return DecimalAggregateOperation; }
+
   sameType(func: ScalarFunction, label: string, secondArg?: number, extraArgs: (string | number | boolean)[] = []): DecimalFunctionOperation {
     return new DecimalFunctionOperation(this, func, label, secondArg, extraArgs);
   }
 }
 
 /** A function that gives a date or timestamp (`orElse` of a date column): compared with dates. */
-export class DateFunctionOperation extends FunctionResult {}
+export class DateFunctionOperation extends FunctionResult {
+  aggregateKind(): AggregateConstructor<DateAggregateOperation> { return DateAggregateOperation; }
+}
 
 /** A function that gives a boolean (`orElse` of a boolean column): compared for equality. */
 export class BooleanFunctionOperation extends FunctionResult {}
@@ -244,20 +259,20 @@ export abstract class NumericFunctions<R extends NumericFunctionOperation> {
   }
 }
 
-export interface StringFunctionOperation extends Equatable<string>, StringPredicates, StringFunctions {}
-applyMixins(StringFunctionOperation, [Equatable, StringPredicates, StringFunctions]);
+export interface StringFunctionOperation extends Equatable<string>, StringPredicates, StringFunctions, Aggregates<UntypedAggregateOperation> {}
+applyMixins(StringFunctionOperation, [Equatable, StringPredicates, StringFunctions, Aggregates]);
 
-export interface IntegerFunctionOperation extends Equatable<number>, Orderable<number>, Arithmetic, NumericFunctions<IntegerFunctionOperation> {}
-applyMixins(IntegerFunctionOperation, [Equatable, Orderable, Arithmetic, NumericFunctions]);
+export interface IntegerFunctionOperation extends Equatable<number>, Orderable<number>, Arithmetic, NumericFunctions<IntegerFunctionOperation>, Aggregates<IntegerAggregateOperation> {}
+applyMixins(IntegerFunctionOperation, [Equatable, Orderable, Arithmetic, NumericFunctions, Aggregates]);
 
-export interface DoubleFunctionOperation extends Equatable<number>, Orderable<number>, Arithmetic, NumericFunctions<DoubleFunctionOperation> {}
-applyMixins(DoubleFunctionOperation, [Equatable, Orderable, Arithmetic, NumericFunctions]);
+export interface DoubleFunctionOperation extends Equatable<number>, Orderable<number>, Arithmetic, NumericFunctions<DoubleFunctionOperation>, Aggregates<DoubleAggregateOperation> {}
+applyMixins(DoubleFunctionOperation, [Equatable, Orderable, Arithmetic, NumericFunctions, Aggregates]);
 
-export interface DecimalFunctionOperation extends Equatable<number>, Orderable<number>, Arithmetic, NumericFunctions<DecimalFunctionOperation> {}
-applyMixins(DecimalFunctionOperation, [Equatable, Orderable, Arithmetic, NumericFunctions]);
+export interface DecimalFunctionOperation extends Equatable<number>, Orderable<number>, Arithmetic, NumericFunctions<DecimalFunctionOperation>, Aggregates<DecimalAggregateOperation> {}
+applyMixins(DecimalFunctionOperation, [Equatable, Orderable, Arithmetic, NumericFunctions, Aggregates]);
 
-export interface DateFunctionOperation extends Equatable<DateValue>, Orderable<DateValue> {}
-applyMixins(DateFunctionOperation, [Equatable, Orderable]);
+export interface DateFunctionOperation extends Equatable<DateValue>, Orderable<DateValue>, Aggregates<DateAggregateOperation> {}
+applyMixins(DateFunctionOperation, [Equatable, Orderable, Aggregates]);
 
-export interface BooleanFunctionOperation extends Equatable<boolean> {}
-applyMixins(BooleanFunctionOperation, [Equatable]);
+export interface BooleanFunctionOperation extends Equatable<boolean>, Aggregates {}
+applyMixins(BooleanFunctionOperation, [Equatable, Aggregates]);
