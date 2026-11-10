@@ -42,6 +42,10 @@ export interface Expectation {
   unexpectedSql?: string;
   /** Why the expectation does not apply to the GraphQL backend; the GraphQL specs skip it. */
   skipGraphql?: string;
+  /** Why no finder query can ask this (the TPC-BiH cases the finders cannot express); the test is skipped. */
+  skip?: string;
+  /** Floating point values are compared to a relative 1e-9: the last digits of an aggregate depend on the order of its rows. */
+  approximate?: boolean;
 }
 
 /** The backend an expectation runs against: SQL is only checked for `duckdb`. */
@@ -69,8 +73,6 @@ function normalize(value: unknown): unknown {
     if (name === 'DuckDBDateValue' || name === 'DuckDBTimestampValue') return instant(String(value));
     if (name === 'DuckDBDecimalValue') return Number(String(value));
   }
-  // the last digits of a sin, tan or log depend on the platform's math library, so floats are compared to 12 digits
-  if (typeof value === 'number' && Number.isFinite(value) && !Number.isInteger(value)) return Number(value.toPrecision(12));
   return value;
 }
 
@@ -91,8 +93,18 @@ export async function runExpectation(
   const rows = await result.toRows();
   expect(runner.lastColumns).toEqual(expected.columns);
   // a GraphQL server returns dates and timestamps as text, so an expected instant is compared with the text read as one
-  expect(rows.map((r, i) => r.map((v, j) => normalize(expected.rows[i]?.[j] instanceof Temporal && typeof v === 'string' ? ts(v) : v))))
-    .toEqual(expected.rows.map(r => r.map(normalize)));
+  // the last digits of a sin, tan or log depend on the platform's math library, and those of an aggregate on the order its
+  // rows were added in, so two floats are equal when they agree to a relative 1e-12 (1e-9 where the spec says approximate)
+  const tolerance = expected.approximate === true ? 1e-9 : 1e-12;
+  const wanted = expected.rows.map(r => r.map(normalize));
+  const actual = rows.map((r, i) => r.map((v, j) => {
+    const value = normalize(expected.rows[i]?.[j] instanceof Temporal && typeof v === 'string' ? ts(v) : v);
+    const want = wanted[i]?.[j];
+    const close = typeof value === 'number' && typeof want === 'number' && Number.isFinite(value) && Number.isFinite(want)
+      && Math.abs(value - want) <= tolerance * Math.max(Math.abs(want), 1e-300);
+    return close ? want : value;
+  }));
+  expect(actual).toEqual(wanted);
 }
 
 /** One generated expectation: the query is built from a finder so that cases can share one. */

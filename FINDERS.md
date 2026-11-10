@@ -252,7 +252,7 @@ af.findAll([af.count()]).toSql()
 `countAll()` counts the rows of a group, `COUNT(*)`, where `.count()` of a column skips rows where it is missing:
 `f.findAll([f.category(), countAll()]).groupBy(f.category())`. `.std()` and `.var()` give the sample standard
 deviation and variance, and `.std(0)` / `.var(0)` the population ones, as in pandas. `.min()` and `.max()` also work on
-text and dates.
+text and dates. A group is a column or an expression: `.groupBy(f.tradeDate().year())`.
 
 An expression has the aggregates a column has: `f.price().times(f.quantity()).sum()`, `constant(1).sum()`,
 `when(f.price().gt(10)).then(5.5).otherwise(1.5).sum()`. A condition has `.all()` and `.any()`:

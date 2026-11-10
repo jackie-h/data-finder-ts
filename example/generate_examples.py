@@ -27,6 +27,7 @@ _MAPPINGS = [
     'business_range_mapping.md',
     'processing_snapshot_mapping.md',
     'joins_through_tables_mapping.md',
+    'tpch_bih_mapping.md',
 ]
 
 if __name__ == '__main__':
