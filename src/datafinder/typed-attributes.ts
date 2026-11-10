@@ -165,10 +165,11 @@ export abstract class NumericAttribute<A extends AggregateOperation = AggregateO
   }
 }
 
-export interface NumericAttribute<A extends AggregateOperation = AggregateOperation> extends MinMax<A>, Arithmetic {}
-applyMixins(NumericAttribute, [MinMax, Arithmetic]);
+export interface NumericAttribute<A extends AggregateOperation = AggregateOperation> extends MinMax<A> {}
+applyMixins(NumericAttribute, [MinMax]);
 
 export class DoubleAttribute extends NumericAttribute<DoubleAggregateOperation> {
+  numberKind(): 'double' { return 'double'; }
   aggregateKind(): AggregateConstructor<DoubleAggregateOperation> { return DoubleAggregateOperation; }
 
   /** @internal A function of this column that gives a double. */
@@ -222,13 +223,14 @@ export class DoubleAttribute extends NumericAttribute<DoubleAggregateOperation> 
   }
 }
 
-export interface DoubleAttribute extends NumericFunctions<DoubleFunctionOperation> {}
-applyMixins(DoubleAttribute, [NumericFunctions]);
+export interface DoubleAttribute extends NumericFunctions<DoubleFunctionOperation>, Arithmetic<'double'> {}
+applyMixins(DoubleAttribute, [NumericFunctions, Arithmetic]);
 
 export const FloatAttribute = DoubleAttribute;
 export type FloatAttribute = DoubleAttribute;
 
 export class DecimalAttribute extends NumericAttribute<DecimalAggregateOperation> {
+  numberKind(): 'decimal' { return 'decimal'; }
   aggregateKind(): AggregateConstructor<DecimalAggregateOperation> { return DecimalAggregateOperation; }
 
   /** @internal A function of this column that gives a decimal. */
@@ -282,10 +284,11 @@ export class DecimalAttribute extends NumericAttribute<DecimalAggregateOperation
   }
 }
 
-export interface DecimalAttribute extends NumericFunctions<DecimalFunctionOperation> {}
-applyMixins(DecimalAttribute, [NumericFunctions]);
+export interface DecimalAttribute extends NumericFunctions<DecimalFunctionOperation>, Arithmetic<'decimal'> {}
+applyMixins(DecimalAttribute, [NumericFunctions, Arithmetic]);
 
 export class IntegerAttribute extends NumericAttribute<IntegerAggregateOperation> {
+  numberKind(): 'integer' { return 'integer'; }
   aggregateKind(): AggregateConstructor<IntegerAggregateOperation> { return IntegerAggregateOperation; }
 
   /** @internal A function of this column that gives a integer. */
@@ -343,8 +346,8 @@ export class IntegerAttribute extends NumericAttribute<IntegerAggregateOperation
   }
 }
 
-export interface IntegerAttribute extends NumericFunctions<IntegerFunctionOperation> {}
-applyMixins(IntegerAttribute, [NumericFunctions]);
+export interface IntegerAttribute extends NumericFunctions<IntegerFunctionOperation>, Arithmetic<'integer'> {}
+applyMixins(IntegerAttribute, [NumericFunctions, Arithmetic]);
 
 export class BooleanAttribute extends Attribute {
   declare readonly valueType?: boolean;

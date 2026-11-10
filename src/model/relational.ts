@@ -157,18 +157,24 @@ export abstract class NumericConstantOperation extends ConstantOperation {
   abstract readonly value: number;
 
   arithmeticOperand(): RelationalOperationElement { return this; }
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
 
 export class IntegerConstantOperation extends NumericConstantOperation {
   constructor(readonly value: number) { super(); }
+  numberKind(): 'integer' { return 'integer'; }
+  aggregateKind(): AggregateConstructor<IntegerAggregateOperation> { return IntegerAggregateOperation; }
 }
 
 export class FloatConstantOperation extends NumericConstantOperation {
   constructor(readonly value: number) { super(); }
+  numberKind(): 'double' { return 'double'; }
+  aggregateKind(): AggregateConstructor<DoubleAggregateOperation> { return DoubleAggregateOperation; }
 }
 
 export class StringConstantOperation extends ConstantOperation {
   constructor(readonly value: string) { super(); }
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
 
 /** Matches a zone-less calendar date such as `2024-06-01`. */
@@ -183,18 +189,23 @@ export class DateOnly extends Date {}
 
 export class DateConstantOperation extends ConstantOperation {
   constructor(readonly value: Date) { super(); }
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
 
 export class DateTimeConstantOperation extends ConstantOperation {
   constructor(readonly value: Date) { super(); }
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
 
 export class DecimalConstantOperation extends NumericConstantOperation {
   constructor(readonly value: number) { super(); }
+  numberKind(): 'decimal' { return 'decimal'; }
+  aggregateKind(): AggregateConstructor<DecimalAggregateOperation> { return DecimalAggregateOperation; }
 }
 
 export class BooleanConstantOperation extends ConstantOperation {
   constructor(readonly value: boolean) { super(); }
+  comparisonOperand(): RelationalOperationElement { return this; }
 }
 
 export abstract class UnaryOperation extends Operation {
@@ -286,13 +297,21 @@ export type AggregateConstructor<A extends AggregateOperation> = new (
 ) => A;
 
 /** An aggregate of an expression whose type is not known: it takes any comparison. */
-export class UntypedAggregateOperation extends AggregateOperation {}
+export class UntypedAggregateOperation extends AggregateOperation {
+  numberKind(): 'unknown' { return 'unknown'; }
+}
 /** An aggregate that gives a whole number: a count, or the sum, minimum or maximum of integers. */
-export class IntegerAggregateOperation extends AggregateOperation {}
+export class IntegerAggregateOperation extends AggregateOperation {
+  numberKind(): 'integer' { return 'integer'; }
+}
 /** An aggregate that gives a floating-point number: an average, a standard deviation, a variance, or the sum of doubles. */
-export class DoubleAggregateOperation extends AggregateOperation {}
+export class DoubleAggregateOperation extends AggregateOperation {
+  numberKind(): 'double' { return 'double'; }
+}
 /** An aggregate that gives a decimal. */
-export class DecimalAggregateOperation extends AggregateOperation {}
+export class DecimalAggregateOperation extends AggregateOperation {
+  numberKind(): 'decimal' { return 'decimal'; }
+}
 /** An aggregate that gives text: the minimum or maximum of text, or text joined. */
 export class StringAggregateOperation extends AggregateOperation {}
 /** An aggregate that gives a boolean: `all` or `any` of a condition. */
@@ -966,47 +985,111 @@ export enum ArithmeticOperator {
   DIVIDE = '/',
 }
 
+/**
+ * The kind of number an expression holds, as SQL types it: a whole number, a floating-point number or a decimal.
+ * `unknown` is a number of a kind that is not known, such as one given as a variable of type `number`.
+ */
+export type NumberKind = 'integer' | 'double' | 'decimal' | 'unknown';
+
+/** What an expression that holds a number says about it: the operand arithmetic takes, and its kind. */
+export interface NumericOperand extends Typed<number> {
+  arithmeticOperand(): RelationalOperationElement;
+  numberKind(): NumberKind;
+}
+
 /** A number or a numeric expression: what arithmetic takes on the other side. */
-export type ArithmeticOperand = number | { arithmeticOperand(): RelationalOperationElement };
+export type ArithmeticOperand = number | NumericOperand;
 
 /**
- * `plus`, `minus`, `times` and `dividedBy` for an expression that holds a number: `f.price().times(f.quantity())`,
+ * The kind of number an operand is: an expression says; a whole-number literal is an integer and a fractional one a
+ * double (`1` and `1.0` are the same number in JavaScript); a `number` that is not a literal is not known.
+ */
+export type OperandKind<O> = O extends number
+  ? (number extends O ? 'unknown' : `${O}` extends `${bigint}` ? 'integer' : 'double')
+  : O extends { numberKind(): infer B } ? (B extends NumberKind ? B : 'unknown') : 'unknown';
+
+/** The kind of `a + b`, `a - b` and `a * b`, as SQL gives it: a double if either is, else a decimal if either is, else an integer. */
+export type CombinedKind<A extends NumberKind, B extends NumberKind> =
+  'unknown' extends A | B ? 'unknown' : 'double' extends A | B ? 'double' : 'decimal' extends A | B ? 'decimal' : 'integer';
+
+/** The kind of `a / b`: always a double. */
+export type QuotientKind<A extends NumberKind, B extends NumberKind> = 'unknown' extends A | B ? 'unknown' : 'double';
+
+function combinedKind(a: NumberKind, b: NumberKind): NumberKind {
+  if (a === 'unknown' || b === 'unknown') return 'unknown';
+  if (a === 'double' || b === 'double') return 'double';
+  if (a === 'decimal' || b === 'decimal') return 'decimal';
+  return 'integer';
+}
+
+/**
+ * `plus`, `minus`, `times` and `dividedBy` for an expression that holds a number of kind `K`: `f.price().times(f.quantity())`,
  * `f.price().plus(1.5)`, `constant(100).minus(f.price())`. The other operand is a number or another numeric
  * expression. Mixed into the expressions that have it.
+ *
+ * The result is typed as SQL types it: `+ - *` of two integers is an integer, of an integer and a decimal a
+ * decimal, with a double a double; `/` is always a double. A result whose kind is not known is `unknown`, which
+ * takes any comparison.
  */
-export abstract class Arithmetic {
+export abstract class Arithmetic<K extends NumberKind> {
   abstract arithmeticOperand(): RelationalOperationElement;
+  /** @internal The kind of number this expression holds. */
+  abstract numberKind(): K;
 
   /** Raises if this expression is not a number. */
   assertNumeric(): void {}
 
-  private _arithmetic(operator: ArithmeticOperator, other: ArithmeticOperand): ArithmeticOperation {
+  private _arithmetic(operator: ArithmeticOperator, other: ArithmeticOperand): ArithmeticOperation<NumberKind> {
     this.assertNumeric();
     let operand: RelationalOperationElement;
+    let otherKind: NumberKind;
     if (typeof other === 'number') {
       if (!Number.isFinite(other)) throw new TypeError('Arithmetic is between numbers and numeric columns, not a non-finite number');
       operand = valueOperand(other);
+      otherKind = Number.isInteger(other) ? 'integer' : 'double';
     } else if (other !== null && typeof other === 'object' && typeof other.arithmeticOperand === 'function') {
-      (other as unknown as Arithmetic).assertNumeric?.();
+      (other as unknown as Arithmetic<NumberKind>).assertNumeric?.();
       operand = other.arithmeticOperand();
+      otherKind = typeof other.numberKind === 'function' ? other.numberKind() : 'unknown';
     } else {
-      throw new TypeError(`Arithmetic is between numbers and numeric columns, not ${other === null ? 'null' : typeof other === 'object' ? other.constructor.name : typeof other}`);
+      throw new TypeError(`Arithmetic is between numbers and numeric columns, not ${other === null ? 'null' : typeof other === 'object' ? (other as object).constructor.name : typeof other}`);
     }
-    return new ArithmeticOperation(this.arithmeticOperand(), operator, operand);
+    const kind = operator === ArithmeticOperator.DIVIDE
+      ? (this.numberKind() === 'unknown' || otherKind === 'unknown' ? 'unknown' : 'double')
+      : combinedKind(this.numberKind(), otherKind);
+    return arithmeticOfKind(kind, this.arithmeticOperand(), operator, operand);
   }
 
   /** `this + other`. */
-  plus(other: ArithmeticOperand): ArithmeticOperation { return this._arithmetic(ArithmeticOperator.ADD, other); }
+  plus<O extends ArithmeticOperand>(other: O): ArithmeticOperation<CombinedKind<K, OperandKind<O>>> {
+    return this._arithmetic(ArithmeticOperator.ADD, other) as ArithmeticOperation<never>;
+  }
   /** `this - other`. */
-  minus(other: ArithmeticOperand): ArithmeticOperation { return this._arithmetic(ArithmeticOperator.SUBTRACT, other); }
+  minus<O extends ArithmeticOperand>(other: O): ArithmeticOperation<CombinedKind<K, OperandKind<O>>> {
+    return this._arithmetic(ArithmeticOperator.SUBTRACT, other) as ArithmeticOperation<never>;
+  }
   /** `this * other`. */
-  times(other: ArithmeticOperand): ArithmeticOperation { return this._arithmetic(ArithmeticOperator.MULTIPLY, other); }
-  /** `this / other`. */
-  dividedBy(other: ArithmeticOperand): ArithmeticOperation { return this._arithmetic(ArithmeticOperator.DIVIDE, other); }
+  times<O extends ArithmeticOperand>(other: O): ArithmeticOperation<CombinedKind<K, OperandKind<O>>> {
+    return this._arithmetic(ArithmeticOperator.MULTIPLY, other) as ArithmeticOperation<never>;
+  }
+  /** `this / other`: a double. */
+  dividedBy<O extends ArithmeticOperand>(other: O): ArithmeticOperation<QuotientKind<K, OperandKind<O>>> {
+    return this._arithmetic(ArithmeticOperator.DIVIDE, other) as ArithmeticOperation<never>;
+  }
 }
 
+/** The aggregate that gives a number of kind `K`. */
+export type AggregateOfKind<K extends NumberKind> =
+  K extends 'integer' ? IntegerAggregateOperation
+  : K extends 'double' ? DoubleAggregateOperation
+  : K extends 'decimal' ? DecimalAggregateOperation
+  : UntypedAggregateOperation;
+
+/** What an expression of kind `K` is compared with: numbers, whatever the kind; anything if it is not known. */
+export type NumberOf<K extends NumberKind> = 'unknown' extends K ? any : number;
+
 /** `left operator right` on numbers, e.g. `price * quantity`. */
-export class ArithmeticOperation extends BinaryOperation implements Sortable {
+export class ArithmeticOperation<K extends NumberKind = NumberKind> extends BinaryOperation implements Sortable {
   constructor(
     left: RelationalOperationElement,
     readonly operator: ArithmeticOperator,
@@ -1022,6 +1105,41 @@ export class ArithmeticOperation extends BinaryOperation implements Sortable {
 
   arithmeticOperand(): RelationalOperationElement { return this; }
   comparisonOperand(): RelationalOperationElement { return this; }
+  /** @internal The kind of number it gives: not known, unless a subclass says. */
+  numberKind(): K { return 'unknown' as K; }
+}
+
+export interface ArithmeticOperation<K extends NumberKind = NumberKind>
+  extends Arithmetic<K>, Equatable<NumberOf<K>>, Orderable<NumberOf<K>>, Aggregates<AggregateOfKind<K>> {}
+applyMixins(ArithmeticOperation, [Arithmetic, Equatable, Orderable, Aggregates]);
+
+/** `+ - *` of integers: an integer. Its sum, minimum and maximum are integers. */
+export class IntegerArithmeticOperation extends ArithmeticOperation<'integer'> {
+  numberKind(): 'integer' { return 'integer'; }
+  aggregateKind(): AggregateConstructor<IntegerAggregateOperation> { return IntegerAggregateOperation; }
+}
+
+/** Arithmetic with a double, or a division: a double. */
+export class DoubleArithmeticOperation extends ArithmeticOperation<'double'> {
+  numberKind(): 'double' { return 'double'; }
+  aggregateKind(): AggregateConstructor<DoubleAggregateOperation> { return DoubleAggregateOperation; }
+}
+
+/** `+ - *` of decimals, or of a decimal and an integer: a decimal. */
+export class DecimalArithmeticOperation extends ArithmeticOperation<'decimal'> {
+  numberKind(): 'decimal' { return 'decimal'; }
+  aggregateKind(): AggregateConstructor<DecimalAggregateOperation> { return DecimalAggregateOperation; }
+}
+
+function arithmeticOfKind(
+  kind: NumberKind, left: RelationalOperationElement, operator: ArithmeticOperator, right: RelationalOperationElement,
+): ArithmeticOperation<NumberKind> {
+  switch (kind) {
+    case 'integer': return new IntegerArithmeticOperation(left, operator, right);
+    case 'double': return new DoubleArithmeticOperation(left, operator, right);
+    case 'decimal': return new DecimalArithmeticOperation(left, operator, right);
+    default: return new ArithmeticOperation(left, operator, right);
+  }
 }
 
 /** Text joined end to end. A NULL in any part makes the whole NULL, as with SQL's `||`. */
@@ -1076,19 +1194,16 @@ applyMixins(DateDiffOperation, [Equatable, Orderable]);
 export interface DateTruncOperation extends Equatable<DateValue>, Orderable<DateValue> {}
 applyMixins(DateTruncOperation, [Equatable, Orderable]);
 
-export interface ArithmeticOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
-applyMixins(ArithmeticOperation, [Arithmetic, Equatable, Orderable]);
-
-export interface UntypedAggregateOperation extends Arithmetic, Equatable<any>, Orderable<any>, StringPredicates {}
+export interface UntypedAggregateOperation extends Arithmetic<'unknown'>, Equatable<any>, Orderable<any>, StringPredicates {}
 applyMixins(UntypedAggregateOperation, [Arithmetic, Equatable, Orderable, StringPredicates]);
 
-export interface IntegerAggregateOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
+export interface IntegerAggregateOperation extends Arithmetic<'integer'>, Equatable<number>, Orderable<number> {}
 applyMixins(IntegerAggregateOperation, [Arithmetic, Equatable, Orderable]);
 
-export interface DoubleAggregateOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
+export interface DoubleAggregateOperation extends Arithmetic<'double'>, Equatable<number>, Orderable<number> {}
 applyMixins(DoubleAggregateOperation, [Arithmetic, Equatable, Orderable]);
 
-export interface DecimalAggregateOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
+export interface DecimalAggregateOperation extends Arithmetic<'decimal'>, Equatable<number>, Orderable<number> {}
 applyMixins(DecimalAggregateOperation, [Arithmetic, Equatable, Orderable]);
 
 export interface StringAggregateOperation extends Equatable<string>, StringPredicates {}
@@ -1106,14 +1221,28 @@ applyMixins(DateTimeAggregateOperation, [Equatable, Orderable]);
 export interface CountAllOperation extends Equatable<number>, Orderable<number> {}
 applyMixins(CountAllOperation, [Equatable, Orderable]);
 
-export interface NumericConstantOperation extends Arithmetic {}
-applyMixins(NumericConstantOperation, [Arithmetic]);
+// A constant is compared as its type is, and has the aggregates of its type: `constant(1).sum()` is an integer.
+// A number also takes part in arithmetic of its own kind: `constant(100).minus(f.price())`.
+export interface IntegerConstantOperation extends Arithmetic<'integer'>, Equatable<number>, Orderable<number>, Aggregates<IntegerAggregateOperation> {}
+applyMixins(IntegerConstantOperation, [Arithmetic, Equatable, Orderable, Aggregates]);
 
-export interface ConstantOperation extends Aggregates {}
-applyMixins(ConstantOperation, [Aggregates]);
+export interface FloatConstantOperation extends Arithmetic<'double'>, Equatable<number>, Orderable<number>, Aggregates<DoubleAggregateOperation> {}
+applyMixins(FloatConstantOperation, [Arithmetic, Equatable, Orderable, Aggregates]);
 
-export interface ArithmeticOperation extends Aggregates {}
-applyMixins(ArithmeticOperation, [Aggregates]);
+export interface DecimalConstantOperation extends Arithmetic<'decimal'>, Equatable<number>, Orderable<number>, Aggregates<DecimalAggregateOperation> {}
+applyMixins(DecimalConstantOperation, [Arithmetic, Equatable, Orderable, Aggregates]);
+
+export interface StringConstantOperation extends Equatable<string>, StringPredicates, Aggregates {}
+applyMixins(StringConstantOperation, [Equatable, StringPredicates, Aggregates]);
+
+export interface DateConstantOperation extends Equatable<DateValue>, Orderable<DateValue>, Aggregates {}
+applyMixins(DateConstantOperation, [Equatable, Orderable, Aggregates]);
+
+export interface DateTimeConstantOperation extends Equatable<DateValue>, Orderable<DateValue>, Aggregates {}
+applyMixins(DateTimeConstantOperation, [Equatable, Orderable, Aggregates]);
+
+export interface BooleanConstantOperation extends Equatable<boolean>, Aggregates {}
+applyMixins(BooleanConstantOperation, [Equatable, Aggregates]);
 
 export interface CaseOperation extends Aggregates {}
 applyMixins(CaseOperation, [Aggregates]);

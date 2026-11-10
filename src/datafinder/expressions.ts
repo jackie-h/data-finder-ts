@@ -14,10 +14,17 @@ import {
 
 /**
  * A fixed value as a column: `f.findAll(null, null, [f.name(), constant('EU').alias('Region')])`.
- * A number is a `NumericConstantOperation`, which takes part in arithmetic: `constant(100).minus(f.price())`.
+ * A number is an integer constant or a float one, which takes part in arithmetic: `constant(100).minus(f.price())`.
+ * A whole-number literal is an integer and a fractional one a float, as `1` and `1.0` are the same number in JavaScript.
  * A `DateOnly` is a date and any other `Date` a timestamp. It is named "Constant" unless `alias` gives it a name.
  */
-export function constant(value: number): NumericConstantOperation;
+export function constant<N extends number>(value: N): number extends N
+  ? IntegerConstantOperation | FloatConstantOperation
+  : `${N}` extends `${bigint}` ? IntegerConstantOperation : FloatConstantOperation;
+export function constant(value: string): StringConstantOperation;
+export function constant(value: boolean): BooleanConstantOperation;
+export function constant(value: DateOnly): DateConstantOperation;
+export function constant(value: Date): DateTimeConstantOperation;
 export function constant(value: boolean | string | Date): ConstantOperation;
 export function constant(value: boolean | number | string | Date): ConstantOperation;
 export function constant(value: boolean | number | string | Date): ConstantOperation {
