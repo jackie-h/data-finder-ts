@@ -20,6 +20,10 @@ import {
   Arithmetic,
   StringPredicates,
   DateValue,
+  StringConstantOperation,
+  IntegerConstantOperation,
+  FloatConstantOperation,
+  DecimalConstantOperation,
   Aggregates,
   AggregateConstructor,
   IntegerAggregateOperation,
@@ -279,3 +283,27 @@ applyMixins(DateFunctionOperation, [Equatable, Orderable, Aggregates]);
 
 export interface BooleanFunctionOperation extends Equatable<boolean>, Aggregates {}
 applyMixins(BooleanFunctionOperation, [Equatable, Aggregates]);
+
+// A constant has the functions a column of its type has: `constant('Hello').length()`, `constant(16).sqrt()`.
+// A function of a constant is applied to the constant and named for the function and the value: `Upper Hello`.
+declare module '../model/relational' {
+  interface StringConstantOperation extends StringFunctions {}
+  interface IntegerConstantOperation extends NumericFunctions<IntegerFunctionOperation> {}
+  interface FloatConstantOperation extends NumericFunctions<DoubleFunctionOperation> {}
+  interface DecimalConstantOperation extends NumericFunctions<DecimalFunctionOperation> {}
+}
+applyMixins(StringConstantOperation, [StringFunctions]);
+applyMixins(IntegerConstantOperation, [NumericFunctions]);
+applyMixins(FloatConstantOperation, [NumericFunctions]);
+applyMixins(DecimalConstantOperation, [NumericFunctions]);
+
+IntegerConstantOperation.prototype.sameType = function (func, label, secondArg) {
+  return new IntegerFunctionOperation(this, func, label, secondArg);
+};
+IntegerConstantOperation.prototype.isInteger = () => true;
+FloatConstantOperation.prototype.sameType = function (func, label, secondArg) {
+  return new DoubleFunctionOperation(this, func, label, secondArg);
+};
+DecimalConstantOperation.prototype.sameType = function (func, label, secondArg) {
+  return new DecimalFunctionOperation(this, func, label, secondArg);
+};

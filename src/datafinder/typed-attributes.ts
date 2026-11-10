@@ -1,4 +1,5 @@
 import { Attribute, AttributeValue, Comparand, comparandOperand } from './attribute';
+import { DateFunctions, DateTimeFunctions } from './date-functions';
 import {
   NumericFunctions, StringFunctions, StringFunctionOperation, IntegerFunctionOperation, DoubleFunctionOperation,
   DecimalFunctionOperation, DateFunctionOperation, BooleanFunctionOperation,
@@ -457,46 +458,6 @@ export class DateAttribute extends Attribute {
     return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
 
-  /** Extract the four-digit calendar year. */
-  year(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.YEAR, 'Year ' + this.displayName()); }
-  /** Extract the month number (1–12). */
-  month(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.MONTH, 'Month ' + this.displayName()); }
-  /** Extract the day of the month (1–31). */
-  day(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.DAY, 'Day ' + this.displayName()); }
-  /** Extract the quarter (1–4). */
-  quarter(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.QUARTER, 'Quarter ' + this.displayName()); }
-  /** Extract the ISO week number (1–53). */
-  week(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.WEEK, 'Week ' + this.displayName()); }
-  /** Extract the day of the week (0 = Sunday through 6 = Saturday). */
-  dayOfWeek(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.DOW, 'Day Of Week ' + this.displayName()); }
-  /** The date of the first day of the week the date falls in (a Monday). */
-  firstDayOfWeek(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.WEEK, 'First Day Of Week ' + this.displayName()); }
-  /** The date of the first day of the month the date falls in. */
-  firstDayOfMonth(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.MONTH, 'First Day Of Month ' + this.displayName()); }
-  /** The date of the first day of the quarter the date falls in. */
-  firstDayOfQuarter(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.QUARTER, 'First Day Of Quarter ' + this.displayName()); }
-  /** The date of the first day of the year the date falls in. */
-  firstDayOfYear(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.YEAR, 'First Day Of Year ' + this.displayName()); }
-
-  /** Add `n` days to this date. */
-  addDays(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.DAY, true, 'Add Days ' + this.displayName()); }
-  /** Add `n` months to this date. */
-  addMonths(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.MONTH, true, 'Add Months ' + this.displayName()); }
-  /** Add `n` years to this date. */
-  addYears(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.YEAR, true, 'Add Years ' + this.displayName()); }
-  /** Subtract `n` days from this date. */
-  subtractDays(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.DAY, false, 'Subtract Days ' + this.displayName()); }
-  /** Subtract `n` months from this date. */
-  subtractMonths(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.MONTH, false, 'Subtract Months ' + this.displayName()); }
-  /** Subtract `n` years from this date. */
-  subtractYears(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.YEAR, false, 'Subtract Years ' + this.displayName()); }
-
-  /** Number of whole days between this date and `other`. */
-  diffDays(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.DAY, 'Diff Days ' + this.displayName()); }
-  /** Number of whole months between this date and `other`. */
-  diffMonths(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.MONTH, 'Diff Months ' + this.displayName()); }
-  /** Number of whole years between this date and `other`. */
-  diffYears(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.YEAR, 'Diff Years ' + this.displayName()); }
 }
 
 export class DateTimeAttribute extends Attribute {
@@ -549,74 +510,10 @@ export class DateTimeAttribute extends Attribute {
     return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => temporalConstant((value as Date | string)));
   }
 
-  /** Extract the four-digit calendar year. */
-  year(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.YEAR, 'Year ' + this.displayName()); }
-  /** Extract the month number (1–12). */
-  month(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.MONTH, 'Month ' + this.displayName()); }
-  /** Extract the day of the month (1–31). */
-  day(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.DAY, 'Day ' + this.displayName()); }
-  /** Extract the hour (0–23). */
-  hour(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.HOUR, 'Hour ' + this.displayName()); }
-  /** Extract the minute (0–59). */
-  minute(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.MINUTE, 'Minute ' + this.displayName()); }
-  /** Extract the second (0–59). */
-  second(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.SECOND, 'Second ' + this.displayName()); }
-  /** Extract the quarter (1–4). */
-  quarter(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.QUARTER, 'Quarter ' + this.displayName()); }
-  /** Extract the ISO week number (1–53). */
-  week(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.WEEK, 'Week ' + this.displayName()); }
-  /** Extract the day of the week (0 = Sunday through 6 = Saturday). */
-  dayOfWeek(): DateExtractOperation { return new DateExtractOperation(this.cwj(), DatePart.DOW, 'Day Of Week ' + this.displayName()); }
-  /** The date of the first day of the week the date falls in (a Monday). */
-  firstDayOfWeek(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.WEEK, 'First Day Of Week ' + this.displayName()); }
-  /** The date of the first day of the month the date falls in. */
-  firstDayOfMonth(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.MONTH, 'First Day Of Month ' + this.displayName()); }
-  /** The date of the first day of the quarter the date falls in. */
-  firstDayOfQuarter(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.QUARTER, 'First Day Of Quarter ' + this.displayName()); }
-  /** The date of the first day of the year the date falls in. */
-  firstDayOfYear(): DateTruncOperation { return new DateTruncOperation(this.cwj(), DatePart.YEAR, 'First Day Of Year ' + this.displayName()); }
-
-  /** Add `n` days to this timestamp. */
-  addDays(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.DAY, true, 'Add Days ' + this.displayName()); }
-  /** Add `n` months to this timestamp. */
-  addMonths(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.MONTH, true, 'Add Months ' + this.displayName()); }
-  /** Add `n` years to this timestamp. */
-  addYears(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.YEAR, true, 'Add Years ' + this.displayName()); }
-  /** Add `n` hours to this timestamp. */
-  addHours(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.HOUR, true, 'Add Hours ' + this.displayName()); }
-  /** Add `n` minutes to this timestamp. */
-  addMinutes(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.MINUTE, true, 'Add Minutes ' + this.displayName()); }
-  /** Add `n` seconds to this timestamp. */
-  addSeconds(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.SECOND, true, 'Add Seconds ' + this.displayName()); }
-  /** Subtract `n` days from this timestamp. */
-  subtractDays(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.DAY, false, 'Subtract Days ' + this.displayName()); }
-  /** Subtract `n` months from this timestamp. */
-  subtractMonths(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.MONTH, false, 'Subtract Months ' + this.displayName()); }
-  /** Subtract `n` years from this timestamp. */
-  subtractYears(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.YEAR, false, 'Subtract Years ' + this.displayName()); }
-  /** Subtract `n` hours from this timestamp. */
-  subtractHours(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.HOUR, false, 'Subtract Hours ' + this.displayName()); }
-  /** Subtract `n` minutes from this timestamp. */
-  subtractMinutes(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.MINUTE, false, 'Subtract Minutes ' + this.displayName()); }
-  /** Subtract `n` seconds from this timestamp. */
-  subtractSeconds(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.cwj(), n, DatePart.SECOND, false, 'Subtract Seconds ' + this.displayName()); }
-
-  /** Number of whole days between this timestamp and `other`. */
-  diffDays(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.DAY, 'Diff Days ' + this.displayName()); }
-  /** Number of whole months between this timestamp and `other`. */
-  diffMonths(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.MONTH, 'Diff Months ' + this.displayName()); }
-  /** Number of whole years between this timestamp and `other`. */
-  diffYears(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.YEAR, 'Diff Years ' + this.displayName()); }
-  /** Number of whole hours between this timestamp and `other`. */
-  diffHours(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.HOUR, 'Diff Hours ' + this.displayName()); }
-  /** Number of whole minutes between this timestamp and `other`. */
-  diffMinutes(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.MINUTE, 'Diff Minutes ' + this.displayName()); }
-  /** Number of whole seconds between this timestamp and `other`. */
-  diffSeconds(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.cwj(), diffOther(other), DatePart.SECOND, 'Diff Seconds ' + this.displayName()); }
 }
 
-export interface DateAttribute extends MinMax<DateAggregateOperation> {}
-applyMixins(DateAttribute, [MinMax]);
+export interface DateAttribute extends MinMax<DateAggregateOperation>, DateFunctions {}
+applyMixins(DateAttribute, [MinMax, DateFunctions]);
 
-export interface DateTimeAttribute extends MinMax<DateTimeAggregateOperation> {}
-applyMixins(DateTimeAttribute, [MinMax]);
+export interface DateTimeAttribute extends MinMax<DateTimeAggregateOperation>, DateTimeFunctions {}
+applyMixins(DateTimeAttribute, [MinMax, DateTimeFunctions]);
