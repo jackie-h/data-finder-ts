@@ -1038,6 +1038,9 @@ class SQLQueryGenerator {
       const ta = this._tableAliasForTable(col.ownerRelation);
       this._from.add(ta);
       this._select.push(new Alias(new TableAliasColumn(col, ta), col.name));
+    } else if ((col instanceof DateExtractOperation || col instanceof DateArithmeticOperation) && !(col.element instanceof ColumnWithJoin)) {
+      // a function of a constant or of an expression: rewritten as a whole
+      this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation) {
       const colNested = this._resolve(findColumn(col as RelationalOperationElement));
       const node = colNested.parent;

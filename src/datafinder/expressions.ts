@@ -11,6 +11,8 @@ import {
   NumericConstantOperation,
   StringConstantOperation,
 } from '../model/relational';
+import './scalar-functions'; // a constant has the functions of its type
+import './date-functions';
 
 /**
  * A fixed value as a column: `f.findAll(null, null, [f.name(), constant('EU').alias('Region')])`.

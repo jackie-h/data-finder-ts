@@ -150,6 +150,17 @@ export abstract class ConstantOperation extends RelationalOperationElement imple
 
   /** Sort by this expression, largest first. */
   descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+
+  /** @internal The expression a function of this constant applies to: the constant itself. */
+  functionInput(): RelationalOperationElement { return this; }
+
+  /** @internal What a function of this constant is labelled after: its value, as text. */
+  functionLabel(): string {
+    const value = (this as unknown as { value: unknown }).value;
+    if (value instanceof DateOnly) return value.toISOString().slice(0, 10);
+    if (value instanceof Date) return value.toISOString().slice(0, 19).replace('T', ' ');
+    return String(value);
+  }
 }
 
 /** A constant that is a number, so it can be an operand of arithmetic: `constant(100).minus(f.price())`. */
@@ -185,7 +196,10 @@ export const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  * that was given as a date rather than a timestamp, and is rendered as a date literal (`'2024-06-01'`)
  * instead of a timestamp literal (`'2024-06-01 00:00:00'`).
  */
-export class DateOnly extends Date {}
+export class DateOnly extends Date {
+  /** Only for the types: a plain `Date` is not a `DateOnly`, so `constant(date)` can tell a date from a timestamp. */
+  declare readonly dateOnly: true;
+}
 
 export class DateConstantOperation extends ConstantOperation {
   constructor(readonly value: Date) { super(); }
