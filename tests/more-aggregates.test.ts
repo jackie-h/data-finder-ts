@@ -5,11 +5,11 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { DateAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, NoOperation, RelationalOperationElement, Table } from '../src/model/relational';
 
-const table = new Table('t', [new Column('a', 'INT', 't'), new Column('s', 'VARCHAR', 't'), new Column('d', 'DATE', 't')]);
+const table = new Table('t', [new Column('a', 'INT', new Table('t', [])), new Column('s', 'VARCHAR', new Table('t', [])), new Column('d', 'DATE', new Table('t', []))]);
 const sql = (...columns: RelationalOperationElement[]) => toSql(null, null, columns as never, table, new NoOperation());
 
 describe('more aggregates', () => {
-  const a = new IntegerAttribute('A', 'a', 'INT', 't');
+  const a = new IntegerAttribute('A', 'a', 'INT', new Table('t', []));
 
   it('countAll is COUNT(*)', () => {
     expect(sql(countAll())).toBe('SELECT COUNT(*) AS "Count" FROM t AS t0');
@@ -31,8 +31,8 @@ describe('more aggregates', () => {
   });
 
   it('min and max work on text and dates', () => {
-    const s = new StringAttribute('S', 's', 'VARCHAR', 't');
-    const d = new DateAttribute('D', 'd', 'DATE', 't');
+    const s = new StringAttribute('S', 's', 'VARCHAR', new Table('t', []));
+    const d = new DateAttribute('D', 'd', 'DATE', new Table('t', []));
     expect(sql(s.min(), d.max())).toBe('SELECT MIN(t0.s) AS "Min S",MAX(t0.d) AS "Max D" FROM t AS t0');
   });
 });

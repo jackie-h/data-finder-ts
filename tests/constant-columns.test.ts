@@ -16,7 +16,7 @@ import { Column, DateOnly, NoOperation, RelationalOperationElement, Table } from
 import { csvTable, startGraphQLServer } from './csv-graphql-server';
 
 const select = (...columns: (Attribute | RelationalOperationElement)[]) =>
-  toSql(null, null, columns, new Table('t', [new Column('a', 'INT', 't')]), new NoOperation());
+  toSql(null, null, columns, new Table('t', [new Column('a', 'INT', new Table('t', []))]), new NoOperation());
 
 describe('the SQL', () => {
   it('types', () => {

@@ -13,10 +13,10 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Alias, CaseOperation, Column, NoOperation, RelationalOperationElement, Table } from '../src/model/relational';
 
-const a = new IntegerAttribute('A', 'a', 'INT', 't');
-const b = new StringAttribute('B', 'b', 'VARCHAR', 't');
+const a = new IntegerAttribute('A', 'a', 'INT', new Table('t', []));
+const b = new StringAttribute('B', 'b', 'VARCHAR', new Table('t', []));
 const sql = (...columns: (Attribute | RelationalOperationElement)[]) =>
-  toSql(null, null, columns, new Table('t', [new Column('a', 'INT', 't'), new Column('b', 'VARCHAR', 't')]), new NoOperation());
+  toSql(null, null, columns, new Table('t', [new Column('a', 'INT', new Table('t', [])), new Column('b', 'VARCHAR', new Table('t', []))]), new NoOperation());
 
 describe('a condition as a column', () => {
   it('a comparison', () => {

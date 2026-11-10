@@ -4,8 +4,8 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, NoOperation, Operation, Table } from '../src/model/relational';
 
-const table = new Table('t', [new Column('name', 'VARCHAR', 't')]);
-const attr = new StringAttribute('Name', 'name', 'VARCHAR', 't');
+const table = new Table('t', [new Column('name', 'VARCHAR', new Table('t', []))]);
+const attr = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
 const where = (op: Operation) => toSql(null, null, [attr], table, op).split(' WHERE ')[1];
 
 describe('string literals are escaped', () => {

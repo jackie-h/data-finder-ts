@@ -5,9 +5,9 @@ import { FinderResult } from '../src/datafinder/runner';
 import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, NoOperation, Table } from '../src/model/relational';
 
-const table = new Table('t', [new Column('a', 'INT', 't'), new Column('s', 'VARCHAR', 't')]);
-const a = new IntegerAttribute('A', 'a', 'INT', 't');
-const s = new StringAttribute('S', 's', 'VARCHAR', 't');
+const table = new Table('t', [new Column('a', 'INT', new Table('t', [])), new Column('s', 'VARCHAR', new Table('t', []))]);
+const a = new IntegerAttribute('A', 'a', 'INT', new Table('t', []));
+const s = new StringAttribute('S', 's', 'VARCHAR', new Table('t', []));
 
 describe('having', () => {
   it('having a count', () => {

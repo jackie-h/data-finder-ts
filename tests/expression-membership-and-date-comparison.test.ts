@@ -5,9 +5,9 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { Column, DateOnly, RelationalOperationElement, Table } from '../src/model/relational';
 
 const table = new Table('t', [new Column('D', 'DATE'), new Column('T', 'TIMESTAMP'), new Column('N', 'VARCHAR')]);
-const day = new DateAttribute('D', 'D', 'DATE', 't');
-const moment = new DateTimeAttribute('T', 'T', 'TIMESTAMP', 't');
-const name = new StringAttribute('N', 'N', 'VARCHAR', 't');
+const day = new DateAttribute('D', 'D', 'DATE', new Table('t', []));
+const moment = new DateTimeAttribute('T', 'T', 'TIMESTAMP', new Table('t', []));
+const name = new StringAttribute('N', 'N', 'VARCHAR', new Table('t', []));
 const sql = (select: RelationalOperationElement, condition: RelationalOperationElement) => toSql(null, null, [select as never], table, condition);
 
 describe('isIn and isNotIn on an expression', () => {

@@ -57,10 +57,16 @@ def has_processing_snapshot(mapping: MilestonePropertyMapping) -> bool:
     return isinstance(mapping, SingleProcessingDatetimeMilestonePropertyMapping)
 
 
+def owner_code(table: Table) -> str:
+    """TypeScript source for the relation a column or an attribute belongs to: a table of that name, whose columns this
+    finder does not need to know."""
+    return f"new Table('{table_qualified_name(table)}', [])"
+
+
 def column_code(column: Column, keyed: bool = True) -> str:
     """TypeScript source that builds ``column`` in a generated finder. ``keyed`` False leaves out its primary key flag."""
     key = ", true" if column.primary_key and keyed else ""
-    return f"new Column('{column.name}', '{column.type}', '{table_qualified_name(column.table)}'{key})"
+    return f"new Column('{column.name}', '{column.type}', {owner_code(column.table)}{key})"
 
 
 def _scheme_columns_code(table: Table) -> str:
@@ -365,6 +371,7 @@ def generate(mapping: Mapping, output_directory: str):
         to_ts_name=to_ts_name,
         to_camel_case=to_camel_case,
         table_qualified_name=table_qualified_name,
+        owner_code=owner_code,
         get_used_attr_types=get_used_attr_types,
         get_doc=get_doc,
         prop_jsdoc=prop_jsdoc,

@@ -5,8 +5,8 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { Column, NoOperation, Table } from '../src/model/relational';
 
 const table = new Table('t', [new Column('name', 'VARCHAR'), new Column('id', 'INT')]);
-const name = new StringAttribute('Name', 'name', 'VARCHAR', 't');
-const id = new IntegerAttribute('Id', 'id', 'INT', 't');
+const name = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
+const id = new IntegerAttribute('Id', 'id', 'INT', new Table('t', []));
 
 describe('an aggregate over a window', () => {
   it('does not group the rows', () => {

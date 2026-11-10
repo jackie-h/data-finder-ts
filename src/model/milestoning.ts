@@ -87,7 +87,7 @@ export class MilestonedTable extends Table {
   ) {
     super(name, columns, schema);
     for (const col of milestoningColumns.columns()) {
-      col.table = this;
+      col.owner = this;
     }
   }
 }

@@ -11,7 +11,7 @@ import { Column, JoinOperation, JoinTreeNodeOperation, NoOperation, SortDirectio
 const result = () => convertInputsAndSelect(null, null, [], new Table('t', []), new NoOperation());
 const orderOf = (r: unknown) => (r as { _orderBy: { column: { column: { name: string } }; direction: SortDirection }[] })
   ._orderBy.map(s => [s.column.column.name, s.direction]);
-const [a, b, c] = ['a', 'b', 'c'].map(n => new StringAttribute(n.toUpperCase(), n, 'VARCHAR', 't'));
+const [a, b, c] = ['a', 'b', 'c'].map(n => new StringAttribute(n.toUpperCase(), n, 'VARCHAR', new Table('t', [])));
 
 describe('orderBy accumulates', () => {
   it('makes the later call primary', () => {
@@ -35,9 +35,9 @@ describe('orderBy accumulates', () => {
   });
 
   it('treats the same column reached through a join as a different sort', () => {
-    const join = new JoinOperation('Other', new Table('other', []), new Column('fk', 'INT', 't'), new Column('id', 'INT', 'other'));
-    const joined = new StringAttribute('Other Name', 'name', 'VARCHAR', 'other', new JoinTreeNodeOperation(join));
-    const own = new StringAttribute('Name', 'name', 'VARCHAR', 't');
+    const join = new JoinOperation('Other', new Table('other', []), new Column('fk', 'INT', new Table('t', [])), new Column('id', 'INT', new Table('other', [])));
+    const joined = new StringAttribute('Other Name', 'name', 'VARCHAR', new Table('other', []), new JoinTreeNodeOperation(join));
+    const own = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
     expect(orderOf(result().orderBy(own.ascending()).orderBy(joined.ascending()))).toHaveLength(2);
   });
 

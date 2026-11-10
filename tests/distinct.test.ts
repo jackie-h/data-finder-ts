@@ -15,8 +15,8 @@ import { Column, NoOperation, Table } from '../src/model/relational';
 import { csvTable, startGraphQLServer } from './csv-graphql-server';
 
 describe('the SQL', () => {
-  const attr = new IntegerAttribute('Id', 'id', 'INT', 't');
-  const table = new Table('t', [new Column('id', 'INT', 't')]);
+  const attr = new IntegerAttribute('Id', 'id', 'INT', new Table('t', []));
+  const table = new Table('t', [new Column('id', 'INT', new Table('t', []))]);
 
   it('selects distinct', () => {
     expect(toSql(null, null, [attr], table, new NoOperation(), [], [], undefined, null, true))

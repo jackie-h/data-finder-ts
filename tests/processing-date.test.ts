@@ -11,11 +11,11 @@ import { MilestonedTable, ProcessingTemporalColumns } from '../src/model/milesto
 
 function table(): MilestonedTable {
   return new MilestonedTable('trades', [], new ProcessingTemporalColumns(
-    new Column('in_z', 'TIMESTAMP', 'trades'), new Column('out_z', 'TIMESTAMP', 'trades'), '9999-12-31 23:59:59',
+    new Column('in_z', 'TIMESTAMP', new Table('trades', [])), new Column('out_z', 'TIMESTAMP', new Table('trades', [])), '9999-12-31 23:59:59',
   ));
 }
 
-const id = new IntegerAttribute('Id', 'id', 'INT', 'trades');
+const id = new IntegerAttribute('Id', 'id', 'INT', new Table('trades', []));
 
 function sqlFor(processing: Date | string): string {
   return convertInputsAndSelect(null, processing, [id], table(), new NoOperation()).toSql();
@@ -50,13 +50,13 @@ describe('processing date rendering', () => {
   });
 
   it('renders a DateOnly in a hand-built filter', () => {
-    const op = new DateTimeAttribute('Start', 'in_z', 'TIMESTAMP', 'trades');
+    const op = new DateTimeAttribute('Start', 'in_z', 'TIMESTAMP', new Table('trades', []));
     expect(toSql(null, null, [id], table(), op.lte(new DateOnly('2017-06-11')))).toContain("in_z <= '2017-06-11'");
   });
 });
 
 describe('DateTimeAttribute compared with a date', () => {
-  const attr = new DateTimeAttribute('Start', 'in_z', 'TIMESTAMP', 'trades');
+  const attr = new DateTimeAttribute('Start', 'in_z', 'TIMESTAMP', new Table('trades', []));
   const where = (op: ReturnType<typeof attr.eq>) => toSql(null, null, [id], new Table('trades', []), op).split(' WHERE ')[1];
 
   it('renders a DateOnly or a date string as a date literal', () => {

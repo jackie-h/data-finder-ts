@@ -5,10 +5,10 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { IntegerAttribute } from '../src/datafinder/typed-attributes';
 import { Column, NoOperation, RelationalOperationElement, Table } from '../src/model/relational';
 
-const table = new Table('t', [new Column('a', 'INT', 't'), new Column('b', 'INT', 't')]);
+const table = new Table('t', [new Column('a', 'INT', new Table('t', [])), new Column('b', 'INT', new Table('t', []))]);
 const sql = (...columns: RelationalOperationElement[]) => toSql(null, null, columns as never, table, new NoOperation());
-const a = new IntegerAttribute('A', 'a', 'INT', 't');
-const b = new IntegerAttribute('B', 'b', 'INT', 't');
+const a = new IntegerAttribute('A', 'a', 'INT', new Table('t', []));
+const b = new IntegerAttribute('B', 'b', 'INT', new Table('t', []));
 
 describe('aggregates of expressions', () => {
   it('sum of arithmetic', () => {

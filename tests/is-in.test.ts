@@ -17,9 +17,9 @@ import { toSql } from '../src/datafinder/sql-generator';
 import { BooleanAttribute, DateAttribute, DateTimeAttribute, DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { csvTable, startGraphQLServer } from './csv-graphql-server';
 
-const table = new Table('people', [new Column('id', 'INTEGER', 'people'), new Column('first_name', 'VARCHAR', 'people')]);
-const id = new IntegerAttribute('Id', 'id', 'INTEGER', 'people');
-const name = new StringAttribute('First Name', 'first_name', 'VARCHAR', 'people');
+const table = new Table('people', [new Column('id', 'INTEGER', new Table('people', [])), new Column('first_name', 'VARCHAR', new Table('people', []))]);
+const id = new IntegerAttribute('Id', 'id', 'INTEGER', new Table('people', []));
+const name = new StringAttribute('First Name', 'first_name', 'VARCHAR', new Table('people', []));
 const where = (op: Operation) => toSql(null, null, [id], table, op).split(' WHERE ')[1];
 
 describe('SQL rendering', () => {
@@ -27,14 +27,14 @@ describe('SQL rendering', () => {
     expect(where(name.isIn(['John', 'Peter']))).toBe("t0.first_name IN ('John', 'Peter')");
     expect(where(name.isNotIn(['John', 'Peter']))).toBe("(t0.first_name NOT IN ('John', 'Peter') OR t0.first_name IS NULL)");
     expect(where(id.isIn([2, 3]))).toBe('t0.id IN (2, 3)');
-    expect(where(new DoubleAttribute('Price', 'price', 'DOUBLE', 'people').isIn([1.5, 2]))).toBe('t0.price IN (1.5, 2.0)');
-    expect(where(new BooleanAttribute('Active', 'active', 'BOOLEAN', 'people').isIn([true]))).toBe('t0.active IN (TRUE)');
-    expect(where(new DateAttribute('Born', 'born', 'DATE', 'people').isIn(['2020-01-15', new Date('2021-02-03')])))
+    expect(where(new DoubleAttribute('Price', 'price', 'DOUBLE', new Table('people', [])).isIn([1.5, 2]))).toBe('t0.price IN (1.5, 2.0)');
+    expect(where(new BooleanAttribute('Active', 'active', 'BOOLEAN', new Table('people', [])).isIn([true]))).toBe('t0.active IN (TRUE)');
+    expect(where(new DateAttribute('Born', 'born', 'DATE', new Table('people', [])).isIn(['2020-01-15', new Date('2021-02-03')])))
       .toBe("t0.born IN ('2020-01-15', '2021-02-03')");
   });
 
   it('renders a DateOnly or date string as a date literal for a timestamp', () => {
-    const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', 'people');
+    const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', new Table('people', []));
     expect(where(at.isIn([new DateOnly('2020-01-15'), new Date('2021-02-03T10:30:00Z')])))
       .toBe("t0.at IN ('2020-01-15', '2021-02-03 10:30:00')");
   });
@@ -50,7 +50,7 @@ describe('SQL rendering', () => {
   });
 
   it('isNotIn on a not-null column has no NULL check', () => {
-    const notNull = new StringAttribute('First Name', 'first_name', 'VARCHAR', 'people', undefined, undefined, false);
+    const notNull = new StringAttribute('First Name', 'first_name', 'VARCHAR', new Table('people', []), undefined, undefined, false);
     expect(where(notNull.isNotIn(['John', 'Peter']))).toBe("t0.first_name NOT IN ('John', 'Peter')");
   });
 
@@ -90,7 +90,7 @@ describe('DuckDB', () => {
   });
 
   it('isNotIn on a not-null column excludes NULL, as SQL does', async () => {
-    const notNull = new StringAttribute('First Name', 'first_name', 'VARCHAR', 'people', undefined, undefined, false);
+    const notNull = new StringAttribute('First Name', 'first_name', 'VARCHAR', new Table('people', []), undefined, undefined, false);
     expect(await ids(toSql(null, null, [id], table, notNull.isNotIn(['John', 'Peter'])))).toEqual([3]);
   });
 
@@ -117,7 +117,7 @@ describe('GraphQL where clause', () => {
   });
 
   it('does not for a not-null field', () => {
-    const notNull = new StringAttribute('First Name', 'first_name', 'VARCHAR', 'people', undefined, undefined, false);
+    const notNull = new StringAttribute('First Name', 'first_name', 'VARCHAR', new Table('people', []), undefined, undefined, false);
     expect(args(notNull.isNotIn(['John']))).toBe('where: { first_name: { _nin: ["John"] } }');
   });
 });

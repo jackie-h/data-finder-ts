@@ -1,3 +1,4 @@
+import { Table } from '@model/relational';
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb } from './duckdb-runner';
@@ -69,7 +70,7 @@ describe('findForDateRange (business date + processing)', () => {
 });
 
 describe('date-range milestoning SQL', () => {
-  const id = new IntegerAttribute('Id', 'id', 'INTEGER', 'main.t');
+  const id = new IntegerAttribute('Id', 'id', 'INTEGER', new Table('main.t', []));
 
   it('uses interval overlap for bitemporal tables', () => {
     const table = new MilestonedTable('main.t', [], new BiTemporalColumns(

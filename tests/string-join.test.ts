@@ -10,10 +10,10 @@ import { AggregateOperator, Column, NoOperation, Table } from '../src/model/rela
 import type { Attribute } from '../src/datafinder/attribute';
 import type { RelationalOperationElement } from '../src/model/relational';
 
-const a = new StringAttribute('A', 'a', 'VARCHAR', 't');
-const b = new StringAttribute('B', 'b', 'VARCHAR', 't');
+const a = new StringAttribute('A', 'a', 'VARCHAR', new Table('t', []));
+const b = new StringAttribute('B', 'b', 'VARCHAR', new Table('t', []));
 const sql = (columns: (Attribute | RelationalOperationElement)[], groupBy: Attribute[] = []) =>
-  toSql(null, null, columns, new Table('t', [new Column('a', 'VARCHAR', 't'), new Column('b', 'VARCHAR', 't')]), new NoOperation(), [], groupBy);
+  toSql(null, null, columns, new Table('t', [new Column('a', 'VARCHAR', new Table('t', [])), new Column('b', 'VARCHAR', new Table('t', []))]), new NoOperation(), [], groupBy);
 
 describe('the SQL', () => {
   it('separator only', () => {
