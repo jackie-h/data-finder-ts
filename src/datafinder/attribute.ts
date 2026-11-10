@@ -4,6 +4,7 @@ import {
   ComparisonOperation,
   ComparisonOperator,
   AggregateOperation,
+  IntegerAggregateOperation,
   AggregateOperator,
   ColumnWithJoin,
   SortOperation,
@@ -91,8 +92,8 @@ export abstract class Attribute implements Aliasable {
   }
 
   /** Count the number of non-null values. Use in a projection with `groupBy` to aggregate per group. */
-  count(): AggregateOperation {
-    return new AggregateOperation(
+  count(): IntegerAggregateOperation {
+    return new IntegerAggregateOperation(
       this.cwj(),
       AggregateOperator.COUNT,
       this._displayName + ' Count',
@@ -105,8 +106,8 @@ export abstract class Attribute implements Aliasable {
   }
 
   /** The number of different non-NULL values in the group: `COUNT(DISTINCT column)`. Use with `groupBy` to count per group. */
-  countDistinct(): AggregateOperation {
-    return new AggregateOperation(this.cwj(), AggregateOperator.COUNT_DISTINCT, this._displayName + ' Count Distinct');
+  countDistinct(): IntegerAggregateOperation {
+    return new IntegerAggregateOperation(this.cwj(), AggregateOperator.COUNT_DISTINCT, this._displayName + ' Count Distinct');
   }
 
   /** @internal The extra arguments of `COALESCE` for an `orElse` default, which is a string, a number or a boolean. */
