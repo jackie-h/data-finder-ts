@@ -1,6 +1,6 @@
 import { Attribute, AttributeValue, Comparand, comparandOperand } from './attribute';
 import { NumericFunctions, StringFunctions } from './scalar-functions';
-import { Relation } from '../model/relational';
+import { Relation, Operand, DateValue } from '../model/relational';
 import {
   ComparisonOperation,
   ComparisonOperator,
@@ -54,6 +54,8 @@ abstract class MinMax {
 }
 
 export class StringAttribute extends Attribute {
+  declare readonly valueType?: string;
+
   constructor(
     displayName: string,
     columnName: string,
@@ -78,11 +80,11 @@ export class StringAttribute extends Attribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: string | Comparand): ComparisonOperation {
+  eq(value: Operand<string>): ComparisonOperation {
     return this.compared(ComparisonOperator.EQUAL, value, () => new StringConstantOperation((value as string)));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: string | Comparand): ComparisonOperation {
+  ne(value: Operand<string>): ComparisonOperation {
     return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new StringConstantOperation((value as string)));
   }
   /** Filter to rows where this attribute has a match for the regular expression `pattern` anywhere in it. */
@@ -111,6 +113,8 @@ export interface StringAttribute extends MinMax, StringFunctions {}
 applyMixins(StringAttribute, [MinMax, StringFunctions]);
 
 export abstract class NumericAttribute extends Attribute {
+  declare readonly valueType?: number;
+
   constructor(
     displayName: string,
     columnName: string,
@@ -162,27 +166,27 @@ export class DoubleAttribute extends NumericAttribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: number | Comparand): ComparisonOperation {
+  eq(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.EQUAL, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: number | Comparand): ComparisonOperation {
+  ne(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than `value`. */
-  gt(value: number | Comparand): ComparisonOperation {
+  gt(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than `value`. */
-  lt(value: number | Comparand): ComparisonOperation {
+  lt(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than or equal to `value`. */
-  gte(value: number | Comparand): ComparisonOperation {
+  gte(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => new FloatConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than or equal to `value`. */
-  lte(value: number | Comparand): ComparisonOperation {
+  lte(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new FloatConstantOperation((value as number)));
   }
 }
@@ -207,27 +211,27 @@ export class DecimalAttribute extends NumericAttribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: number | Comparand): ComparisonOperation {
+  eq(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.EQUAL, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: number | Comparand): ComparisonOperation {
+  ne(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than `value`. */
-  gt(value: number | Comparand): ComparisonOperation {
+  gt(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than `value`. */
-  lt(value: number | Comparand): ComparisonOperation {
+  lt(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than or equal to `value`. */
-  gte(value: number | Comparand): ComparisonOperation {
+  gte(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => new DecimalConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than or equal to `value`. */
-  lte(value: number | Comparand): ComparisonOperation {
+  lte(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new DecimalConstantOperation((value as number)));
   }
 }
@@ -252,32 +256,34 @@ export class IntegerAttribute extends NumericAttribute {
   isInteger(): boolean { return true; }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: number | Comparand): ComparisonOperation {
+  eq(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.EQUAL, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: number | Comparand): ComparisonOperation {
+  ne(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than `value`. */
-  gt(value: number | Comparand): ComparisonOperation {
+  gt(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than `value`. */
-  lt(value: number | Comparand): ComparisonOperation {
+  lt(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is greater than or equal to `value`. */
-  gte(value: number | Comparand): ComparisonOperation {
+  gte(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => new IntegerConstantOperation((value as number)));
   }
   /** Filter to rows where this attribute is less than or equal to `value`. */
-  lte(value: number | Comparand): ComparisonOperation {
+  lte(value: Operand<number>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new IntegerConstantOperation((value as number)));
   }
 }
 
 export class BooleanAttribute extends Attribute {
+  declare readonly valueType?: boolean;
+
   constructor(
     displayName: string,
     columnName: string,
@@ -294,11 +300,11 @@ export class BooleanAttribute extends Attribute {
   }
 
   /** Filter to rows where this attribute equals `value`. */
-  eq(value: boolean | Comparand): ComparisonOperation {
+  eq(value: Operand<boolean>): ComparisonOperation {
     return this.compared(ComparisonOperator.EQUAL, value, () => new BooleanConstantOperation((value as boolean)));
   }
   /** Filter to rows where this attribute does not equal `value`. */
-  ne(value: boolean | Comparand): ComparisonOperation {
+  ne(value: Operand<boolean>): ComparisonOperation {
     return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new BooleanConstantOperation((value as boolean) as boolean));
   }
   /** Filter to rows where this attribute is true. */
@@ -329,6 +335,8 @@ function temporalConstant(value: Date | string): DateConstantOperation | DateTim
 }
 
 export class DateAttribute extends Attribute {
+  declare readonly valueType?: DateValue;
+
   constructor(
     displayName: string,
     columnName: string,
@@ -345,27 +353,27 @@ export class DateAttribute extends Attribute {
   }
 
   /** Filter to rows where this date equals `value`. */
-  eq(value: Date | string | Comparand): ComparisonOperation {
+  eq(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.EQUAL, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date does not equal `value`. */
-  ne(value: Date | string | Comparand): ComparisonOperation {
+  ne(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date is after `value`. */
-  gt(value: Date | string | Comparand): ComparisonOperation {
+  gt(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date is before `value`. */
-  lt(value: Date | string | Comparand): ComparisonOperation {
+  lt(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date is on or after `value`. */
-  gte(value: Date | string | Comparand): ComparisonOperation {
+  gte(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
   /** Filter to rows where this date is on or before `value`. */
-  lte(value: Date | string | Comparand): ComparisonOperation {
+  lte(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new DateConstantOperation(parseDate((value as Date | string))));
   }
 
@@ -412,6 +420,8 @@ export class DateAttribute extends Attribute {
 }
 
 export class DateTimeAttribute extends Attribute {
+  declare readonly valueType?: DateValue;
+
   constructor(
     displayName: string,
     columnName: string,
@@ -428,27 +438,27 @@ export class DateTimeAttribute extends Attribute {
   }
 
   /** Filter to rows where this timestamp equals `value`. */
-  eq(value: Date | string | Comparand): ComparisonOperation {
+  eq(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.EQUAL, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp does not equal `value`. */
-  ne(value: Date | string | Comparand): ComparisonOperation {
+  ne(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.NOT_EQUAL, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp is after `value`. */
-  gt(value: Date | string | Comparand): ComparisonOperation {
+  gt(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp is before `value`. */
-  lt(value: Date | string | Comparand): ComparisonOperation {
+  lt(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp is on or after `value`. */
-  gte(value: Date | string | Comparand): ComparisonOperation {
+  gte(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => temporalConstant((value as Date | string)));
   }
   /** Filter to rows where this timestamp is on or before `value`. */
-  lte(value: Date | string | Comparand): ComparisonOperation {
+  lte(value: Operand<DateValue>): ComparisonOperation {
     return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => temporalConstant((value as Date | string)));
   }
 

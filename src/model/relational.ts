@@ -792,28 +792,41 @@ export function operandOf(other: unknown): RelationalOperationElement {
 }
 
 /**
- * Comparisons for an expression, as for a column: `f.name().toUpperCase().eq('ACME')`, `f.name().length().gt(10)`.
- * The other side is a value or another expression. Each gives a filter. Mixed into the expressions that have it.
+ * A date or timestamp as a value: a `Date`, or text such as `'2024-01-15'` that the database reads as one.
  */
-export abstract class Comparable {
+export type DateValue = Date | string;
+
+/**
+ * An expression that holds a `T`, as the type system sees it. The `valueType` is only there for the types: an
+ * expression that can be compared declares it by being `Equatable<T>`, and a comparison takes a `T` or another
+ * expression of the same type, so `f.name().eq(f.price())` is a compile error.
+ */
+export interface Typed<T> {
+  readonly valueType?: T;
+}
+
+/** What an expression of type `T` is compared with: a value, or an expression (or column) that holds one. */
+export type Operand<T> = T | Typed<T>;
+
+/**
+ * Equality for an expression, as for a column: `f.name().toUpperCase().eq('ACME')`, `f.name().length().isIn([3, 5])`.
+ * The other side is a value or another expression of the same type. Each gives a filter. Mixed into the expressions
+ * that have it; an expression that can only be tested for equality (joined text) is only this.
+ */
+export abstract class Equatable<T> implements Typed<T> {
+  declare readonly valueType?: T;
+
   abstract comparisonOperand(): RelationalOperationElement;
 
-  private _compared(operator: ComparisonOperator, other: unknown): ComparisonOperation {
+  /** @internal */
+  _compared(operator: ComparisonOperator, other: unknown): ComparisonOperation {
     return new ComparisonOperation(this.comparisonOperand(), operator, operandOf(other));
   }
 
   /** Filter to rows where this expression equals `other`. */
-  eq(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.EQUAL, other); }
+  eq(other: Operand<T>): ComparisonOperation { return this._compared(ComparisonOperator.EQUAL, other); }
   /** Filter to rows where this expression does not equal `other`. */
-  ne(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.NOT_EQUAL, other); }
-  /** Filter to rows where this expression is less than `other`. */
-  lt(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.LESS_THAN, other); }
-  /** Filter to rows where this expression is at most `other`. */
-  lte(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, other); }
-  /** Filter to rows where this expression is greater than `other`. */
-  gt(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.GREATER_THAN, other); }
-  /** Filter to rows where this expression is at least `other`. */
-  gte(other: unknown): ComparisonOperation { return this._compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, other); }
+  ne(other: Operand<T>): ComparisonOperation { return this._compared(ComparisonOperator.NOT_EQUAL, other); }
 
   private _constants(values: readonly unknown[]): ConstantOperation[] {
     if (values.length === 0) throw new Error('isIn / isNotIn need at least one value');
@@ -821,9 +834,29 @@ export abstract class Comparable {
   }
 
   /** Filter to rows where this expression equals any of `values`: `f.name().substring(0, 4).isIn(['beta', 'Hell'])`. */
-  isIn(values: readonly unknown[]): InOperation { return new InOperation(this.comparisonOperand(), this._constants(values)); }
+  isIn(values: readonly T[]): InOperation { return new InOperation(this.comparisonOperand(), this._constants(values)); }
   /** Filter to rows where this expression equals none of `values`. */
-  isNotIn(values: readonly unknown[]): NotInOperation { return new NotInOperation(this.comparisonOperand(), this._constants(values)); }
+  isNotIn(values: readonly T[]): NotInOperation { return new NotInOperation(this.comparisonOperand(), this._constants(values)); }
+}
+
+/**
+ * Ordering for an expression of a type that has an order: `f.name().length().gt(10)`, `f.date().plus(1, 'day').lte(d)`.
+ * Mixed into the expressions that have it, with `Equatable`.
+ */
+export abstract class Orderable<T> implements Typed<T> {
+  declare readonly valueType?: T;
+
+  abstract comparisonOperand(): RelationalOperationElement;
+  abstract _compared(operator: ComparisonOperator, other: unknown): ComparisonOperation;
+
+  /** Filter to rows where this expression is less than `other`. */
+  lt(other: Operand<T>): ComparisonOperation { return this._compared(ComparisonOperator.LESS_THAN, other); }
+  /** Filter to rows where this expression is at most `other`. */
+  lte(other: Operand<T>): ComparisonOperation { return this._compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, other); }
+  /** Filter to rows where this expression is greater than `other`. */
+  gt(other: Operand<T>): ComparisonOperation { return this._compared(ComparisonOperator.GREATER_THAN, other); }
+  /** Filter to rows where this expression is at least `other`. */
+  gte(other: Operand<T>): ComparisonOperation { return this._compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, other); }
 }
 
 /** Whether a standard deviation or variance is the sample one (`ddof` 1) or the population one (0). */
@@ -1014,32 +1047,32 @@ export function concat(...parts: ConcatPart[]): ConcatOperation {
   return new ConcatOperation(parts.flatMap(partsOf));
 }
 
-export interface ConcatOperation extends Comparable, StringPredicates {}
-applyMixins(ConcatOperation, [Comparable, StringPredicates]);
+export interface ConcatOperation extends Equatable<string>, StringPredicates {}
+applyMixins(ConcatOperation, [Equatable, StringPredicates]);
 
-export interface DateExtractOperation extends Comparable {}
-applyMixins(DateExtractOperation, [Comparable]);
+export interface DateExtractOperation extends Equatable<number>, Orderable<number> {}
+applyMixins(DateExtractOperation, [Equatable, Orderable]);
 
-export interface DateArithmeticOperation extends Comparable {}
-applyMixins(DateArithmeticOperation, [Comparable]);
+export interface DateArithmeticOperation extends Equatable<DateValue>, Orderable<DateValue> {}
+applyMixins(DateArithmeticOperation, [Equatable, Orderable]);
 
-export interface DateDiffOperation extends Comparable {}
-applyMixins(DateDiffOperation, [Comparable]);
+export interface DateDiffOperation extends Equatable<number>, Orderable<number> {}
+applyMixins(DateDiffOperation, [Equatable, Orderable]);
 
-export interface DateTruncOperation extends Comparable {}
-applyMixins(DateTruncOperation, [Comparable]);
+export interface DateTruncOperation extends Equatable<DateValue>, Orderable<DateValue> {}
+applyMixins(DateTruncOperation, [Equatable, Orderable]);
 
-export interface ArithmeticOperation extends Arithmetic, Comparable {}
-applyMixins(ArithmeticOperation, [Arithmetic, Comparable]);
+export interface ArithmeticOperation extends Arithmetic, Equatable<number>, Orderable<number> {}
+applyMixins(ArithmeticOperation, [Arithmetic, Equatable, Orderable]);
 
-export interface ScalarFunctionOperation extends Comparable, Arithmetic, StringPredicates {}
-applyMixins(ScalarFunctionOperation, [Comparable, Arithmetic, StringPredicates]);
+export interface ScalarFunctionOperation extends Equatable<any>, Orderable<any>, Arithmetic, StringPredicates {}
+applyMixins(ScalarFunctionOperation, [Equatable, Orderable, Arithmetic, StringPredicates]);
 
-export interface AggregateOperation extends Arithmetic, Comparable, StringPredicates {}
-applyMixins(AggregateOperation, [Arithmetic, Comparable, StringPredicates]);
+export interface AggregateOperation extends Arithmetic, Equatable<any>, Orderable<any>, StringPredicates {}
+applyMixins(AggregateOperation, [Arithmetic, Equatable, Orderable, StringPredicates]);
 
-export interface CountAllOperation extends Comparable {}
-applyMixins(CountAllOperation, [Comparable]);
+export interface CountAllOperation extends Equatable<number>, Orderable<number> {}
+applyMixins(CountAllOperation, [Equatable, Orderable]);
 
 export interface NumericConstantOperation extends Arithmetic {}
 applyMixins(NumericConstantOperation, [Arithmetic]);
