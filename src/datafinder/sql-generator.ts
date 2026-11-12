@@ -76,6 +76,7 @@ import {
   SingleBusinessDateColumn,
   SingleProcessingDatetimeColumn,
   hasProcessingRange,
+  milestoningColumnsOf,
 } from '../model/milestoning';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
 import { DialectName, SqlDialect, dialectOf } from './dialect';
@@ -354,6 +355,7 @@ function embeddedOf(ref: Attribute | ColumnWithJoin): Attribute | ColumnWithJoin
 function findColumn(operation: RelationalOperationElement): ColumnWithJoin {
   if (operation instanceof UnaryOperation) return findColumn(operation.element);
   if (operation instanceof ColumnWithJoin) return operation;
+  if (operation instanceof Column) return new ColumnWithJoin(operation); // a column of a query a class is mapped to
   throw new TypeError('Cannot find ColumnWithJoin in: ' + operation.constructor.name);
 }
 
@@ -458,10 +460,11 @@ function businessRangePredicate(
 function buildMilestoningFilterOperation(
   businessDate: Date | null,
   processingDatetime: Date | null,
-  table: MilestonedTable,
+  table: MilestonedTable | TableAlias,
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
-  const mc = table.milestoningColumns;
+  const mc = milestoningColumnsOf(table);
+  if (mc === undefined) throw new Error(`${table.name} is not milestoned`);
   return andAll([processingPredicate(mc, processingDatetime, joinNode), businessPredicate(mc, businessDate, joinNode)]);
 }
 
@@ -480,11 +483,12 @@ function buildMilestoningFilterOperationForDateRange(
   businessDateFrom: Date | null,
   businessDateTo: Date | null,
   processingDatetime: Date | null,
-  table: MilestonedTable,
+  table: MilestonedTable | TableAlias,
   joinNode?: JoinTreeNodeOperation,
   processingDatetimeTo: Date | null = null,
 ): Operation | null {
-  const mc = table.milestoningColumns;
+  const mc = milestoningColumnsOf(table);
+  if (mc === undefined) throw new Error(`${table.name} is not milestoned`);
   const processing = processingDatetime !== null && processingDatetimeTo !== null
     ? processingRangePredicate(mc, processingDatetime, processingDatetimeTo, joinNode)
     : processingPredicate(mc, processingDatetime, joinNode);
@@ -666,7 +670,7 @@ function buildQuerySpecification(
   processingDatetimeTo: Date | null = null,
 ): OrderedQuerySpecification {
   let filter = op;
-  const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) => {
+  const milestoningFor = (t: MilestonedTable | TableAlias, node?: JoinTreeNodeOperation) => {
     const dates = node === undefined
       ? { businessDate, businessDateTo, processingDatetime, processingDatetimeTo }
       : datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
@@ -675,8 +679,8 @@ function buildQuerySpecification(
       : buildMilestoningFilterOperation(dates.businessDate, dates.processingDatetime, t, node);
   };
 
-  if (table instanceof MilestonedTable) {
-    const milestonedOp = milestoningFor(table);
+  if (milestoningColumnsOf(table) !== undefined) {
+    const milestonedOp = milestoningFor(table as MilestonedTable | TableAlias);
     if (milestonedOp !== null) {
       filter = filter instanceof NoOperation
         ? milestonedOp
@@ -701,8 +705,8 @@ function buildQuerySpecification(
     if (Object.keys(node.join.filterKwargs).length > 0) {
       combined = buildJoinFilterFromProperties(node, node.join.filterKwargs, node.join.filterColumnMap);
     }
-    if (node.join.target instanceof MilestonedTable) {
-      const milestonedOp = milestoningFor(node.join.target, node);
+    if (milestoningColumnsOf(node.join.target) !== undefined) {
+      const milestonedOp = milestoningFor(node.join.target as MilestonedTable | TableAlias, node);
       if (milestonedOp !== null) {
         combined = combined === undefined ? milestonedOp : new LogicalOperation(combined, LogicalOperator.AND, milestonedOp);
       }
@@ -1157,7 +1161,7 @@ class SQLQueryGenerator {
     const right = join.right;
     const tc = new TableAliasColumn(right, this._tableAliasForTable(right.ownerRelation, node));
     // a sub-select carries the step's filter itself, so it is not repeated in the ON clause
-    const queryFilter = tc.tableAlias.relation instanceof QuerySpecification ? undefined : this._joinFilters.get(node);
+    const queryFilter = tc.tableAlias.relation instanceof OrderedQuerySpecification ? undefined : this._joinFilters.get(node);
     const filterOp = join.filter !== undefined && queryFilter !== undefined
       ? new LogicalOperation(join.filter as Operation, LogicalOperator.AND, queryFilter)
       : join.filter ?? queryFilter;

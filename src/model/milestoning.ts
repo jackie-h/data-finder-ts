@@ -1,4 +1,4 @@
-import { Column, Table, Schema } from './relational';
+import { Column, Table, Schema, TableAlias, type Relation } from './relational';
 
 export abstract class MilestoningColumns {
   abstract columns(): Column[];
@@ -96,4 +96,14 @@ export class MilestonedTable extends Table {
       col.owner = this;
     }
   }
+}
+
+/**
+ * The columns that milestone a relation's rows: a milestoned table's, or those of a query a class is mapped to with a milestoning
+ * scheme; none for a relation that is not milestoned.
+ */
+export function milestoningColumnsOf(relation: Relation | undefined): MilestoningColumns | undefined {
+  if (relation instanceof MilestonedTable) return relation.milestoningColumns;
+  if (relation instanceof TableAlias) return relation.milestoningColumns;
+  return undefined;
 }

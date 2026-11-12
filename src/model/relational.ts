@@ -92,6 +92,8 @@ export enum SortDirection {
   DESC = 'DESC',
 }
 
+import type { MilestoningColumns } from './milestoning';
+
 export abstract class RelationalOperationElement {}
 
 /**
@@ -583,9 +585,34 @@ export class Table extends NamedRelation {
  * which alias they belong to by its name. A table is already named, so this is for a relation that is not: a query.
  */
 export class TableAlias extends NamedRelation {
-  constructor(readonly relation: Relation, name: string) { super(name); }
+  /** For a query a class is mapped to with a milestoning scheme: the columns the query gives that milestone it, which the alias owns. */
+  milestoningColumns?: MilestoningColumns;
+  private _own?: Column[];
 
-  get columns(): readonly RelationalOperationElement[] { return this.relation.columns; }
+  /**
+   * `own` are the columns of the alias itself, for a query a class is mapped to: typed columns the alias owns, which a finder's
+   * attributes read. Without them the alias has the columns of the relation it names.
+   */
+  constructor(readonly relation: Relation, name: string, own?: Column[]) {
+    super(name);
+    if (own !== undefined) {
+      this._own = own;
+      for (const column of own) column.owner = this;
+    }
+  }
+
+  get columns(): readonly RelationalOperationElement[] { return this._own ?? this.relation.columns; }
+
+  /** The alias's own column of that name; one it has not got yet is made, owned by the alias. */
+  column(name: string, type: string): Column {
+    this._own ??= [];
+    let found = this._own.find(c => c.name === name);
+    if (found === undefined) {
+      found = new Column(name, type, this);
+      this._own.push(found);
+    }
+    return found;
+  }
 }
 
 export class JoinOperation {
@@ -597,7 +624,7 @@ export class JoinOperation {
 
   constructor(
     readonly name: string,
-    readonly target: Table,
+    readonly target: Table | TableAlias,
     readonly left: Column,
     readonly right: Column,
     filter?: RelationalOperationElement,
