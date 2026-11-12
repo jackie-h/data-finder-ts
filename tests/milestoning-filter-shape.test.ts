@@ -15,7 +15,7 @@ const INFINITE = '9999-12-31 23:59:59';
 function bitemporal(name = 'trades', infinite: string | null = INFINITE): MilestonedTable {
   return new MilestonedTable(name, [new Column('id', 'INT'), new Column('fk', 'INT')], new BiTemporalColumns(
     new Column('from_z', 'DATE'), new Column('thru_z', 'DATE'),
-    new Column('in_z', 'TIMESTAMP'), new Column('out_z', 'TIMESTAMP'), infinite ?? undefined,
+    new Column('in_z', 'TIMESTAMP'), new Column('out_z', 'TIMESTAMP'), infinite ?? undefined, infinite ?? undefined,
   ));
 }
 

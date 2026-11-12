@@ -17,7 +17,7 @@ classifiers = [
     "Topic :: Software Development :: Code Generators",
 ]
 dependencies = [
-    "data-finder[markdown]>=0.1.20",
+    "data-finder[markdown]>=0.1.21",
     "pytest>=9.0.0",
     "duckdb>=1.0,<2",
 ]

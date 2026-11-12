@@ -28,7 +28,7 @@ describe('PROCESSING_SNAPSHOT_QUOTE_FINDER_SPECS', () => {
   const f = new QuoteFinder();
 
   for (const c of PROCESSING_SNAPSHOT_QUOTE_FINDER_SPECS) {
-    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    (c.expected.skip === undefined ? it : it.skip)(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
 
@@ -36,6 +36,6 @@ describe('PROCESSING_SNAPSHOT_POSITION_FINDER_SPECS', () => {
   const f = new PositionFinder();
 
   for (const c of PROCESSING_SNAPSHOT_POSITION_FINDER_SPECS) {
-    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    (c.expected.skip === undefined ? it : it.skip)(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

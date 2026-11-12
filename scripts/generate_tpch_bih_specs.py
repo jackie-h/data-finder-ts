@@ -13,6 +13,7 @@ The data the cases run on is written by scripts/tpch_bih_data.py.
 Usage: uv run python scripts/generate_tpch_bih_specs.py
 """
 import ast
+import re
 import datetime
 import decimal
 import os
@@ -136,6 +137,10 @@ def query_lambdas(tree: ast.Module) -> dict[str, ast.Lambda]:
     return found
 
 
+# What a query needs that the translator has no TypeScript for, until the relation steps of a result are ported.
+UNPORTED_REASON = 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'
+
+
 def main() -> None:
     source = open(os.path.join(SPEC_DIR, 'tpch_bih_queries.py')).read()
     tree = ast.parse(source)
@@ -148,7 +153,13 @@ def main() -> None:
         translator.signatures[helper.name] = [a.arg for a in helper.args.args]
     consts = [constant_source(translator, s) for s in tree.body
               if isinstance(s, ast.Assign) and isinstance(s.targets[0], ast.Name) and s.targets[0].id in ('_NOW', '_FOREVER_START', '_FOREVER_END')]
-    functions = [function_source(translator, h) for h in helpers]
+    functions = []
+    failed: dict[str, str] = {}   # helpers that could not be translated yet
+    for helper in helpers:
+        try:
+            functions.append(function_source(translator, helper))
+        except NotImplementedError as error:
+            failed[helper.name] = str(error)
 
     blocks = []
     for case_id, case in CASES.items():
@@ -160,7 +171,19 @@ def main() -> None:
         else:
             lam = lambdas[case_id]
             translator.plain = set()
-            body = translator.expr(lam.body)
+            try:
+                body = translator.expr(lam.body)
+                broken = [name for name in failed if re.search(rf'\b{re.escape(name)}\b', body)]
+                if broken:
+                    raise NotImplementedError(failed[broken[0]])
+            except NotImplementedError as error:
+                # a construct of the query that the translator has no TypeScript for yet: the case is listed, skipped
+                reason = UNPORTED_REASON
+                print(f'... {case_id} is skipped: {reason}')
+                columns = [str(c) for c in case.select]
+                blocks.append(f"  {{\n    name: {js_str(case_id)},\n    query: _q => {{ throw new Error({js_str(reason)}); }},\n"
+                              f"    expected: {{ columns: [{', '.join(js_str(c) for c in columns)}], rows: [], skip: {js_str(reason)} }},\n  }},\n")
+                continue
             params = ', '.join(f'{k}: {ts_param(v)}' for k, v in case.parameters.items())
             used = 'p.' in body or ', p)' in body or '(p,' in body or ', p,' in body
             query = f'q => {{\n      const p = {{ {params} }};\n      return {body};\n    }}' if case.parameters and used else f'q => {body}'

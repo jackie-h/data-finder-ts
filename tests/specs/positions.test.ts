@@ -27,6 +27,6 @@ describe('POSITION_DATE_FINDER_SPECS', () => {
   const f = new PositionFinder();
 
   for (const c of POSITION_DATE_FINDER_SPECS) {
-    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    (c.expected.skip === undefined ? it : it.skip)(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

@@ -4,11 +4,12 @@ export abstract class MilestoningColumns {
   abstract columns(): Column[];
 }
 
+/** A processing range. `processingInfiniteDatetime` is what its end holds in a row that has not ended, or `undefined` when that end is NULL. */
 export class ProcessingTemporalColumns extends MilestoningColumns {
   constructor(
     readonly startAtColumn: Column,
     readonly endAtColumn: Column,
-    readonly infiniteDatetime?: string,
+    readonly processingInfiniteDatetime?: string,
   ) { super(); }
 
   columns(): Column[] { return [this.startAtColumn, this.endAtColumn]; }
@@ -25,7 +26,7 @@ export class BusinessDateAndProcessingTemporalColumns extends MilestoningColumns
     readonly businessDateColumn: Column,
     readonly startAtColumn: Column,
     readonly endAtColumn: Column,
-    readonly infiniteDatetime?: string,
+    readonly processingInfiniteDatetime?: string,
   ) { super(); }
 
   columns(): Column[] {
@@ -40,25 +41,30 @@ export class SingleProcessingDatetimeColumn extends MilestoningColumns {
   columns(): Column[] { return [this.processingDatetimeColumn]; }
 }
 
-/** A business date range: a row applies from `businessDateFrom` up to, but not including, `businessDateTo`. */
+/**
+ * A business date range: a row applies from `businessDateFrom` up to, but not including, `businessDateTo`.
+ * `businessInfiniteDatetime` is what the end holds in a row that has not ended, or `undefined` when that end is NULL.
+ */
 export class BusinessDateRangeColumns extends MilestoningColumns {
   constructor(
     readonly businessDateFromColumn: Column,
     readonly businessDateToColumn: Column,
-    readonly infiniteDatetime?: string,
+    readonly businessInfiniteDatetime?: string,
   ) { super(); }
 
   columns(): Column[] { return [this.businessDateFromColumn, this.businessDateToColumn]; }
 }
 
+/** Each axis has its own infinity: one can end in a datetime and the other in a date, or one in an infinity and the other in NULL (`undefined`). */
 export class BiTemporalColumns extends BusinessDateRangeColumns {
   constructor(
     businessDateFromColumn: Column,
     businessDateToColumn: Column,
     readonly startAtColumn: Column,
     readonly endAtColumn: Column,
-    infiniteDatetime?: string,
-  ) { super(businessDateFromColumn, businessDateToColumn, infiniteDatetime); }
+    readonly processingInfiniteDatetime?: string,
+    businessInfiniteDatetime?: string,
+  ) { super(businessDateFromColumn, businessDateToColumn, businessInfiniteDatetime); }
 
   columns(): Column[] {
     return [

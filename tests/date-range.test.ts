@@ -75,7 +75,7 @@ describe('date-range milestoning SQL', () => {
   it('uses interval overlap for bitemporal tables', () => {
     const table = new MilestonedTable('main.t', [], new BiTemporalColumns(
       new Column('from_z', 'DATE'), new Column('thru_z', 'DATE'),
-      new Column('in_z', 'TIMESTAMP'), new Column('out_z', 'TIMESTAMP'), '9999-12-01',
+      new Column('in_z', 'TIMESTAMP'), new Column('out_z', 'TIMESTAMP'), '9999-12-01', '9999-12-01',
     ));
     const sql = toSql(new Date('2023-01-10'), new Date('2023-06-01T00:00:00Z'), [id], table, new NoOperation(), [], [], undefined, new Date('2023-01-20'));
     expect(sql).toContain("t0.from_z <= '2023-01-20' AND t0.thru_z > '2023-01-10'");

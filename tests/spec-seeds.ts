@@ -110,6 +110,28 @@ export const seeds: Record<string, Seed> = {
     await loadCsv(conn, 'mkt.rates', 'business_range_rates.csv');
   },
 
+  business_range_infinity: async conn => {
+    await run(conn, 'CREATE SCHEMA ranged', 'CREATE TABLE ranged.rates (code VARCHAR, amount DOUBLE, from_z DATE, thru_z DATE)');
+    await loadCsv(conn, 'ranged.rates', 'business_range_infinity_rates.csv');
+  },
+
+  bitemporal_infinity: async conn => {
+    await run(conn, 'CREATE SCHEMA mkt',
+      'CREATE TABLE mkt.quotes (code VARCHAR, amount DOUBLE, in_z TIMESTAMP, out_z TIMESTAMP, from_z DATE, thru_z DATE)');
+    await loadCsv(conn, 'mkt.quotes', 'bitemporal_infinity_quotes.csv');
+  },
+
+  bitemporal_dates: async conn => {
+    await run(conn, 'CREATE SCHEMA dated',
+      'CREATE TABLE dated.quotes (code VARCHAR, amount DOUBLE, in_z TIMESTAMP, out_z TIMESTAMP, from_z DATE, thru_z DATE)');
+    await loadCsv(conn, 'dated.quotes', 'bitemporal_dates_quotes.csv');
+  },
+
+  companies_missing_category: async conn => {
+    await run(conn, 'CREATE TABLE companies (id INT, name VARCHAR, category VARCHAR)');
+    await loadCsv(conn, 'companies', 'companies_missing_category.csv');
+  },
+
   processing_snapshot: async conn => {
     await run(conn, 'CREATE SCHEMA mkt',
       'CREATE TABLE mkt.quotes (id INT, symbol VARCHAR, price DOUBLE, taken_at TIMESTAMP)',

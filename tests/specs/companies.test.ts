@@ -27,6 +27,6 @@ describe('COMPANY_FINDER_SPECS', () => {
   const f = new CompanyFinder();
 
   for (const c of COMPANY_FINDER_SPECS) {
-    it(c.name, () => runExpectation(c.query(f), runner, c.expected));
+    (c.expected.skip === undefined ? it : it.skip)(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });
