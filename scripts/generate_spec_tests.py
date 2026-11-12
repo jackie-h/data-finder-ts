@@ -102,7 +102,6 @@ SKIPPED_MODULES = {
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 UNPORTED = [
     (r'^(chain_group_by|chain_filter_the_groups|chain_aggregate|join_|exists_keeps|not_exists_keeps)', 'group_by, aggregate, join and exists on a result are not ported yet'),
-    (r'^(not_equal|ne_matches)', '!= matching a missing value is not ported yet'),
 ]
 
 
@@ -241,7 +240,7 @@ class Translator:
         """A function of a row of a result (`lambda r: r.price > 250.0`): the row's columns are attributes."""
         names = [a.arg for a in node.args.args]
         self.rows.update(names)
-        return f'({", ".join(names)}) => {self.expr(node.body)}'
+        return f'({", ".join(n + ": any" for n in names)}) => {self.expr(node.body)}'
 
     def visit_GeneratorExp(self, node: ast.GeneratorExp) -> str:
         (gen,) = node.generators
@@ -355,11 +354,18 @@ class Translator:
             return 'new Date(Date.UTC(' + ', '.join(str(x) for x in [y, m - 1, d, *rest]) + '))'
         args = [self.expr(a) for a in node.args]
         name = method_name(func.attr)
+        if func.attr == 'removeprefix':   # str.removeprefix on a parameter of the query
+            (prefix,) = args
+            return f'((s: string) => s.startsWith({prefix}) ? s.slice({prefix}.length) : s)({self.expr(owner)})'
         if func.attr in ('std', 'var') and node.keywords:
             # std(ddof=0): the degrees of freedom are the one argument
             (kw,) = node.keywords
             assert kw.arg == 'ddof', ast.dump(node)
             return f'{self.expr(owner)}.{name}({", ".join(args + [self.expr(kw.value)])})'
+        if func.attr == 'join' and any(k.arg == 'how' for k in node.keywords):
+            raise NotImplementedError('a join of two results')
+        if func.attr == 'aggregate' or (func.attr == 'group_by' and node.args and isinstance(node.args[0], ast.Lambda)):
+            raise NotImplementedError('group_by and aggregate on a result')
         if func.attr == 'join' and node.keywords:
             # join(",", order_by=[...]): the order the values are joined in is the second argument
             (kw,) = node.keywords
