@@ -15,11 +15,11 @@ import './generated_examples/finance/InstrumentFinder';
 import { constant } from '../src/datafinder';
 import { toSql } from '../src/datafinder/sql-generator';
 import { DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
-import { Column, CountAllOperation, JoinOperation, JoinTreeNodeOperation, NoOperation, Table } from '../src/model/relational';
+import { Column, CountAllOperation, JoinOperation, JoinKind, JoinTreeNodeOperation, NoOperation, Table } from '../src/model/relational';
 
 function firmAndEmployeeAges(many = true, rootKey = true) {
   const root = new Table('firm', [new Column('ID', 'INT', new Table('firm', []), rootKey), new Column('LEGALNAME', 'VARCHAR', new Table('firm', []))]);
-  const join = new JoinOperation('Employees', new Table('person', []), new Column('ID', 'INT', new Table('firm', [])), new Column('FIRMID', 'INT', new Table('person', [])));
+  const join = JoinOperation.onKeys('Employees', new Table('person', []), new Column('ID', 'INT', new Table('firm', [])), new Column('FIRMID', 'INT', new Table('person', [])), JoinKind.LEFT);
   const node = new JoinTreeNodeOperation(join, undefined, many);
   return {
     root,

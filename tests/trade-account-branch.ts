@@ -13,7 +13,7 @@
 import { DuckDBConnection } from '@duckdb/node-api';
 import { StringAttribute } from '../src/datafinder/typed-attributes';
 import { convertInputsAndSelect } from '../src/datafinder/runner';
-import { Column, JoinOperation, JoinTreeNodeOperation, NoOperation, RelationalOperationElement, Table } from '../src/model/relational';
+import { Column, JoinOperation, JoinKind, JoinTreeNodeOperation, NoOperation, RelationalOperationElement, Table } from '../src/model/relational';
 import { MilestonedTable, ProcessingTemporalColumns } from '../src/model/milestoning';
 
 export const AT = '2023-12-01 12:00:00';
@@ -27,15 +27,15 @@ export const tradeTable = new MilestonedTable('trading.trades', [], processing()
 const accountTable = new MilestonedTable('ref_data.account_master', [], processing());
 const branchTable = new Table('ref_data.branch', []);
 
-export const accountJoin = new JoinOperation(
+export const accountJoin = JoinOperation.onKeys(
   'Account', accountTable,
-  new Column('account_id', 'INT', new Table('trading.trades', [])), new Column('ID', 'INT', new Table('ref_data.account_master', [])),
+  new Column('account_id', 'INT', new Table('trading.trades', [])), new Column('ID', 'INT', new Table('ref_data.account_master', [])), JoinKind.LEFT
 );
 export const accountNode = new JoinTreeNodeOperation(accountJoin);
 export const branchNode = new JoinTreeNodeOperation(
-  new JoinOperation(
+  JoinOperation.onKeys(
     'Branch', branchTable,
-    new Column('BRANCH_ID', 'INT', new Table('ref_data.account_master', [])), new Column('ID', 'INT', new Table('ref_data.branch', [])),
+    new Column('BRANCH_ID', 'INT', new Table('ref_data.account_master', [])), new Column('ID', 'INT', new Table('ref_data.branch', [])), JoinKind.LEFT
   ),
   accountNode,
 );

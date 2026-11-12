@@ -1,6 +1,8 @@
 import {
-  Column, Table, NoOperation, JoinOperation, JoinTreeNodeOperation, CountAllOperation,
+  Column, Table, NoOperation, JoinKind, JoinTreeNodeOperation, CountAllOperation,
   Operation, RelationalOperationElement,
+  ComparisonOperation, ComparisonOperator, LogicalOperation, LogicalOperator, IsNullOperation, IsNotNullOperation, NotOperation,
+  StringConstantOperation, IntegerConstantOperation, FloatConstantOperation, DecimalConstantOperation,
 } from '@model/relational';
 import {
   ProcessingTemporalColumns, SingleBusinessDateColumn, SingleProcessingDatetimeColumn,
@@ -11,7 +13,7 @@ import {
   convertDate, convertProcessingDate, FinderResult,
 } from '@datafinder/runner';
 import { ExistsOperation, NotExistsOperation } from '@model/relational';
-import { displayPrefix, viaJoins, type NavigationDates } from '@datafinder/finder';
+import { displayPrefix, keysJoin, viaJoins, type JoinCondition, type NavigationDates } from '@datafinder/finder';
 import type { Attribute } from '@datafinder/attribute';
 import { EmbeddedAttributes, embeddedUnder } from '@datafinder/embedded';
 import { titleCase } from '@datafinder/naming';
@@ -93,7 +95,7 @@ export class {{ec.name}} {
     this._{{to_ts_name(prop)}} = new {{child}}(parent, prefix);
 {% endfor %}
 {% for prop, join in ec.joins %}
-    this._{{to_ts_name(prop)}} = new {{prop.type.name}}RelatedFinder('{{ec.label}} {{prop.name}}', {{column_code(join.lhs)}}, {{column_code(join.rhs)}}, {{ 'true' if prop.multiplicity.is_many() else 'false' }}, {{ 'true' if ec.optional or prop.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(join, 'parent') }});
+    this._{{to_ts_name(prop)}} = new {{prop.type.name}}RelatedFinder('{{ec.label}} {{prop.name}}', {{column_code(join.lhs)}}, {{column_code(join.rhs)}}, {{ 'true' if prop.multiplicity.is_many() else 'false' }}, {{ 'true' if ec.optional or prop.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(join, 'parent') }}{{ condition_args(join, 6) }});
 {% endfor %}
   }
 {% for prop, col in ec.columns %}
@@ -114,7 +116,7 @@ export class {{ec.name}} {
 
   {{prop_jsdoc(prop)}}
   {{to_ts_name(prop)}}(filter?: {{prop.type.name}}Filter, dates?: NavigationDates): {{prop.type.name}}RelatedFinder {
-    if (filter || dates) return new {{prop.type.name}}RelatedFinder('{{ec.label}} {{prop.name}}', {{column_code(join.lhs)}}, {{column_code(join.rhs)}}, {{ 'true' if prop.multiplicity.is_many() else 'false' }}, {{ 'true' if ec.optional or prop.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(join, 'this._parent', True) }}, undefined, filter, dates);
+    if (filter || dates) return new {{prop.type.name}}RelatedFinder('{{ec.label}} {{prop.name}}', {{column_code(join.lhs)}}, {{column_code(join.rhs)}}, {{ 'true' if prop.multiplicity.is_many() else 'false' }}, {{ 'true' if ec.optional or prop.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(join, 'this._parent', True) }}, undefined, filter, dates{{ condition_args(join, 9) }});
     return this._{{to_ts_name(prop)}};
   }
 {% endfor %}
@@ -194,9 +196,9 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   private _{{reverse_name}}?: {{source_rcm.clazz.name}}RelatedFinder;
 {% endfor %}
 
-  constructor(relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{rcm.clazz.name}}Filter, dates?: NavigationDates) {
+  constructor(relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{rcm.clazz.name}}Filter, dates?: NavigationDates, condition?: JoinCondition, conditionReverse = false) {
     super();
-    const join = new JoinOperation(relationName, {{rcm.clazz.name}}RelatedFinder._table, source, target);
+    const join = keysJoin(relationName, {{rcm.clazz.name}}RelatedFinder._table, source, target, JoinKind.LEFT, condition, conditionReverse);
     if (filter) {
       join.filterKwargs = filter as Record<string, unknown>;
       join.filterColumnMap = {{rcm.clazz.name}}RelatedFinder._filterColumns;
@@ -210,7 +212,7 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% if is_primitive(rpm.property) %}
     this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(displayPrefix(relationName, parentJoin) + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', {{owner_code(rpm.target.table)}}, this._node, embedded?.['{{rpm.property.id}}'], {{ 'true' if rpm.target.nullable else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }});
 {% elif rpm.property.type.name != rcm.clazz.name %}
-    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'this._node') }}, {% if flatten_embedded(rpm.target) %}embeddedFor_{{to_ts_name(rpm.property)}}(embedded, this._node, '{{rpm.property.name}}'){% else %}embeddedUnder(embedded, '{{rpm.property.id}}.'){% endif %});
+    this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'this._node') }}, {% if flatten_embedded(rpm.target) %}embeddedFor_{{to_ts_name(rpm.property)}}(embedded, this._node, '{{rpm.property.name}}'){% else %}embeddedUnder(embedded, '{{rpm.property.id}}.'){% endif %}{{ condition_args(rpm.target, 7) }});
 {% endif %}
 {% endfor %}
 {% for pm in rcm.embedded_mappings %}
@@ -228,9 +230,9 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% elif rpm.property.type.name == rcm.clazz.name %}
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinder {
-    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'this._node', True) }}, undefined, filter, dates);
+    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'this._node', True) }}, undefined, filter, dates{{ condition_args(rpm.target, 9) }});
     if (!this._{{to_ts_name(rpm.property)}}) {
-      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, this._node);
+      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, this._node{{ condition_args(rpm.target, 6) }});
     }
     return this._{{to_ts_name(rpm.property)}}!;
   }
@@ -238,7 +240,7 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% else %}
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinder {
-    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'this._node', True) }}, undefined, filter, dates);
+    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'this._node', True) }}, undefined, filter, dates{{ condition_args(rpm.target, 9) }});
     return this._{{to_ts_name(rpm.property)}};
   }
 
@@ -253,11 +255,11 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
   {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinder {
-    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates) => {{source_rcm.clazz.name}}RelatedFinder;
+    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates, condition?: JoinCondition, conditionReverse?: boolean) => {{source_rcm.clazz.name}}RelatedFinder;
     if (!_Cls) throw new Error('{{source_rcm.clazz.name}}RelatedFinder not registered. Import {{source_rcm.clazz.name}}Finder before calling {{reverse_name}}().');
-    if (filter || dates) return new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, this._node, undefined, filter, dates);
+    if (filter || dates) return new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, this._node, undefined, filter, dates{{ condition_args(rpm.target, True, 9) }});
     if (!this._{{reverse_name}}) {
-      this._{{reverse_name}} = new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, this._node);
+      this._{{reverse_name}} = new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, this._node{{ condition_args(rpm.target, True, 6) }});
     }
     return this._{{reverse_name}}!;
   }
@@ -325,7 +327,7 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% if is_primitive(rpm.property) %}
   private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute('{{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', {{owner_code(rpm.target.table)}}, undefined, undefined, {{ 'true' if rpm.target.nullable else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }});
 {% elif rpm.property.type.name != rcm.clazz.name %}
-  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}{% if rpm.target.via or flatten_embedded(rpm.target) %}, {{ parent_expr(rpm.target, 'undefined') }}{% endif %}{% if flatten_embedded(rpm.target) %}, embeddedFor_{{to_ts_name(rpm.property)}}(undefined, undefined, '{{rpm.property.name}}'){% endif %});
+  private static readonly _{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'undefined') }}{% if flatten_embedded(rpm.target) %}, embeddedFor_{{to_ts_name(rpm.property)}}(undefined, undefined, '{{rpm.property.name}}'){% else %}, undefined{% endif %}{{ condition_args(rpm.target, 7) }});
 {% endif %}
 {% endfor %}
 {% for pm in rcm.embedded_mappings %}
@@ -350,9 +352,9 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% elif rpm.property.type.name == rcm.clazz.name %}
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinder {
-    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'undefined', True) }}, undefined, filter, dates);
+    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'undefined', True) }}, undefined, filter, dates{{ condition_args(rpm.target, 9) }});
     if (!this._{{to_ts_name(rpm.property)}}) {
-      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }});
+      this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}{{ condition_args(rpm.target, 5) }});
     }
     return this._{{to_ts_name(rpm.property)}}!;
   }
@@ -360,7 +362,7 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% else %}
   {{prop_jsdoc(rpm.property)}}
   {{to_ts_name(rpm.property)}}(filter?: {{rpm.property.type.name}}Filter, dates?: NavigationDates): {{rpm.property.type.name}}RelatedFinder {
-    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'undefined', True) }}, undefined, filter, dates);
+    if (filter || dates) return new {{rpm.property.type.name}}RelatedFinder('{{rpm.property.name}}', new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), {{ 'true' if rpm.property.multiplicity.is_many() else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }}, {{ parent_expr(rpm.target, 'undefined', True) }}, undefined, filter, dates{{ condition_args(rpm.target, 9) }});
     return {{rcm.clazz.name}}Finder._{{to_ts_name(rpm.property)}};
   }
 
@@ -375,11 +377,11 @@ export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 {% endfor %}
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
   {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinder {
-    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates) => {{source_rcm.clazz.name}}RelatedFinder;
+    const _Cls = getRelatedFinderClass('{{source_rcm.clazz.name}}') as new (relationName: string, source: Column, target: Column, many: boolean, optional: boolean, parentJoin?: JoinTreeNodeOperation, embedded?: EmbeddedAttributes, filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates, condition?: JoinCondition, conditionReverse?: boolean) => {{source_rcm.clazz.name}}RelatedFinder;
     if (!_Cls) throw new Error('{{source_rcm.clazz.name}}RelatedFinder not registered. Import {{source_rcm.clazz.name}}Finder before calling {{reverse_name}}().');
-    if (filter || dates) return new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, undefined, undefined, filter, dates);
+    if (filter || dates) return new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}, undefined, undefined, filter, dates{{ condition_args(rpm.target, True, 9) }});
     if (!this._{{reverse_name}}) {
-      this._{{reverse_name}} = new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }});
+      this._{{reverse_name}} = new _Cls('{{assoc.target_property.name}}', new Column('{{rpm.target.rhs.name}}', '{{rpm.target.rhs.type}}', {{owner_code(rpm.target.rhs.table)}}{% if rpm.target.rhs.primary_key %}, true{% endif %}), new Column('{{rpm.target.lhs.name}}', '{{rpm.target.lhs.type}}', {{owner_code(rpm.target.lhs.table)}}{% if rpm.target.lhs.primary_key %}, true{% endif %}), {{ 'true' if assoc.target_multiplicity.is_many() else 'false' }}, {{ 'true' if assoc.target_multiplicity.lower == 0 else 'false' }}{{ condition_args(rpm.target, True, 5) }});
     }
     return this._{{reverse_name}}!;
   }

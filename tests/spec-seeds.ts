@@ -132,6 +132,15 @@ export const seeds: Record<string, Seed> = {
     await loadCsv(conn, 'companies', 'companies_missing_category.csv');
   },
 
+  join_conditions: async conn => {
+    await run(conn, 'CREATE SCHEMA org',
+      'CREATE TABLE org.firms (id INT, legal_name VARCHAR, flag INT)',
+      'CREATE TABLE org.persons (id INT, first_name VARCHAR, flag INT, firm_id INT)',
+      'CREATE TABLE org.memberships (person_id INT, firm_id INT, active INT)',
+      'CREATE TABLE org.staff (id INT, name VARCHAR, manager_id INT, active INT)');
+    for (const table of ['firms', 'persons', 'memberships', 'staff']) await loadCsv(conn, `org.${table}`, `join_conditions_${table}.csv`);
+  },
+
   processing_snapshot: async conn => {
     await run(conn, 'CREATE SCHEMA mkt',
       'CREATE TABLE mkt.quotes (id INT, symbol VARCHAR, price DOUBLE, taken_at TIMESTAMP)',

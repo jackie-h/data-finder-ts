@@ -30,6 +30,7 @@ _MAPPINGS = [
     'bitemporal_dates_mapping.md',
     'processing_snapshot_mapping.md',
     'joins_through_tables_mapping.md',
+    'join_conditions_mapping.md',
     'tpch_bih_mapping.md',
 ]
 
