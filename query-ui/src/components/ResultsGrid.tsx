@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { themeQuartz, type ColDef } from 'ag-grid-community';
+import { themeQuartz, type ColDef, type GridApi } from 'ag-grid-community';
 import { displayValue } from '../lib/format';
 
 /**
@@ -39,13 +39,21 @@ export function ResultsGrid({ columns, rows }: Props) {
     } satisfies ColDef;
   }), [columns, rows]);
 
+  const api = useRef<GridApi | null>(null);
   const rowData = useMemo(() => rows.map(r => Object.fromEntries(r.map((v, i) => [`c${i}`, v]))), [rows]);
+
+  // every new result has its own headings (Average Price, Count Distinct Price, ...), so fit the columns to them and
+  // their cells each time, not only for the first rows the grid sees
+  useEffect(() => {
+    const timer = setTimeout(() => api.current?.autoSizeAllColumns(), 0);
+    return () => clearTimeout(timer);
+  }, [columnDefs, rowData]);
 
   return (
     <div className="grid-host">
       <AgGridReact theme={theme} columnDefs={columnDefs} rowData={rowData}
         defaultColDef={{ sortable: true, resizable: true, floatingFilter: true, minWidth: 90 }}
-        autoSizeStrategy={{ type: 'fitCellContents' }}
+        onGridReady={e => { api.current = e.api; e.api.autoSizeAllColumns(); }}
         enableCellTextSelection suppressFieldDotNotation />
     </div>
   );
