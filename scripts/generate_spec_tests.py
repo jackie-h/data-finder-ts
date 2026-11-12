@@ -103,7 +103,6 @@ SKIPPED_MODULES = {
 UNPORTED = [
     (r'^concatenate', 'concatenate (UNION) is not ported yet'),
     (r'^(chain_|join_|exists_keeps|not_exists_keeps)', 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'),
-    (r'^(not_equal|ne_matches)', '!= matching a missing value is not ported yet'),
 ]
 
 

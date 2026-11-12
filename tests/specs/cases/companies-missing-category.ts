@@ -5,13 +5,21 @@ import type { CompanyFinder } from '../../generated_examples/companies/CompanyFi
 export const COMPANIES_MISSING_CATEGORY_SPECS: SpecCase<CompanyFinder>[] = [
   {
     name: 'not_equal_matches_a_missing_value',
-    query: () => { throw new Error('!= matching a missing value is not ported yet'); },
-    expected: { columns: [], rows: [], skip: '!= matching a missing value is not ported yet' },
+    query: f => f.findAll([f.id()], f.category().ne('Finance')).orderBy(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [1],
+        [2],
+        [4],
+      ], sql: '<> \'Finance\' OR ' },
   },
   {
     name: 'ne_matches_a_missing_value',
-    query: () => { throw new Error('!= matching a missing value is not ported yet'); },
-    expected: { columns: [], rows: [], skip: '!= matching a missing value is not ported yet' },
+    query: f => f.findAll([f.id()], f.category().ne('Technology')).orderBy(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+        [4],
+      ] },
   },
   {
     name: 'equal_does_not_match_a_missing_value',
@@ -22,18 +30,29 @@ export const COMPANIES_MISSING_CATEGORY_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'not_equal_with_another_condition',
-    query: () => { throw new Error('!= matching a missing value is not ported yet'); },
-    expected: { columns: [], rows: [], skip: '!= matching a missing value is not ported yet' },
+    query: f => f.findAll([f.id()], f.category().ne('Finance').and(f.id().lt(3))).orderBy(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [1],
+        [2],
+      ], sql: '(t0.category <> \'Finance\' OR t0.category IS NULL) AND' },
   },
   {
     name: 'not_equal_on_a_required_property_also_has_the_null_alternative',
-    query: () => { throw new Error('!= matching a missing value is not ported yet'); },
-    expected: { columns: [], rows: [], skip: '!= matching a missing value is not ported yet' },
+    query: f => f.findAll([f.id()], f.name().ne('Acme Corp')).orderBy(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+        [4],
+      ], sql: '<> \'Acme Corp\' OR ' },
   },
   {
     name: 'not_equal_on_a_primary_key_also_has_the_null_alternative',
-    query: () => { throw new Error('!= matching a missing value is not ported yet'); },
-    expected: { columns: [], rows: [], skip: '!= matching a missing value is not ported yet' },
+    query: f => f.findAll([f.id()], f.id().ne(1)).orderBy(f.id().ascending()),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+        [4],
+      ], sql: '<> 1 OR ' },
   },
 ];
 
