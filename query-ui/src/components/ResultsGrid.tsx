@@ -32,7 +32,8 @@ export function ResultsGrid({ columns, rows }: Props) {
     return {
       colId: `c${i}`, headerName: name, field: `c${i}`,
       filter: numeric ? 'agNumberColumnFilter' : 'agTextColumnFilter',
-      type: numeric ? 'rightAligned' : undefined,
+      // numbers line up on the right in the cells; every heading stays on the left
+      cellClass: numeric ? 'ag-right-aligned-cell' : undefined,
       valueFormatter: p => (numeric && typeof p.value === 'number' ? p.value.toLocaleString(undefined, { maximumFractionDigits: 6 }) : displayValue(p.value)),
       filterValueGetter: p => (typeof p.data?.[`c${i}`] === 'bigint' ? Number(p.data[`c${i}`]) : p.data?.[`c${i}`]),
     } satisfies ColDef;
@@ -43,7 +44,8 @@ export function ResultsGrid({ columns, rows }: Props) {
   return (
     <div className="grid-host">
       <AgGridReact theme={theme} columnDefs={columnDefs} rowData={rowData}
-        defaultColDef={{ sortable: true, resizable: true, floatingFilter: true, minWidth: 90, flex: 1 }}
+        defaultColDef={{ sortable: true, resizable: true, floatingFilter: true, minWidth: 90 }}
+        autoSizeStrategy={{ type: 'fitCellContents' }}
         enableCellTextSelection suppressFieldDotNotation />
     </div>
   );
