@@ -270,8 +270,11 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'not_equal_on_an_expression',
-    query: () => { throw new Error('!= matching a missing value is not ported yet'); },
-    expected: { columns: [], rows: [], skip: '!= matching a missing value is not ported yet' },
+    query: f => f.findAll([f.id()], f.name().toLowerCase().ne('acme corp')).orderBy(f.id().ascending()).limit(2),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+      ], skipGraphql: 'A filter on an expression cannot be pushed to the server' },
   },
   {
     name: 'sort_by_an_aggregate_descending_then_a_column',
