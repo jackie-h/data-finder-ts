@@ -29,6 +29,9 @@ import {
   StringAggregateOperation,
   DateAggregateOperation,
   DateTimeAggregateOperation,
+  Interval,
+  IntervalConstantOperation,
+  IntervalAggregateOperation,
   AggregateOperator,
   SortOperation,
   ScalarFunction,
@@ -511,6 +514,59 @@ export class DateTimeAttribute extends Attribute {
   }
 
 }
+
+/**
+ * A column that holds a length of time, as the difference of two timestamps is: compared with an `Interval` and ordered,
+ * and its smallest and largest are intervals. It is not a number, so it has no arithmetic, sum or average.
+ */
+export class IntervalAttribute extends Attribute {
+  aggregateKind(): AggregateConstructor<IntervalAggregateOperation> { return IntervalAggregateOperation; }
+
+  declare readonly valueType?: Interval;
+
+  constructor(
+    displayName: string,
+    columnName: string,
+    columnDbType: string,
+    owner: Relation,
+    parent?: JoinTreeNodeOperation,
+    embedded?: Attribute,
+    nullable: boolean = true,
+    optional: boolean = false,
+  ) { super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional); }
+
+  protected toConstant(value: AttributeValue): ConstantOperation {
+    return new IntervalConstantOperation(value as Interval);
+  }
+
+  /** Filter to rows where this interval equals `value`. */
+  eq(value: Operand<Interval>): ComparisonOperation {
+    return this.compared(ComparisonOperator.EQUAL, value, () => new IntervalConstantOperation(value as Interval));
+  }
+  /** Filter to rows where this interval does not equal `value`. */
+  ne(value: Operand<Interval>): ComparisonOperation {
+    return this.compared(ComparisonOperator.NOT_EQUAL, value, () => new IntervalConstantOperation(value as Interval));
+  }
+  /** Filter to rows where this interval is longer than `value`. */
+  gt(value: Operand<Interval>): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN, value, () => new IntervalConstantOperation(value as Interval));
+  }
+  /** Filter to rows where this interval is shorter than `value`. */
+  lt(value: Operand<Interval>): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN, value, () => new IntervalConstantOperation(value as Interval));
+  }
+  /** Filter to rows where this interval is at least `value`. */
+  gte(value: Operand<Interval>): ComparisonOperation {
+    return this.compared(ComparisonOperator.GREATER_THAN_OR_EQUAL_TO, value, () => new IntervalConstantOperation(value as Interval));
+  }
+  /** Filter to rows where this interval is at most `value`. */
+  lte(value: Operand<Interval>): ComparisonOperation {
+    return this.compared(ComparisonOperator.LESS_THAN_OR_EQUAL_TO, value, () => new IntervalConstantOperation(value as Interval));
+  }
+}
+
+export interface IntervalAttribute extends MinMax<IntervalAggregateOperation> {}
+applyMixins(IntervalAttribute, [MinMax]);
 
 export interface DateAttribute extends MinMax<DateAggregateOperation>, DateFunctions {}
 applyMixins(DateAttribute, [MinMax, DateFunctions]);
