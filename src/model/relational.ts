@@ -743,6 +743,28 @@ export class NotExistsOperation extends RelationalOperationElement implements Al
  */
 export abstract class QueryExpression extends Relation {}
 
+/** ANSI SQL's join types: `inner`, and the outer joins `left`, `right` and `full`, which keep the rows that find no match. */
+export enum JoinKind {
+  INNER = 'inner',
+  LEFT = 'left',
+  RIGHT = 'right',
+  FULL = 'full',
+}
+
+/**
+ * A relation joined on a condition, as ANSI SQL's `<join type> JOIN <table reference> ON <search condition>` and Legend's
+ * `Join`: its `target`, the kind of join and the condition `operation`. Every column in the condition is owned by a relation,
+ * which says which side of the join it is on. A query holds these for the relations it reads besides its root.
+ */
+export class RelationJoin {
+  constructor(
+    readonly name: string,
+    readonly target: Relation,
+    readonly operation: RelationalOperationElement,
+    readonly kind: JoinKind,
+  ) {}
+}
+
 /**
  * A single SELECT over a root table, as ANSI SQL's `<query specification>`: what to show, which rows qualify, how
  * they are grouped, which groups qualify (HAVING) and whether duplicates are removed (DISTINCT). It has no ORDER BY
@@ -769,6 +791,8 @@ export class QuerySpecification extends QueryExpression {
      * that instead of to the table, so a parent is not repeated for each row that matches.
      */
     readonly subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map(),
+    /** Relations joined to the root on a condition, in the order they are written. */
+    readonly joins: readonly RelationJoin[] = [],
   ) { super(); }
 }
 
@@ -791,7 +815,8 @@ export class OrderedQuerySpecification extends QuerySpecification {
     readonly offset?: number,
     having?: Operation,
     subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map(),
-  ) { super(columns, filter, groupBy, table, joinFilters, distinct, having, subSelects); }
+    joins: readonly RelationJoin[] = [],
+  ) { super(columns, filter, groupBy, table, joinFilters, distinct, having, subSelects, joins); }
 }
 
 /**

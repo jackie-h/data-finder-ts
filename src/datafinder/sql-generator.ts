@@ -47,6 +47,8 @@ import {
   QuerySpecification,
   OrderedQuerySpecification,
   QueryExpression,
+  RelationJoin,
+  JoinKind,
   UnionOperation,
   BinaryOperation,
   CaseOperation,
@@ -799,6 +801,7 @@ class SQLQueryGenerator {
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
   private _subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map();
+  private _relationJoins: readonly RelationJoin[] = [];
 
   generate(query: QuerySpecification): void {
     // a query that is only stored has no order, limit or offset
@@ -807,9 +810,12 @@ class SQLQueryGenerator {
     this._elidableNodes = this._computeElidableNodes(query);
     this._joinFilters = query.joinFilters;
     this._subSelects = query.subSelects;
+    this._relationJoins = query.joins;
     if (this._rootTable !== undefined) {
       this._from.add(this._tableAliasForTable(this._rootTable));
     }
+    // the relations joined to it are named next, so they read t1, t2, ... in the order they are joined
+    for (const join of query.joins) this._tableAliasForTable(join.target);
     this.processSelect([...query.columns]);
     this._where = this.buildFilter(this._guarded(query.filter));
     const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
@@ -1277,8 +1283,17 @@ class SQLQueryGenerator {
       (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
+    // a relation joined on a condition is written in its JOIN, not listed in FROM because a column of it was read
+    const joinedAliases = new Set(this._relationJoins.map(j => this._tableAliasForTable(j.target)));
+    const joined = this._relationJoins.map(j => {
+      const alias = this._tableAliasForTable(j.target);
+      const word = { [JoinKind.INNER]: 'INNER', [JoinKind.LEFT]: 'LEFT OUTER', [JoinKind.RIGHT]: 'RIGHT OUTER', [JoinKind.FULL]: 'FULL OUTER' }[j.kind];
+      return ' ' + word + ' JOIN ' + this._relationSql(alias) + ' AS ' + alias.name + ' ON (' + this.buildFilter(j.operation) + ')';
+    });
+
     return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca, this._dialect)).join(',') +
-      ' FROM ' + Array.from(this._from).map(ta => this._relationSql(ta) + ' AS ' + ta.name).join(',') +
+      ' FROM ' + Array.from(this._from).filter(ta => !joinedAliases.has(ta)).map(ta => this._relationSql(ta) + ' AS ' + ta.name).join(',') +
+      joined.join('') +
       joins.join('') +
       this._buildWhere() +
       this._buildGroupBy() +

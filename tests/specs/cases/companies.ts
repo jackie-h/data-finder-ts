@@ -43,23 +43,35 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'join_per_group_in_an_order',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: f => f.findAll([f.category(), f.name().join(', ', [f.name().ascending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
+    expected: { columns: ['Category', 'Join Name'], rows: [
+        ['Finance', 'Delta Ltd, Gamma LLC'],
+        ['Manufacturing', 'Acme Industries'],
+        ['Technology', 'Acme Corp, Beta Corp'],
+      ], sql: 'STRING_AGG(t0.name, \', \' ORDER BY t0.name ASC)', skipGraphql: 'The GraphQL engine cannot order the values it joins' },
   },
   {
     name: 'join_descending',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: f => f.findAll([f.category(), f.name().join('|', [f.name().descending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
+    expected: { columns: ['Category', 'Join Name'], rows: [
+        ['Finance', 'Gamma LLC|Delta Ltd'],
+        ['Manufacturing', 'Acme Industries'],
+        ['Technology', 'Beta Corp|Acme Corp'],
+      ], skipGraphql: 'The GraphQL engine cannot order the values it joins' },
   },
   {
     name: 'join_of_the_whole_result',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: f => f.findAll([f.category().join('/', [f.id().ascending()])]),
+    expected: { columns: ['Join Category'], rows: [
+        ['Technology/Manufacturing/Technology/Finance/Finance'],
+      ], skipGraphql: 'The GraphQL engine cannot order the values it joins' },
   },
   {
     name: 'join_without_an_order_joins_every_value',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: f => f.findAll([f.category(), f.name().join(',')], f.category().eq('Manufacturing')).groupBy(f.category()),
+    expected: { columns: ['Category', 'Join Name'], rows: [
+        ['Manufacturing', 'Acme Industries'],
+      ], sql: 'STRING_AGG(t0.name, \',\')' },
   },
   {
     name: 'count_all_counts_rows_per_group',

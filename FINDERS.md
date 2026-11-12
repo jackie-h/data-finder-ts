@@ -214,6 +214,16 @@ trades.aggregate({ total: r => r.price.sum(), average: r => r.price.sum().divide
 
 Each aggregate column must be an aggregate of the rows of its group (`sum`, `count`, `average`, `min`, `max`, ... also inside arithmetic). `groupBy` with finder attributes (`f.findAll([...]).groupBy(f.category())`) is as before; the two forms are told apart by their arguments and cannot be mixed. A step after it, such as `filter`, reads the groups' columns (a `HAVING`, written as a `WHERE` over the grouped query).
 
+`join` puts two results together, as Legend's `join`. The condition is a function of a row of each (`and` / `or` combine comparisons), and `how` is one of ANSI SQL's join types, `'inner'`, or `'left'`, `'right'` and `'full'`, the outer joins that keep the rows that find no match, with NULL for the other side's columns:
+
+```ts
+orders.join(customers, (o, c) => o.customerId.eq(c.id), 'inner');      // only the orders that have a customer
+orders.join(customers, (o, c) => o.customerId.eq(c.id), 'left');       // every order, with a customer or NULL
+lines.join(others, (a, b) => a.order.eq(b.order).and(a.supplier.ne(b.supplier)), 'inner');
+```
+
+The result has the columns of both sides, which must be named differently (as Legend requires): name them with `alias()`, or `extend` then `select`. It is a result like any other, so it can be joined again, filtered, grouped and ordered. The SQL is `FROM (left) AS t1 INNER JOIN (right) AS t2 ON (...)` inside the query that reads it.
+
 The result of a step is a result: order it with `.column(name)` (`rows.orderBy(rows.column('price').ascending())`), limit it, concatenate it. A row's attributes are loosely typed (`ResultRow`): a column's type is known when the query is built, not by the compiler.
 
 ## Sorting
