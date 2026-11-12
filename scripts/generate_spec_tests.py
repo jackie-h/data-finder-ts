@@ -101,7 +101,6 @@ SKIPPED_MODULES = {
 # Expectations of the Python specs for features that are not ported yet, by the pattern their names match. Each is generated
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 UNPORTED = [
-    (r'^(exists_keeps|not_exists_keeps)', 'exists on a result is not ported yet'),
 ]
 
 
@@ -140,7 +139,7 @@ def camel(name: str) -> str:
 
 
 # Free functions of the Python package that the specs call, and their TypeScript names.
-FREE_FUNCTIONS = {'count_all': 'countAll', 'constant': 'constant', 'when': 'when', 'concat': 'concat'}
+FREE_FUNCTIONS = {'count_all': 'countAll', 'constant': 'constant', 'when': 'when', 'concat': 'concat', 'exists': 'exists'}
 # Methods whose result is a number or text, which decides how `+ - * /` between them translates.
 NUMBER_METHODS = {'length', 'abs', 'ceil', 'ceiling', 'floor', 'round', 'sqrt', 'power', 'mod', 'sum', 'average',
                   'min', 'max', 'count', 'count_distinct', 'std', 'var', 'year', 'month', 'day', 'hour', 'minute',

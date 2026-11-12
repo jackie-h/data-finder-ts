@@ -737,6 +737,16 @@ export class NotExistsOperation extends RelationalOperationElement implements Al
 }
 
 /**
+ * There is a row of `relation` for which `condition` holds: ANSI SQL's `EXISTS (SELECT 1 FROM <relation> WHERE <condition>)`. The
+ * condition reads the columns of the relation and of the row it is asked of (a correlated subquery). It is a condition like any
+ * other, so it is combined with `and` / `or` and negated with `not()`, as Legend's `exists` is in a `filter`. (An `ExistsOperation`
+ * asks if a property of the class has a value.)
+ */
+export class RelationExistsOperation extends Operation {
+  constructor(readonly relation: Relation, readonly condition: RelationalOperationElement) { super(); }
+}
+
+/**
  * What ANSI SQL calls a `<query expression>`: a query that returns rows and can be used where a table is. It is a
  * relation, as Legend's select is: its columns are what it shows. It has no name of its own: a table alias gives it
  * one where it is used. It has no ORDER BY or row limit: a table is a set of rows with no order.
@@ -1395,3 +1405,6 @@ export class IntervalOperation extends BinaryOperation implements Sortable {
 
 export interface IntervalOperation extends Equatable<Interval>, Orderable<Interval>, Extremes<IntervalAggregateOperation> {}
 applyMixins(IntervalOperation, [Equatable, Orderable, Extremes]);
+
+export interface RelationExistsOperation extends BooleanAggregates {}
+applyMixins(RelationExistsOperation, [BooleanAggregates]);
