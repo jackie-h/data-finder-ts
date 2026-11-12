@@ -47,7 +47,8 @@ import {
   QuerySpecification,
   OrderedQuerySpecification,
   QueryExpression,
-    JoinKind,
+  RelationExistsOperation,
+  JoinKind,
   UnionOperation,
   BinaryOperation,
   CaseOperation,
@@ -251,7 +252,7 @@ class RenderedSql extends RelationalOperationElement {
 function isCondition(op: unknown): boolean {
   return op instanceof ComparisonOperation || op instanceof LogicalOperation || op instanceof IsNullOperation
     || op instanceof IsNotNullOperation || op instanceof InOperation || op instanceof NotInOperation
-    || op instanceof ExistsOperation || op instanceof NotExistsOperation || op instanceof NotOperation;
+    || op instanceof ExistsOperation || op instanceof NotExistsOperation || op instanceof RelationExistsOperation || op instanceof NotOperation;
 }
 
 function sqlOperationToString(operation: RelationalOperationElement, d: SqlDialect): string {
@@ -1192,6 +1193,10 @@ class SQLQueryGenerator {
     if (op instanceof ExistsOperation) {
       const col = op.node.join.keys()[1];
       return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NOT NULL';
+    }
+    if (op instanceof RelationExistsOperation) {
+      const inner = this._tableAliasForTable(op.relation);
+      return 'EXISTS (SELECT 1 FROM ' + this._relationSql(inner) + ' AS ' + inner.name + ' WHERE ' + this.buildFilter(op.condition) + ')';
     }
     if (op instanceof NotExistsOperation) {
       const col = op.node.join.keys()[1];

@@ -4,7 +4,7 @@ import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb } from './duckdb-runner';
 import { seeds } from './spec-seeds';
 import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
-import { clearRunner } from '../src/datafinder/runner';
+import { clearRunner, exists } from '../src/datafinder/runner';
 
 const f = new CompanyFinder();
 const companies = () => f.findAll([f.id(), f.name().alias('company'), f.category()]);
@@ -186,3 +186,40 @@ describe('join of two results against DuckDB', () => {
   });
 });
 
+
+describe('exists on a result', () => {
+  let instance: DuckDBInstance;
+  let conn: DuckDBConnection;
+  beforeAll(async () => {
+    instance = await DuckDBInstance.create(':memory:');
+    conn = await instance.connect();
+    registerDuckDb(conn);
+    await seeds.companies(conn);
+  });
+  afterAll(() => { clearRunner(); conn.disconnectSync(); instance.closeSync(); });
+
+  const all = () => f.findAll([f.id().alias('id'), f.category().alias('category')]);
+  const finance = () => f.findAll([f.id().alias('other_id'), f.category().alias('other_category')], f.category().eq('Finance'));
+
+  it('is a correlated EXISTS over the other result', () => {
+    const sql = all().filter(r => exists(finance(), o => o.other_category.eq(r.category))).toSql('duckdb');
+    expect(sql).toMatch(/WHERE EXISTS \(SELECT 1 FROM \(SELECT .* WHERE .*category = 'Finance'\) AS t\d+ WHERE t\d+\.other_category = t0\.category\)$/);
+  });
+
+  it('keeps the rows that have a match, and not() the rows that have none', async () => {
+    const has = all().filter(r => exists(finance(), o => o.other_category.eq(r.category))).select('id');
+    expect(await has.orderBy(has.column('id').ascending()).toRows()).toEqual([[4], [5]]);
+    const hasNone = all().filter(r => exists(finance(), o => o.other_category.eq(r.category)).not()).select('id');
+    expect((await hasNone.toRows()).length).toBe(3);
+  });
+
+  it('combines with and / or, and a result can be tested against itself', async () => {
+    const both = all().filter(r => exists(all(), o => o.category.eq(r.category).and(o.id.ne(r.id))).and(r.id.gt(1))).select('id');
+    expect(await both.orderBy(both.column('id').ascending()).toRows()).toEqual([[3], [4], [5]]);
+  });
+
+  it('is refused without a function of a row, or a comparison', () => {
+    expect(() => exists(all(), 5 as never)).toThrow(TypeError);
+    expect(() => exists(all(), () => 5 as never)).toThrow('gives a comparison');
+  });
+});
