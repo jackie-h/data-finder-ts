@@ -18,7 +18,7 @@ import { join, relative, basename } from "node:path";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import { BLUE, GREEN, page, loadConfig, setAcronyms, spaced, multLeft, multRight } from "./common.mjs";
-import { loadData } from "./data.mjs";
+import { loadData, QUERY_SCHEMA } from "./data.mjs";
 
 const cfg = loadConfig(process.argv.slice(2));
 setAcronyms(cfg.acronyms);
@@ -31,7 +31,7 @@ const mermaidJs = relative(outDir, createRequire(import.meta.url).resolve("merma
 const slug = s => s.replace(/[^A-Za-z0-9]+/g, "_");
 const words = s => s.split("_").filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
 const nameOf = f => basename(f).replace(/(_model|_mapping)?\.md$/, "");
-const plural = (n, w) => `${n} ${n === 1 ? w : w.endsWith("s") ? w + "es" : w + "s"}`;
+const plural = (n, w) => `${n} ${n === 1 ? w : w.endsWith("s") ? w + "es" : /[^aeiou]y$/.test(w) ? w.slice(0, -1) + "ies" : w + "s"}`;
 const write = (name, text) => writeFileSync(join(outDir, name), text);
 const attrNote = Number.isFinite(maxAttrs) ? `First ${maxAttrs} attributes shown.` : "All attributes shown.";
 
@@ -213,7 +213,8 @@ function paginate(tables, edges) {
 // one page with every table when it fits. Returns the number of foreign keys drawn.
 function dbViews(mp, scope) {
   const prefix = `${mp.key}__database`;
-  const table = (schema, name) => mp.tables.find(t => t.schema === schema && t.name === name);
+  // a join that starts from or ends at a query has a null schema and the query's name for its table
+  const table = (schema, name) => mp.tables.find(t => (schema == null ? t.isQuery : t.schema === schema && !t.isQuery) && t.name === name);
   const edges = [];                              // every foreign key, resolved to (child table, parent table)
   for (const a of mp.associations) for (const r of a.rows) {
     const child = table(r.sourceSchema, r.sourceTable), parent = table(r.targetSchema, r.targetTable);
@@ -225,7 +226,7 @@ function dbViews(mp, scope) {
   const schemas = [...new Set(mp.tables.map(t => t.schema))];
   const pages = schemas.flatMap(schema => {
     const parts = paginate(mp.tables.filter(t => t.schema === schema), edges);
-    return parts.map((tables, i) => ({ schema, name: `${prefix}__${slug(schema)}${parts.length > 1 ? `_part${i + 1}` : ""}`, part: i + 1, of: parts.length, tables, rels: [], stubs: new Map() }));
+    return parts.map((tables, i) => ({ schema, name: `${prefix}__${slug(schema)}${parts.length > 1 ? `_part${i + 1}` : ""}`, part: i + 1, of: parts.length, tables, rels: [], reads: [], stubs: new Map() }));
   });
   const pageOf = new Map(pages.flatMap(pg => pg.tables.map(t => [t, pg])));
   const relOf = ({ def, r, child, parent }) => ({ child, parent, srcCol: r.srcCol, tgtCol: r.tgtCol, childMult: def.targetMult, parentMult: def.sourceMult });
@@ -235,28 +236,43 @@ function dbViews(mp, scope) {
     if (pageOf.get(e.parent) !== pg) pg.stubs.set(entityId(e.parent), { table: e.parent, href: `${pageOf.get(e.parent).name}.html` });
   }
   totalFks += edges.length;
+  // what each query reads: a dotted line from the table (or earlier query) read to the query
+  const reads = mp.tables.filter(t => t.isQuery).flatMap(q => q.reads.map(r => ({ child: q, parent: r.query ? table(null, r.query) : table(r.schema, r.table) })))
+    .filter(r => r.parent);
+  for (const r of reads) {
+    const pg = pageOf.get(r.child);
+    pg.reads.push(r);
+    if (pageOf.get(r.parent) !== pg) pg.stubs.set(entityId(r.parent), { table: r.parent, href: `${pageOf.get(r.parent).name}.html` });
+  }
 
   const home = `<a href="index.html">&larr; Home</a>`, modelLink = ` &middot; <a href="${mp.key}__model.html">Mapped model &rarr;</a>`;
   const first = schema => pages.find(pg => pg.schema === schema).name;
   const sub = `Tables and columns from ${mp.file}${mp.datastore ? ` (data store ${mp.datastore})` : ""}`;
   const tableCount = schema => mp.tables.filter(t => t.schema === schema).length;
+  const things = (n, schema) => schema === QUERY_SCHEMA ? plural(n, "query") : plural(n, "table");   // a query is drawn where a table would be
+  const nTables = mp.tables.filter(t => !t.isQuery).length, nQueries = mp.tables.length - nTables;
+  const inventory = `${plural(nTables, "table")}${nQueries ? ` and ${plural(nQueries, "SQL query")}` : ""}`;
   const fkCount = schema => pages.filter(pg => pg.schema === schema).reduce((n, pg) => n + pg.rels.length, 0);
   const common = { mermaidJs, palette: BLUE, fixUnderscores: false };
 
   // the flowchart of schemas
   const fl = ["flowchart LR"], idx = new Map(schemas.map((sc, i) => [sc, `s${i}`]));
-  for (const sc of schemas) fl.push(`    ${idx.get(sc)}["<b>${sc}</b><br/>${plural(tableCount(sc), "table")}"]`);
+  for (const sc of schemas) fl.push(`    ${idx.get(sc)}["<b>${sc}</b><br/>${things(tableCount(sc), sc)}"]`);
   const between = new Map();
-  for (const e of edges) if (e.child.schema !== e.parent.schema) { const k = `${e.parent.schema}>${e.child.schema}`; between.set(k, (between.get(k) ?? 0) + 1); }
-  for (const [k, n] of between) { const [t, c] = k.split(">"); fl.push(`    ${idx.get(t)} -->|"${plural(n, "foreign key")}"| ${idx.get(c)}`); }
+  for (const e of edges) if (e.child.schema !== e.parent.schema) { const k = `fk|${e.parent.schema}>${e.child.schema}`; between.set(k, (between.get(k) ?? 0) + 1); }
+  for (const e of reads) if (e.child.schema !== e.parent.schema) { const k = `read|${e.parent.schema}>${e.child.schema}`; between.set(k, (between.get(k) ?? 0) + 1); }
+  for (const [k, n] of between) {
+    const [kind, ends] = k.split("|"), [t, c] = ends.split(">");
+    fl.push(`    ${idx.get(t)} ${kind === "read" ? "-.->" : "-->"}|"${kind === "read" ? `${n} read${n === 1 ? "" : "s"}` : plural(n, "foreign key")}"| ${idx.get(c)}`);
+  }
   for (const sc of schemas) fl.push(`    click ${idx.get(sc)} href "${first(sc)}.html"`);
   const flow = fl.join("\n") + "\n";
   const hasAll = mp.tables.length <= MAX_TABLES;
   write(`${prefix}.mmd`, flow);
   write(`${prefix}.html`, page({
     ...common, title: `${mp.title}: database`, mmd: flow, nav: `<nav>${home}${modelLink}</nav>`,
-    intro: `${sub}. Each box is a schema (${plural(schemas.length, "schema")}, ${plural(mp.tables.length, "table")}); arrows run from the schema holding the referenced table to the schema holding the foreign key. Click a box to open its tables.`,
-    footer: `${hasAll ? `<p><a href="${prefix}__all.html">All tables in one ER diagram &rarr;</a></p>` : ""}<ul>${schemas.map(sc => `<li><a href="${first(sc)}.html">${sc}</a> - ${plural(tableCount(sc), "table")}, ${plural(fkCount(sc), "foreign key")}</li>`).join("")}</ul>`,
+    intro: `${sub}. Each box is a schema (${plural(schemas.length, "schema")}: ${inventory}); arrows run from the schema holding the referenced table to the schema holding the foreign key, and a dotted arrow from what a SQL query reads to the query. Click a box to open its tables.`,
+    footer: `${hasAll ? `<p><a href="${prefix}__all.html">All tables in one ER diagram &rarr;</a></p>` : ""}<ul>${schemas.map(sc => `<li><a href="${first(sc)}.html">${sc}</a> - ${things(tableCount(sc), sc)}, ${plural(fkCount(sc), "foreign key")}</li>`).join("")}</ul>`,
   }));
 
   // an ER page per schema (per part, when a schema is too big for one page)
@@ -269,21 +285,28 @@ function dbViews(mp, scope) {
       ...common, title: `${mp.title}: ${pg.schema}${pg.of > 1 ? ` (part ${pg.part} of ${pg.of})` : ""}`, mmd: text, descs, footer: others,
       stubs: Object.fromEntries([...pg.stubs].map(([id, st]) => [id, st.href])),
       nav: `<nav>${home} &middot; <a href="${prefix}.html">&larr; Database</a>${modelLink}</nav>`,
-      intro: `${plural(pg.tables.length, "table")} of schema ${pg.schema}, with database types and PK/FK. Foreign keys are the mapping's associations, labelled source column to target column.${pg.stubs.size ? " Dashed boxes are tables in another schema; click one to open it." : ""}`,
+      intro: `${pg.schema === QUERY_SCHEMA ? `${plural(pg.tables.length, "SQL query")}, each a relation written as SQL that a class is mapped to (hover a box for its SQL and what it reads)` : `${plural(pg.tables.length, "table")} of schema ${pg.schema}`}, with database types and PK/FK. Foreign keys are the mapping's associations, labelled source column to target column.${pg.stubs.size ? " Dashed boxes are tables in another schema; click one to open it." : ""}`,
     }));
   }
 
   // every table in one diagram
   if (hasAll) {
-    const { text, descs } = dbText({ tables: mp.tables, rels: edges.map(relOf), stubs: new Map() }, scope);
+    const { text, descs } = dbText({ tables: mp.tables, rels: edges.map(relOf), reads, stubs: new Map() }, scope);
     write(`${prefix}__all.mmd`, text);
     write(`${prefix}__all.html`, page({
       ...common, title: `${mp.title}: all tables`, mmd: text, descs,
       nav: `<nav>${home} &middot; <a href="${prefix}.html">&larr; Database</a>${modelLink}</nav>`,
-      intro: `${sub}: all ${plural(mp.tables.length, "table")} in one diagram, with database types and PK/FK.`,
+      intro: `${sub}: all ${inventory} in one diagram, with database types and PK/FK.${nQueries ? " A dotted line runs from what a SQL query reads to the query." : ""}`,
     }));
   }
   return { edges: edges.length, schemas: schemas.length };
+}
+
+/** The hover text of a query: the class it is mapped to, the scheme that milestones it, what it reads, and its SQL on one line. */
+function queryNote(q, cls) {
+  const reads = q.reads.map(r => r.query ?? `${r.schema ? r.schema + "." : ""}${r.table}`).join(", ");
+  return [cls ? `${q.cls}: ${cls.desc}` : q.cls, q.milestoning ? `Milestoning: ${q.milestoning}` : "", reads ? `Reads: ${reads}` : "", `SQL: ${q.sql.replace(/\s+/g, " ").trim()}`]
+    .filter(Boolean).join(" - ");
 }
 
 function dbText(pg, scope) {
@@ -293,8 +316,8 @@ function dbText(pg, scope) {
   for (const t of pg.tables) {
     const id = entityId(t), fks = fkCols.get(id) ?? new Map();
     const cls = classes.get((byName.get(t.cls) ?? []).find(k => scope.has(classes.get(k).file)));
-    lines.push(`    ${id}["${t.name}"] {`);
-    descs[id] = { _label: t.name, _: cls ? `${t.cls}: ${cls.desc}` : "" };
+    lines.push(`    ${id}["${t.name}${t.isQuery ? " (SQL query)" : ""}"] {`);
+    descs[id] = { _label: t.name, _: t.isQuery ? queryNote(t, cls) : cls ? `${t.cls}: ${cls.desc}` : "" };
     for (const c of t.columns) {
       const keys = [c.key === "PK" ? "PK" : null, fks.has(c.name) ? "FK" : null].filter(Boolean).join(", ");
       lines.push(`        ${typeToken(c.type)} ${colToken(c.name)}${keys ? " " + keys : ""}`);
@@ -303,7 +326,9 @@ function dbText(pg, scope) {
     }
     lines.push("    }");
   }
-  for (const [id, s] of pg.stubs) { lines.push(`    ${id}["${s.table.name}"]`); descs[id] = { _label: s.table.name, _: s.table.schema }; }
+  for (const [id, s] of pg.stubs) { lines.push(`    ${id}["${s.table.name}${s.table.isQuery ? " (SQL query)" : ""}"]`); descs[id] = { _label: s.table.name, _: s.table.schema }; }
+  // what a query reads: a dotted (non-identifying) line from the table or query read
+  for (const r of pg.reads ?? []) lines.push(`    ${entityId(r.parent)} ||..o{ ${entityId(r.child)} : "read by"`);
   for (const r of pg.rels) lines.push(`    ${entityId(r.parent)} ${multLeft(r.parentMult)}--${multRight(r.childMult)} ${entityId(r.child)} : "${r.srcCol} to ${r.tgtCol}"`);
   return { text: lines.join("\n") + "\n", descs };
 }
@@ -325,7 +350,7 @@ for (const mp of mappings) {
     allIntro: `The ${plural(mapped.size, "class")} mapped by ${mp.file} (${plural(rels.length, "association")}) in one diagram.`,
   });
 
-  summary.push({ mp, classes: mapped.size, tables: mp.tables.length, fks: db.edges, schemas: db.schemas });
+  summary.push({ mp, classes: mapped.size, tables: mp.tables.filter(t => !t.isQuery).length, queries: mp.tables.filter(t => t.isQuery).length, fks: db.edges, schemas: db.schemas });
 }
 
 // ---------- landing page ----------
@@ -347,7 +372,7 @@ h2{font-size:15px;margin:28px 0 10px}
 <h2>Mappings</h2>
 <div class="row">${summary.map(s => `<div class="group"><h3>${s.mp.title}</h3><small>${s.mp.datastore ? s.mp.datastore + " &middot; " : ""}${s.mp.file}</small><div class="pair">${
   box("model", `${s.mp.key}__model.html`, "Mapped model", plural(s.classes, "class"))}${
-  box("db", `${s.mp.key}__database.html`, "Database", `${plural(s.tables, "table")} in ${plural(s.schemas, "schema")}<br>${plural(s.fks, "foreign key")}`)}</div></div>`).join("\n")}</div>`;
+  box("db", `${s.mp.key}__database.html`, "Database", `${plural(s.tables, "table")}${s.queries ? ` and ${plural(s.queries, "SQL query")}` : ""} in ${plural(s.schemas, "schema")}<br>${plural(s.fks, "foreign key")}`)}</div></div>`).join("\n")}</div>`;
 write("index.html", page({
   title: cfg.title, mermaidJs, body, intro: "Start with the full model, or pick a mapping to see the model entities it maps and its database tables.",
 }));

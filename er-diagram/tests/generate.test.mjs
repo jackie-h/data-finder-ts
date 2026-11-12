@@ -116,7 +116,7 @@ test("config covers every e2e model and database mapping file", () => {
   const listed = new Set([...config.models, ...config.mappings]);
   const files = readdirSync(dir).filter(f => f.endsWith(".md") && !f.endsWith("_graphql_mapping.md")   // GraphQL mappings have no tables to draw
     && !f.startsWith("tpch_bih_")                                                                      // the TPC-BiH benchmark is not drawn
-    && !f.startsWith("join_conditions_") && !f.startsWith("sql_queries_"));                            // join conditions and SQL queries are not drawn yet
+    && !f.startsWith("join_conditions_"));                                                                                                 // join conditions are not drawn yet
   assert.deepEqual(files.filter(f => !listed.has(f)), [], "markdown files in the e2e folder missing from the config");
   assert.deepEqual([...listed].filter(f => !existsSync(join(dir, f))), [], "config lists files that do not exist");
 });
@@ -258,5 +258,22 @@ test("e2e: column hover shows the logical property description", () => {
 });
 
 test("e2e: every foreign key is drawn and every association resolved", () => {
-  assert.match(gen.stdout, /15 mappings, 15 foreign keys \(0 associations unresolved\)/);
+  assert.match(gen.stdout, /16 mappings, 17 foreign keys \(0 associations unresolved\)/);
+});
+
+test("e2e: a class mapped to a SQL query is drawn as a query, with what it reads", () => {
+  const mmd = read("sql_queries_mapping__database__SQL_queries.mmd");
+  assert.match(mmd, /FIRM_VIEW\["FIRM_VIEW \(SQL query\)"\] \{/);
+  assert.match(mmd, /org__people \|\|\.\.o\{ SQL_queries__FIRM_VIEW : "read by"/);       // a table it reads, drawn from its other page as a stub
+  assert.match(mmd, /SQL_queries__FIRM_VIEW \|\|\.\.o\{ SQL_queries__SHOUT_VIEW : "read by"/); // a query that reads another query
+  assert.match(mmd, /firm_id to firm_id/);                                                        // the association from the query to the table
+  const d = descsOf(read("sql_queries_mapping__database__SQL_queries.html"));
+  assert.match(d.SQL_queries__FIRM_VIEW._, /Firm: .*Reads: org\.people - SQL: SELECT DISTINCT firm_id, firm_name FROM people/);
+  assert.match(d.SQL_queries__RATE_QUERY._, /Milestoning: business_date_range/);
+});
+
+test("e2e: the database page counts the queries apart from the tables, and shows the reads", () => {
+  assert.match(read("sql_queries_mapping__database.mmd"), /SQL queries<\/b><br\/>7 queries/);
+  assert.match(read("sql_queries_mapping__database.mmd"), /-\.->\|"7 reads"\|/);
+  assert.match(read("index.html"), /6 tables and 7 SQL queries in 2 schemas/);
 });

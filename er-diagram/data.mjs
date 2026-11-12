@@ -5,6 +5,9 @@ import { readFileSync } from "node:fs";
 // -> { classes: Map("file::Name" -> {file, name, desc, props:[{name,id,type,mult,key,desc}]}), byName: Map(Name -> [keys]),
 //      assocs: [{name, file, source, sourcePropName, sourceMult, target, targetPropName, targetMult}],
 //      mappings: Map(file -> {file, title, models, datastore, tables:[{name, cls, schema, columns:[...]}], associations}) }
+/** The name of the pseudo-schema the queries of a mapping are drawn in. */
+export const QUERY_SCHEMA = "SQL queries";
+
 export function loadData(path) {
   const data = JSON.parse(readFileSync(path, "utf8"));
   const classes = new Map(), byName = new Map(), assocs = [], mappings = new Map();
@@ -26,10 +29,18 @@ export function loadData(path) {
   }
   for (const m of data.mappings) mappings.set(m.file, {
     file: m.file, title: m.title, models: m.models, datastore: m.dataStore.name, associations: m.associations,
-    tables: m.schemas.flatMap(s => s.tables.map(t => ({
-      name: t.name, cls: t.class, schema: s.name,
-      columns: t.columns.map(c => ({ name: c.name, type: c.type, key: c.primaryKey ? "PK" : "", nullable: c.nullable, prop: c.property })),
-    }))),
+    tables: [
+      ...m.schemas.flatMap(s => s.tables.map(t => ({
+        name: t.name, cls: t.class, schema: s.name,
+        columns: t.columns.map(c => ({ name: c.name, type: c.type, key: c.primaryKey ? "PK" : "", nullable: c.nullable, prop: c.property })),
+      }))),
+      // a query a class is mapped to, written as SQL, is a relation of the data store in no schema: it is drawn as a table of its own
+      // kind, in a pseudo-schema, with the SQL and what it reads kept for the hover text and the edges
+      ...(m.queries ?? []).map(q => ({
+        name: q.name, cls: q.class, schema: QUERY_SCHEMA, isQuery: true, sql: q.sql, reads: q.reads, milestoning: q.milestoning,
+        columns: q.columns.map(c => ({ name: c.name, type: c.type, key: c.primaryKey ? "PK" : "", nullable: c.nullable, prop: c.property })),
+      })),
+    ],
   });
   return { classes, byName, assocs, mappings };
 }

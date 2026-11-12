@@ -6,6 +6,10 @@ A viewer for data-finder models and mappings: Mermaid diagrams generated from th
   multiplicities, attributes as `Name  Type  [mult]  PK` columns), and one diagram with every class.
 - **Per mapping**: the same views restricted to the classes the mapping maps, plus the database: a flowchart with a box per schema, a
   table diagram (PK/FK) per schema, and one with every table.
+- **SQL queries**: a class mapped to a query written as SQL (a `Query` section of a mapping, data-finder >= 0.1.21) is drawn as a query, in a
+  pseudo-schema named "SQL queries", with its columns, PK and the associations to and from it. A dotted line runs from each table or query it
+  reads to it, and hovering the box shows the class, the milestoning scheme, what it reads and its SQL. The database flowchart counts the queries
+  apart from the tables and shows the reads as a dotted arrow between schemas.
 - Hover an attribute or column for its description; click a dashed stub box to open the page that owns it.
 
 ## Use
