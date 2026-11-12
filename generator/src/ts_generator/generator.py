@@ -1,3 +1,4 @@
+import json
 import os
 import re
 
@@ -333,6 +334,61 @@ def _build_reverse_assoc_map(mapping: Mapping, assoc_lookup: dict) -> dict:
     return reverse_map
 
 
+def humanize(name: str) -> str:
+    """A class name as words: ``LegalEntity`` is ``Legal Entity``."""
+    return re.sub(r'(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])', ' ', name)
+
+
+def milestone_dates(mapping: MilestonePropertyMapping | None) -> dict | None:
+    """Which dates a query of a milestoned class is given (``None`` when the class has no milestoning): the business
+    date for a class with a business date, the processing time for one with a processing time, as findAll takes them."""
+    if mapping is None:
+        return None
+    business = any(f(mapping) for f in (has_uni_business_temporal, has_business_date_and_processing, has_bitemporal,
+                                       has_business_date_range))
+    processing = any(f(mapping) for f in (has_processing_temporal, has_business_date_and_processing, has_bitemporal,
+                                         has_processing_snapshot))
+    return {'businessDate': business, 'processingTime': processing}
+
+
+def mapping_metadata(mapping: Mapping, reverse_assoc_map: dict) -> dict:
+    """What a query tool needs to know about a mapping without its finders' source: for each class its display name,
+    the properties it holds and the relations it reaches, by the name of the accessor that gives each."""
+    classes = []
+    for rcm in mapping.mappings:
+        view = _ClassView(rcm)
+        properties, relations = [], []
+        for pm in view.property_mappings:
+            prop = pm.property
+            doc = get_doc(prop)
+            if is_primitive(prop):
+                entry = {'id': prop.id, 'accessor': to_ts_name(prop), 'label': prop.name, 'type': prop.type.name,
+                         'optional': prop.multiplicity.lower == 0}
+                if isinstance(pm.target, Column) and pm.target.nullable:
+                    entry['optional'] = True
+                target_list = properties
+            elif isinstance(pm.target, Join):
+                entry = {'id': prop.id, 'accessor': to_ts_name(prop), 'label': prop.name, 'target': prop.type.name,
+                         'many': prop.multiplicity.is_many(), 'optional': prop.multiplicity.lower == 0}
+                target_list = relations
+            else:
+                continue
+            if doc:
+                entry['description'] = doc
+            target_list.append(entry)
+        for source_rcm, _, assoc, reverse_name in reverse_assoc_map.get(rcm.clazz.name, []):
+            relations.append({'id': reverse_name, 'accessor': reverse_name, 'label': assoc.target_property.name,
+                              'target': source_rcm.clazz.name, 'many': assoc.target_multiplicity.is_many(),
+                              'optional': assoc.target_multiplicity.lower == 0})
+        entry = {'name': rcm.clazz.name, 'label': humanize(rcm.clazz.name), 'properties': properties, 'relations': relations,
+                 'dates': milestone_dates(view.milestone_mapping)}
+        doc = get_doc(rcm.clazz)
+        if doc:
+            entry['description'] = doc
+        classes.append(entry)
+    return {'name': mapping.name, 'context': _mapping_to_class_name(mapping.name), 'classes': classes}
+
+
 def generate(mapping: Mapping, output_directory: str):
     templates_dir = os.path.join(os.path.dirname(__file__), 'templates')
     environment = Environment(
@@ -407,3 +463,11 @@ def generate(mapping: Mapping, output_directory: str):
             context_class_name=context_class_name,
         ))
         print(f'... wrote {context_filename}')
+
+    metadata_filename = _mapping_to_filename(mapping.name).replace('Context.ts', 'Metadata.ts')
+    metadata_class = _mapping_to_class_name(mapping.name).replace('Context', 'Metadata')
+    with open(os.path.join(output_directory, metadata_filename), mode='w', encoding='utf-8') as f:
+        f.write("import type { MappingMetadata } from '@datafinder/metadata';\n\n"
+                f"export const {metadata_class}: MappingMetadata = "
+                f"{json.dumps(mapping_metadata(mapping, reverse_assoc_map), indent=2, ensure_ascii=False)};\n")
+        print(f'... wrote {metadata_filename}')
