@@ -25,12 +25,16 @@ describe('a column is owned by a Relation', () => {
     expect(() => column.ownerRelation).toThrow(/Column 'a' has no owner/);
   });
 
-  it('a table alias is a named relation with the columns of the relation it names', () => {
+  it('a table alias is a named relation, and an alias of a table has columns of its own', () => {
     const table = new Table('t', [new Column('a', 'INT')]);
     const alias = new TableAlias(table, 't1');
     expect(alias.name).toBe('t1');
     expect(alias.relation).toBe(table);
-    expect(alias.columns).toEqual(table.columns);
+    // the same names and types, owned by the alias: that tells employee.manager_id from manager.id when a table is on both sides
+    expect(alias.columns.map(c => [(c as Column).name, (c as Column).type, (c as Column).ownerRelation])).toEqual([['a', 'INT', alias]]);
+    expect(alias.columns[0]).not.toBe(table.columns[0]);
+    expect(alias.column('b', 'VARCHAR').ownerRelation).toBe(alias);
+    expect(alias.column('a', 'INT')).toBe(alias.columns[0]);
     expect(alias.qualifiedName).toBe('t1');
     expect(new Column('a', 'INT', alias).ownerName).toBe('t1');
   });

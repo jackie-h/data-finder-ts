@@ -1,5 +1,4 @@
 import { Attribute, Comparand } from './attribute';
-import { TARGET_SIDE } from './finder';
 import {
   RelationalOperationElement,
   Operation,
@@ -48,8 +47,7 @@ import {
   QuerySpecification,
   OrderedQuerySpecification,
   QueryExpression,
-  RelationJoin,
-  JoinKind,
+    JoinKind,
   UnionOperation,
   BinaryOperation,
   CaseOperation,
@@ -83,24 +81,18 @@ class TableAliasColumn extends RelationalOperationElement {
   constructor(readonly column: Column, readonly tableAlias: TableAlias) { super(); }
 }
 
+const JOIN_WORDS: Record<JoinKind, string> = {
+  [JoinKind.INNER]: 'INNER', [JoinKind.LEFT]: 'LEFT OUTER', [JoinKind.RIGHT]: 'RIGHT OUTER', [JoinKind.FULL]: 'FULL OUTER',
+};
+
+/** A join as it is written: its kind, the relation it reads (under its alias), its ON condition, and the filter ANDed to that. */
 class Join {
   constructor(
-    readonly source: TableAliasColumn,
-    readonly target: TableAliasColumn,
+    readonly kind: JoinKind,
+    readonly target: TableAlias,
+    readonly condition: string,
     readonly filterOp?: RelationalOperationElement,
-    /** The step it is, which says which side of it a column of its condition is on. */
-    readonly node?: JoinTreeNodeOperation,
   ) {}
-
-  /**
-   * `source = target`, written with the key column first as Legend writes a join defined as key = foreign key. A join that has a
-   * condition besides its keys is written as its mapping gives it, the source first.
-   */
-  condition(): string {
-    let [first, second] = [this.source, this.target];
-    if (this.node?.join.filter === undefined && second.column.primaryKey && !first.column.primaryKey) [first, second] = [second, first];
-    return first.tableAlias.name + '.' + first.column.name + ' = ' + second.tableAlias.name + '.' + second.column.name;
-  }
 }
 
 function sqlFormatDatetime(value: Date): string {
@@ -607,6 +599,11 @@ function withAncestors(nodes: Iterable<JoinTreeNodeOperation>): JoinTreeNodeOper
  * own, whose columns are not known to be the table's. A step given property values, as in `product({ id: 2 })`, can:
  * they are conditions on the table. A to-one step cannot repeat a row, so it stays a join.
  */
+/** Whether a join is one column equal to another, so a step that only asks if a row exists can read its key. */
+function hasKeys(join: JoinOperation): boolean {
+  try { join.keys(); return true; } catch { return false; }
+}
+
 function existsOnlyNodes(expressions: (RelationalOperationElement | undefined)[]): JoinTreeNodeOperation[] {
   const required = new Set<JoinTreeNodeOperation>();
   const referenced = new Set<JoinTreeNodeOperation>();
@@ -621,7 +618,7 @@ function existsOnlyNodes(expressions: (RelationalOperationElement | undefined)[]
     for (let parent = node.parent; parent !== undefined; parent = parent.parent) ancestors.add(parent);
   }
   return [...required].filter(node =>
-    node.many && !referenced.has(node) && !ancestors.has(node) && node.join.filter === undefined);
+    node.many && !referenced.has(node) && !ancestors.has(node) && node.join.filter === undefined && hasKeys(node.join));
 }
 
 /**
@@ -700,8 +697,8 @@ function buildQuerySpecification(
     if (Object.keys(node.join.filterKwargs).length > 0) {
       combined = buildJoinFilterFromProperties(node, node.join.filterKwargs, node.join.filterColumnMap);
     }
-    if (node.join.target instanceof MilestonedTable) {
-      const milestonedOp = milestoningFor(node.join.target, node);
+    if (node.join.table instanceof MilestonedTable) {
+      const milestonedOp = milestoningFor(node.join.table, node);
       if (milestonedOp !== null) {
         combined = combined === undefined ? milestonedOp : new LogicalOperation(combined, LogicalOperator.AND, milestonedOp);
       }
@@ -714,14 +711,15 @@ function buildQuerySpecification(
   // many rows of the table match. Property values the step was given are conditions of the query, on the table's own columns.
   const subSelects = new Map<JoinTreeNodeOperation, QuerySpecification>();
   for (const node of existsOnlyNodes([...columns, ...groupBy, ...orderBy, op, having])) {
-    const right = node.join.right;
+    const key = node.join.keys()[1];
+    const right = new Column(key.name, key.type, node.join.table, key.primaryKey); // of the table, not of an alias of it
     const dates = datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
     const values = node.join.filterKwargs;
     const condition = Object.keys(values).length > 0
       ? buildJoinFilterFromProperties(undefined, values, node.join.filterColumnMap)
       : new NoOperation();
     subSelects.set(node, buildQuerySpecification(
-      dates.businessDate, dates.processingDatetime, [new Alias(right, right.name)], node.join.target, condition,
+      dates.businessDate, dates.processingDatetime, [new Alias(right, right.name)], node.join.table, condition,
       [], [], undefined, dates.businessDateTo, true, undefined, undefined, dates.processingDatetimeTo));
   }
 
@@ -807,7 +805,7 @@ class SQLQueryGenerator {
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
   private _subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map();
-  private _relationJoins: readonly RelationJoin[] = [];
+  private _queryJoinTargets = new Set<TableAlias>();
 
   generate(query: QuerySpecification): void {
     // a query that is only stored has no order, limit or offset
@@ -816,12 +814,15 @@ class SQLQueryGenerator {
     this._elidableNodes = this._computeElidableNodes(query);
     this._joinFilters = query.joinFilters;
     this._subSelects = query.subSelects;
-    this._relationJoins = query.joins;
     if (this._rootTable !== undefined) {
       this._from.add(this._tableAliasForTable(this._rootTable));
     }
-    // the relations joined to it are named next, so they read t1, t2, ... in the order they are joined
-    for (const join of query.joins) this._tableAliasForTable(join.target);
+    // the query's own joins, always written: the relations are named in the order they are joined
+    for (const join of query.joins) {
+      const target = this._tableAliasForTable(join.target);
+      this._queryJoinTargets.add(target);
+      this._join.push(new Join(join.kind, target, this.buildFilter(join.operation)));
+    }
     this.processSelect([...query.columns]);
     this._where = this.buildFilter(this._guarded(query.filter));
     const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
@@ -1149,54 +1150,51 @@ class SQLQueryGenerator {
     this._addedJoinIds.add(node);
 
     const join = node.join;
-    const left = join.left;
-    const srcTa = this._tableAliasForTable(left.ownerRelation, node.parent);
-    if (node.parent === undefined) this._from.add(srcTa);
-    const sc = new TableAliasColumn(left, srcTa);
-    const right = join.right;
-    const tc = new TableAliasColumn(right, this._tableAliasForTable(right.ownerRelation, node));
+    if (node.parent === undefined) {
+      const source = join.columns().find(c => !join.isTarget(c));
+      if (source === undefined) throw new Error(`Join '${join.name}' reads nothing of what it is joined from`);
+      this._from.add(this._tableAliasForTable(source.ownerRelation));
+    }
+    const targetAlias = this._tableAliasForTable(join.target, node);
     // a sub-select carries the step's filter itself, so it is not repeated in the ON clause
-    const queryFilter = tc.tableAlias.relation instanceof QuerySpecification ? undefined : this._joinFilters.get(node);
+    const queryFilter = targetAlias.relation instanceof OrderedQuerySpecification ? undefined : this._joinFilters.get(node);
     const filterOp = join.filter !== undefined && queryFilter !== undefined
       ? new LogicalOperation(join.filter as Operation, LogicalOperator.AND, queryFilter)
       : join.filter ?? queryFilter;
-    this._join.push(new Join(sc, tc, filterOp, node));
+    this._join.push(new Join(join.kind, targetAlias, this.buildFilter(this._sided(join.operation, node)), filterOp));
   }
 
-  /** The step whose ON condition is being written: a column of the condition is on a side of that join, which its owner says. */
-  private _conditionNode?: JoinTreeNodeOperation;
-
-  private _joinFilter(join: Join): string {
-    this._conditionNode = join.node;
-    try {
-      const sql = this.buildFilter(join.filterOp!);
-      // an OR on its own is bracketed, as it is when it is one side of an AND with the keys
-      return join.filterOp instanceof LogicalOperation && join.filterOp.operator === LogicalOperator.OR ? '(' + sql + ')' : sql;
-    } finally {
-      this._conditionNode = undefined;
+  /**
+   * A join's condition with each column under the alias of its side: the joined table's under the step's, any other under the one
+   * it is joined from. An equality of two columns has the key first, as Legend writes a join defined as key = foreign key.
+   */
+  private _sided(op: RelationalOperationElement, node: JoinTreeNodeOperation): RelationalOperationElement {
+    const aliasOf = (column: Column): TableAliasColumn =>
+      new TableAliasColumn(column, this._tableAliasForTable(column.ownerRelation, node.join.isTarget(column) ? node : node.parent));
+    const side = (o: RelationalOperationElement): RelationalOperationElement => {
+      if (o instanceof Column) return aliasOf(o);
+      if (o instanceof ComparisonOperation) return new ComparisonOperation(side(o.left), o.operator, side(o.right));
+      if (o instanceof LogicalOperation) return new LogicalOperation(side(o.left), o.operator, side(o.right));
+      if (o instanceof NotOperation || o instanceof IsNullOperation || o instanceof IsNotNullOperation) {
+        return new (o.constructor as new (e: RelationalOperationElement) => RelationalOperationElement)(side(o.element));
+      }
+      return o;
+    };
+    if (op instanceof ComparisonOperation && op.operator === ComparisonOperator.EQUAL && op.left instanceof Column
+      && op.right instanceof Column && op.right.primaryKey && !op.left.primaryKey) {
+      op = new ComparisonOperation(op.right, op.operator, op.left);
     }
-  }
-
-  /** The alias a column of a join's condition is read under: the joined side's if its owner is the table the join reaches, else the side it starts from. */
-  private _conditionAlias(column: Column, node: JoinTreeNodeOperation): TableAlias {
-    const join = node.join;
-    const owner = column.ownerRelation;
-    const same = (a: Relation, b: Relation) => a === b || (a instanceof NamedRelation && b instanceof NamedRelation && a.qualifiedName === b.qualifiedName);
-    const selfJoin = same(join.left.ownerRelation, join.target);
-    if ((owner instanceof TableAlias && owner.name === TARGET_SIDE) || (!selfJoin && same(owner, join.target))) {
-      return this._tableAliasForTable(join.target, node);
-    }
-    return this._tableAliasForTable(owner, node.parent);
+    return side(op);
   }
 
   buildFilter(op: RelationalOperationElement): string {
     if (op instanceof NoOperation) return '';
     if (op instanceof ExistsOperation) {
-      const col = op.node.join.right;
+      const col = op.node.join.keys()[1];
       return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NOT NULL';
     }
     if (op instanceof NotExistsOperation) {
-      const col = op.node.join.right;
+      const col = op.node.join.keys()[1];
       return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NULL';
     }
     if (op instanceof InOperation) {
@@ -1256,8 +1254,9 @@ class SQLQueryGenerator {
       }
       return ta.name + '.' + column.name;
     }
+    if (op instanceof TableAliasColumn) return op.tableAlias.name + '.' + op.column.name;
     if (op instanceof Column) {
-      const ta = this._conditionNode !== undefined ? this._conditionAlias(op, this._conditionNode) : this._tableAliasForTable(op.ownerRelation);
+      const ta = this._tableAliasForTable(op.ownerRelation);
       return ta.name + '.' + op.name;
     }
     throw new Error('Unknown operation in buildFilter: ' + op.constructor.name);
@@ -1310,22 +1309,13 @@ class SQLQueryGenerator {
 
   buildQueryString(): string {
     const joins = this._join.map(j =>
-      ' LEFT OUTER JOIN ' + this._relationSql(j.target.tableAlias) + ' AS ' + j.target.tableAlias.name +
-      ' ON (' + j.condition() +
-      (j.filterOp ? ' AND ' + this._joinFilter(j) : '') + ')',
+      ' ' + JOIN_WORDS[j.kind] + ' JOIN ' + this._relationSql(j.target) + ' AS ' + j.target.name +
+      ' ON (' + j.condition + (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
-    // a relation joined on a condition is written in its JOIN, not listed in FROM because a column of it was read
-    const joinedAliases = new Set(this._relationJoins.map(j => this._tableAliasForTable(j.target)));
-    const joined = this._relationJoins.map(j => {
-      const alias = this._tableAliasForTable(j.target);
-      const word = { [JoinKind.INNER]: 'INNER', [JoinKind.LEFT]: 'LEFT OUTER', [JoinKind.RIGHT]: 'RIGHT OUTER', [JoinKind.FULL]: 'FULL OUTER' }[j.kind];
-      return ' ' + word + ' JOIN ' + this._relationSql(alias) + ' AS ' + alias.name + ' ON (' + this.buildFilter(j.operation) + ')';
-    });
-
     return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca, this._dialect)).join(',') +
-      ' FROM ' + Array.from(this._from).filter(ta => !joinedAliases.has(ta)).map(ta => this._relationSql(ta) + ' AS ' + ta.name).join(',') +
-      joined.join('') +
+      // a relation joined on a condition is written in its JOIN, not listed in FROM because a column of it was read
+      ' FROM ' + Array.from(this._from).filter(ta => !this._queryJoinTargets.has(ta)).map(ta => this._relationSql(ta) + ' AS ' + ta.name).join(',') +
       joins.join('') +
       this._buildWhere() +
       this._buildGroupBy() +

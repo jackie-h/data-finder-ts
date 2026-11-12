@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { IntegerAttribute } from '../src/datafinder/typed-attributes';
 import { toSql } from '../src/datafinder/sql-generator';
-import { Column, JoinOperation, JoinTreeNodeOperation, NoOperation, Table } from '../src/model/relational';
+import { Column, JoinOperation, JoinKind, JoinTreeNodeOperation, NoOperation, Table } from '../src/model/relational';
 import { MilestonedTable, ProcessingTemporalColumns } from '../src/model/milestoning';
 
 const root = () => new Table('t', [new Column('I', 'INT', new Table('t', []), true)]);
@@ -29,7 +29,7 @@ describe('the optional-property guard', () => {
   it('is not written in the dates of a join through an optional navigation', () => {
     const quotes = new MilestonedTable('u', [new Column('K', 'INT', new Table('u', []), true)],
       new ProcessingTemporalColumns(new Column('in_z', 'TIMESTAMP'), new Column('out_z', 'TIMESTAMP')));
-    const node = new JoinTreeNodeOperation(new JoinOperation('Quote', quotes, new Column('I', 'INT', new Table('t', [])), new Column('K', 'INT', new Table('u', []), true)), undefined, false, true);
+    const node = new JoinTreeNodeOperation(JoinOperation.onKeys('Quote', quotes, new Column('I', 'INT', new Table('t', [])), new Column('K', 'INT', new Table('u', []), true), JoinKind.LEFT), undefined, false, true);
     const sql = toSql(null, new Date('2024-01-01T09:00:00Z'), [optionalInt(node)], root(), new NoOperation());
     expect(sql).toContain('in_z <=');
     expect(sql).not.toContain('IS NOT NULL');

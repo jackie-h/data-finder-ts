@@ -6,7 +6,7 @@ import { seeds } from './spec-seeds';
 import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
 import { convertInputsAndSelect } from '../src/datafinder/runner';
 import { StringAttribute } from '../src/datafinder/typed-attributes';
-import { Column, JoinOperation, JoinTreeNodeOperation, NoOperation, SortDirection, Table } from '../src/model/relational';
+import { Column, JoinOperation, JoinKind, JoinTreeNodeOperation, NoOperation, SortDirection, Table } from '../src/model/relational';
 
 const result = () => convertInputsAndSelect(null, null, [], new Table('t', []), new NoOperation());
 const orderOf = (r: unknown) => (r as { _orderBy: { column: { column: { name: string } }; direction: SortDirection }[] })
@@ -35,7 +35,7 @@ describe('orderBy accumulates', () => {
   });
 
   it('treats the same column reached through a join as a different sort', () => {
-    const join = new JoinOperation('Other', new Table('other', []), new Column('fk', 'INT', new Table('t', [])), new Column('id', 'INT', new Table('other', [])));
+    const join = JoinOperation.onKeys('Other', new Table('other', []), new Column('fk', 'INT', new Table('t', [])), new Column('id', 'INT', new Table('other', [])), JoinKind.LEFT);
     const joined = new StringAttribute('Other Name', 'name', 'VARCHAR', new Table('other', []), new JoinTreeNodeOperation(join));
     const own = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
     expect(orderOf(result().orderBy(own.ascending()).orderBy(joined.ascending()))).toHaveLength(2);
