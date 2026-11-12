@@ -9,15 +9,20 @@ export { constant, countAll } from './expressions';
 export { concat } from '../model/relational';
 export { when } from './conditional';
 export { toSql, querySqlToString } from './sql-generator';
-export { DialectName, SqlDialect, POSTGRES, DUCKDB, DATABRICKS, dialectOf } from './dialect';
+export { type DialectName, type SqlDialect, POSTGRES, DUCKDB, DATABRICKS, dialectOf } from './dialect';
 export { titleCase } from './naming';
-export { EmbeddedAttributes, embeddedUnder } from './embedded';
+export { type EmbeddedAttributes, embeddedUnder } from './embedded';
 export { RelatedFinder } from './finder';
+export type { MappingMetadata, ClassMetadata, PropertyMetadata, RelationMetadata, PropertyType } from './metadata';
+export {
+  buildQuery, operatorsFor, aggregatesFor, resolvePath, classOf, QuerySpecError, AGGREGATE_LABELS,
+  type QuerySpec, type SelectSpec, type FilterSpec, type OrderSpec, type FilterOperator, type AggregateName, type OperatorInfo,
+} from './query-builder';
 export {
   FinderResult,
-  QueryRunner,
-  QueryTarget,
-  Row,
+  type QueryRunner,
+  type QueryTarget,
+  type Row,
   registerRunner,
   clearRunner,
   getRunner,
@@ -26,4 +31,4 @@ export {
   DEFAULT_TIMEOUT_MS,
   QueryTimeoutError,
 } from './runner';
-export { DatabricksConnect, DatabricksConfig, DatabricksQueryError } from './databricks-runner';
+export { DatabricksConnect, type DatabricksConfig, DatabricksQueryError } from './databricks-runner';

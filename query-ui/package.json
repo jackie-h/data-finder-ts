@@ -1,0 +1,30 @@
+{
+  "name": "data-finder-query-ui",
+  "version": "0.1.5",
+  "private": true,
+  "description": "A browser UI that builds SQL from a data-finder mapping, runs it on Databricks and keeps the result in DuckDB for analysis",
+  "type": "module",
+  "scripts": {
+    "generate": "cd .. && uv run python query-ui/generate_mappings.py",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "proxy": "node server/proxy.mjs"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "1.32.0",
+    "ag-grid-community": "^36.3.0",
+    "ag-grid-react": "^36.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.8",
+    "vite-tsconfig-paths": "^6.1.1"
+  }
+}

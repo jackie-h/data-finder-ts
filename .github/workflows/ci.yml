@@ -88,3 +88,32 @@ jobs:
           name: er-diagrams
           path: er-diagram/out
           if-no-files-found: error
+
+  query-ui:
+    name: Query UI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: query-ui/package-lock.json
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Install Node dependencies
+        run: |
+          npm ci
+          npm ci --prefix query-ui
+
+      - name: Generate the finders and metadata the UI offers
+        run: npm run generate --prefix query-ui
+
+      - name: Type-check and build the UI
+        run: npm run build --prefix query-ui
