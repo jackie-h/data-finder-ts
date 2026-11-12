@@ -102,7 +102,6 @@ SKIPPED_MODULES = {
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 UNPORTED = [
     (r'^(chain_|join_|exists_keeps|not_exists_keeps)', 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'),
-    (r'^(not_equal|ne_matches)', '!= matching a missing value is not ported yet'),
 ]
 
 
