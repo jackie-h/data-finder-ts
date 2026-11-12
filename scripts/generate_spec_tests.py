@@ -101,7 +101,7 @@ SKIPPED_MODULES = {
 # Expectations of the Python specs for features that are not ported yet, by the pattern their names match. Each is generated
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 UNPORTED = [
-    (r'^(join_|exists_keeps|not_exists_keeps)', 'join and exists on a result are not ported yet'),
+    (r'^(exists_keeps|not_exists_keeps)', 'exists on a result is not ported yet'),
 ]
 
 
@@ -292,6 +292,8 @@ class Translator:
             return f'{left}.concat({self.expr(right)})'
         if isinstance(node.op, ast.Mult) and kinds[0] == 'text':
             return f'{left}.repeat({self.expr(right)})'
+        if isinstance(node.op, (ast.BitAnd, ast.BitOr)):   # (a == b) & (c != d): and / or of two comparisons
+            return f'{left}.{"and" if isinstance(node.op, ast.BitAnd) else "or"}({self.expr(right)})'
         if type(node.op) in ARITHMETIC_METHODS:
             if kinds[0] is None and not isinstance(node.left, ast.Call):
                 raise NotImplementedError('arithmetic on an unknown type: ' + ast.dump(node))
@@ -366,7 +368,8 @@ class Translator:
             assert kw.arg == 'ddof', ast.dump(node)
             return f'{self.expr(owner)}.{name}({", ".join(args + [self.expr(kw.value)])})'
         if func.attr == 'join' and any(k.arg == 'how' for k in node.keywords):
-            raise NotImplementedError('a join of two results')
+            (how,) = node.keywords
+            return f'{self.expr(owner)}.join({", ".join(args + [self.expr(how.value)])})'
         if func.attr == 'join' and node.keywords:
             # join(",", order_by=[...]): the order the values are joined in is the second argument
             (kw,) = node.keywords

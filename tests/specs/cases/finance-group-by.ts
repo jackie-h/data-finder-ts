@@ -43,6 +43,29 @@ export function _dearer_trades(f: any) {
   const dear = _trades(f).filter((r: any) => r.price.gt(350.0));
   return dear.extend({ dear_account: (r: any) => r.account, dear_sym: (r: any) => r.sym }).select('dear_account', 'dear_sym');
 }
+export function _each_trade_with_its_account_total(f: any) {
+  const trades = _trades(f);
+  const joined = trades.join(_account_totals(f), (t: any, a: any) => t.account.eq(a.total_account), 'inner');
+  const result = joined.select('sym', 'price', 'total');
+  return result.orderBy(result.column('price').ascending());
+}
+export function _accounts_with_the_trades_over_350(f: any, how: any) {
+  const accounts = _account_totals(f).select('total_account');
+  const joined = accounts.join(_dearer_trades(f), (a: any, t: any) => a.total_account.eq(t.dear_account), how);
+  const result = joined.select('total_account', 'dear_sym');
+  return result.orderBy(result.column('total_account').ascending());
+}
+export function _right_join_of_the_trades_over_350_to_the_accounts(f: any) {
+  const joined = _dearer_trades(f).join(_account_totals(f).select('total_account'), (t: any, a: any) => t.dear_account.eq(a.total_account), 'right');
+  const result = joined.select('total_account', 'dear_sym');
+  return result.orderBy(result.column('total_account').ascending());
+}
+export function _full_join_of_two_accounts_to_the_trades_over_350(f: any) {
+  const accounts = _account_totals(f).filter((r: any) => r.total_account.ne('Gamma Fund')).select('total_account');
+  const joined = accounts.join(_dearer_trades(f), (a: any, t: any) => a.total_account.eq(t.dear_account), 'full');
+  const result = joined.select('total_account', 'dear_sym');
+  return result.orderBy(result.column('total_account').ascending(), result.column('dear_sym').ascending());
+}
 
 export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
@@ -140,33 +163,51 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'join_inner_on_a_column_of_each',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: f => _each_trade_with_its_account_total(f),
+    expected: { columns: ['sym', 'price', 'total'], rows: [
+        ['AAPL', 100.0, 300.0],
+        ['GOOG', 200.0, 300.0],
+        ['MSFT', 300.0, 700.0],
+        ['TSLA', 400.0, 700.0],
+        ['GS', 500.0, 500.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'join_left_keeps_the_rows_that_find_no_match',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: f => _accounts_with_the_trades_over_350(f, 'left'),
+    expected: { columns: ['total_account', 'dear_sym'], rows: [
+        ['Alpha Fund', null],
+        ['Beta Fund', 'TSLA'],
+        ['Gamma Fund', 'GS'],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'exists_keeps_the_rows_that_have_a_match',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: () => { throw new Error('exists on a result is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'exists on a result is not ported yet' },
   },
   {
     name: 'not_exists_keeps_the_rows_that_have_none',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: () => { throw new Error('exists on a result is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'exists on a result is not ported yet' },
   },
   {
     name: 'join_right_keeps_every_row_of_the_right',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: f => _right_join_of_the_trades_over_350_to_the_accounts(f),
+    expected: { columns: ['total_account', 'dear_sym'], rows: [
+        ['Alpha Fund', null],
+        ['Beta Fund', 'TSLA'],
+        ['Gamma Fund', 'GS'],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'join_full_keeps_the_rows_of_both_that_find_no_match',
-    query: () => { throw new Error('join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
+    query: f => _full_join_of_two_accounts_to_the_trades_over_350(f),
+    expected: { columns: ['total_account', 'dear_sym'], rows: [
+        ['Alpha Fund', null],
+        ['Beta Fund', 'TSLA'],
+        [null, 'GS'],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
 ];
 

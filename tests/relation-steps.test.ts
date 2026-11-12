@@ -110,3 +110,79 @@ describe('against DuckDB', () => {
     expect(await big.orderBy(big.column('category').ascending()).toRows()).toEqual([['Finance'], ['Technology']]);
   });
 });
+
+describe('join of two results', () => {
+  const left = () => f.findAll([f.id().alias('a_id'), f.name().alias('a_name')]);
+  const right = () => f.findAll([f.id().alias('b_id'), f.category().alias('b_category')], f.id().gt(2));
+
+  it('is written as a JOIN of the two queries', () => {
+    const sql = left().join(right(), (a, b) => a.a_id.eq(b.b_id), 'inner').toSql('duckdb');
+    expect(sql).toMatch(/FROM \(SELECT .* AS t4\) AS t1 INNER JOIN \(SELECT .* AS t3 WHERE t3\.id > 2\) AS t2 ON \(t1\.a_id = t2\.b_id\)\) AS t0$/);
+  });
+
+  it('has the ANSI join types', () => {
+    for (const [how, word] of [['left', 'LEFT OUTER'], ['right', 'RIGHT OUTER'], ['full', 'FULL OUTER'], ['inner', 'INNER']] as const) {
+      expect(left().join(right(), (a, b) => a.a_id.eq(b.b_id), how).toSql('duckdb')).toContain(` ${word} JOIN `);
+    }
+  });
+
+  it('shows the columns of both sides', () => {
+    expect(left().join(right(), (a, b) => a.a_id.eq(b.b_id), 'inner').columnNames()).toEqual(['a_id', 'a_name', 'b_id', 'b_category']);
+  });
+
+  it('takes any condition', () => {
+    const sql = left().join(right(), (a, b) => a.a_id.eq(b.b_id).and(a.a_name.ne(b.b_category)), 'inner').toSql('duckdb');
+    expect(sql).toContain('ON (t1.a_id = t2.b_id AND');
+  });
+
+  it('refuses columns named the same on both sides, an unknown join, and a condition that is not one', () => {
+    expect(() => left().join(left(), (a, b) => a.a_id.eq(b.a_id), 'inner')).toThrow('named differently');
+    expect(() => left().join(right(), (a, b) => a.a_id.eq(b.b_id), 'cross' as never)).toThrow('is one of');
+    expect(() => left().join(right(), 5 as never, 'inner')).toThrow(TypeError);
+    expect(() => left().join(right(), () => 5 as never, 'inner')).toThrow('gives a comparison');
+  });
+});
+
+
+describe('join of two results against DuckDB', () => {
+  let instance: DuckDBInstance;
+  let conn: DuckDBConnection;
+  beforeAll(async () => {
+    instance = await DuckDBInstance.create(':memory:');
+    conn = await instance.connect();
+    registerDuckDb(conn);
+    await seeds.companies(conn);
+  });
+  afterAll(() => { clearRunner(); conn.disconnectSync(); instance.closeSync(); });
+
+  const left = () => f.findAll([f.id().alias('a_id'), f.name().alias('a_name')], f.id().lt(4));
+  const right = () => f.findAll([f.id().alias('b_id'), f.category().alias('b_category')], f.id().gt(2));
+
+  it('inner keeps the rows that match', async () => {
+    const rows = left().join(right(), (a, b) => a.a_id.eq(b.b_id), 'inner').select('a_id', 'b_category');
+    expect((await rows.toRows()).length).toBe(1);
+  });
+
+  it('left keeps every row of the left, with NULL where nothing matched', async () => {
+    const rows = left().join(right(), (a, b) => a.a_id.eq(b.b_id), 'left').select('a_id', 'b_id');
+    expect(await rows.orderBy(rows.column('a_id').ascending()).toRows()).toEqual([[1, null], [2, null], [3, 3]]);
+  });
+
+  it('right keeps every row of the right', async () => {
+    const rows = left().join(right(), (a, b) => a.a_id.eq(b.b_id), 'right').select('a_id', 'b_id');
+    expect(await rows.orderBy(rows.column('b_id').ascending()).toRows()).toEqual([[3, 3], [null, 4], [null, 5]]);
+  });
+
+  it('full keeps the rows of both that find no match', async () => {
+    const rows = left().join(right(), (a, b) => a.a_id.eq(b.b_id), 'full').select('a_id', 'b_id');
+    expect((await rows.toRows()).length).toBe(5);
+  });
+
+  it('a join can be joined again and filtered', async () => {
+    const third = f.findAll([f.id().alias('c_id')]);
+    const rows = left().join(right(), (a, b) => a.a_id.eq(b.b_id), 'left').join(third, (ab, c) => ab.a_id.eq(c.c_id), 'inner')
+      .filter(r => r.b_id.isNotNull()).select('a_id');
+    expect(await rows.toRows()).toEqual([[3]]);
+  });
+});
+

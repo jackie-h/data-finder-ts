@@ -9,6 +9,9 @@ import {
   TableAlias,
   UnionOperation,
   QueryExpression,
+  QuerySpecification,
+  RelationJoin,
+  JoinKind,
   Table,
   containsAggregate,
   Operation,
@@ -320,6 +323,39 @@ export class FinderResult {
     const resorted = new Set(sorts.map(sortTarget));
     this._orderBy = [...sorts, ...this._orderBy.filter(s => !resorted.has(sortTarget(s)))];
     return this;
+  }
+
+  /**
+   * The rows of this result put together with the rows of `other`, as Legend's `join`. The condition is a function of a row of
+   * each, and `and` / `or` combine comparisons:
+   *
+   *     orders.join(customers, (o, c) => o.customerId.eq(c.id), 'inner')   // only orders that have a customer
+   *     orders.join(customers, (o, c) => o.customerId.eq(c.id), 'left')    // every order, with a customer or NULL
+   *     lines.join(others, (a, b) => a.order.eq(b.order).and(a.supplier.ne(b.supplier)), 'inner')
+   *
+   * `how` is one of ANSI SQL's join types: `inner`, or `left`, `right` or `full`, the outer joins that keep the rows that find no
+   * match, with NULL for the other side's columns. The columns of the two must be named differently, as Legend requires: name
+   * them with `alias()`, or `extend` then `select`.
+   */
+  join(other: FinderResult, condition: (left: ResultRow, right: ResultRow) => Operation, how: 'inner' | 'left' | 'right' | 'full'): FinderResult {
+    const kinds = Object.values(JoinKind) as string[];
+    if (!kinds.includes(how)) throw new Error(`A join is one of ${JSON.stringify(kinds)}, not '${how}'`);
+    if (typeof condition !== 'function') throw new TypeError('A join condition is a function of a row of each: join(other, (a, b) => a.key.eq(b.key), \'inner\')');
+    const { alias: leftAlias, attributes: left } = this.relation();
+    const { alias: rightAlias, attributes: right } = other.relation();
+    const repeated = [...left.keys()].filter(n => right.has(n)).sort();
+    if (repeated.length > 0) {
+      throw new Error(`A join needs the columns of its two sides named differently, but ${JSON.stringify(repeated)} are on both: name them with alias(), or extend() then select()`);
+    }
+    const test = condition(rowOf(left), rowOf(right));
+    if (!(test instanceof Operation)) {
+      throw new TypeError(`A join condition gives a comparison, such as a.key.eq(b.key), not ${test === null ? 'null' : typeof test}`);
+    }
+    const columns = [...left, ...right].map(([name, attribute]) => attribute.alias(name));
+    const joined = new QuerySpecification(columns, new NoOperation(), [], leftAlias, new Map(), false, undefined, new Map(),
+      [new RelationJoin('', rightAlias, test, how as JoinKind)]);
+    const alias = new TableAlias(joined, `relation${nextRelationNumber++}`);
+    return new FinderResult(null, null, [...attributes(alias)].map(([name, attribute]) => attribute.alias(name)), alias, new NoOperation());
   }
 
   /**
