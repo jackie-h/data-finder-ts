@@ -141,6 +141,17 @@ export const seeds: Record<string, Seed> = {
     for (const table of ['firms', 'persons', 'memberships', 'staff']) await loadCsv(conn, `org.${table}`, `join_conditions_${table}.csv`);
   },
 
+  sql_queries: async conn => {
+    await run(conn, 'CREATE SCHEMA org',
+      'CREATE TABLE org.people (person_id INT, first_name VARCHAR, age INT, firm_id INT, firm_name VARCHAR)',
+      'CREATE TABLE org.firms (id INT, name VARCHAR)',
+      'CREATE TABLE org.trades (acc_num INT, gsn VARCHAR, qty INT)',
+      'CREATE TABLE org.rates (code VARCHAR, amount DOUBLE, from_z DATE, thru_z DATE)',
+      'CREATE TABLE org.quotes (code VARCHAR, amount DOUBLE, in_z TIMESTAMP, out_z TIMESTAMP, from_z DATE, thru_z DATE)',
+      'CREATE TABLE org.holders (id INT, rate_code VARCHAR)');
+    for (const table of ['people', 'firms', 'trades', 'rates', 'quotes', 'holders']) await loadCsv(conn, `org.${table}`, `sql_queries_${table}.csv`);
+  },
+
   processing_snapshot: async conn => {
     await run(conn, 'CREATE SCHEMA mkt',
       'CREATE TABLE mkt.quotes (id INT, symbol VARCHAR, price DOUBLE, taken_at TIMESTAMP)',

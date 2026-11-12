@@ -224,6 +224,18 @@ lines.join(others, (a, b) => a.order.eq(b.order).and(a.supplier.ne(b.supplier)),
 
 The result has the columns of both sides, which must be named differently (as Legend requires): name them with `alias()`, or `extend` then `select`. It is a result like any other, so it can be joined again, filtered, grouped and ordered. The SQL is `FROM (left) AS t1 INNER JOIN (right) AS t2 ON (...)` inside the query that reads it.
 
+`exists(other, condition)` is a condition for a `filter`: whether `other` has a row for which the condition holds, as Legend's `exists(e | ...)` and SQL's correlated `EXISTS (SELECT 1 FROM other WHERE ...)`. The function is of a row of `other`, and it reads the row being filtered from the function it is in; `.not()` is `NOT EXISTS`, and it combines with `and` / `or`:
+
+```ts
+import { exists } from 'data-finder-ts';
+
+accounts.filter(r => exists(dearTrades, t => t.account.eq(r.account)));            // accounts that have a trade over 350
+accounts.filter(r => exists(dearTrades, t => t.account.eq(r.account)).not());      // and those that have none
+lateLines.filter(l1 => exists(lines, l2 => l2.order.eq(l1.order).and(l2.supplier.ne(l1.supplier))));
+```
+
+A result tested against itself reads as two relations. (This is different from `f.account().exists()`, which asks if a property has a value.)
+
 The result of a step is a result: order it with `.column(name)` (`rows.orderBy(rows.column('price').ascending())`), limit it, concatenate it. A row's attributes are loosely typed (`ResultRow`): a column's type is known when the query is built, not by the compiler.
 
 ## Sorting
@@ -301,6 +313,10 @@ ef.findAll([ef.firstName()], ef.manager().notExists())   // employees with no ma
 ```
 
 They compile to a LEFT JOIN checked for NULL. For a to-many join that is only asked whether a row exists, the join is to a sub-select of the distinct join column, so the row is not repeated once per match; if the query also reads a value through that join, it stays a plain join and the row repeats for each child.
+
+## A class mapped to a query written as SQL
+
+A mapping can map a class to a query written as SQL, as it maps one to a table (see `sql_queries_mapping.md`): a `Query` section whose heading names the query and the class, with the SQL in a `sql` block (PostgreSQL: `SELECT [DISTINCT]`, joins, `WHERE`, `GROUP BY` with aggregates, `HAVING`, `UNION`, named expressions), then the columns it gives and what they map to. Nothing is created in the database: the SQL is read when the mapping is loaded, checked against the tables and columns there are, and the generator writes it into a `<Mapping>Queries.ts` module as the query model (`TableAlias` of a `QuerySpecification`, with typed columns of its own). A query over the class then writes it as a derived table, `FROM (SELECT ...) AS t0`; a query can read an earlier one, and a class mapped to a query has associations like any other. A query is milestoned as a table is, by the columns its SQL gives (name the scheme in the heading), so a query over the class, or a join to it, is given the dates over the query's columns. `count()` on such a class is not supported yet.
 
 ## Count
 

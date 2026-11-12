@@ -31,6 +31,7 @@ _MAPPINGS = [
     'processing_snapshot_mapping.md',
     'joins_through_tables_mapping.md',
     'join_conditions_mapping.md',
+    'sql_queries_mapping.md',
     'tpch_bih_mapping.md',
 ]
 

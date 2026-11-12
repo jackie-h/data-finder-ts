@@ -47,7 +47,8 @@ import {
   QuerySpecification,
   OrderedQuerySpecification,
   QueryExpression,
-    JoinKind,
+  RelationExistsOperation,
+  JoinKind,
   UnionOperation,
   BinaryOperation,
   CaseOperation,
@@ -73,6 +74,7 @@ import {
   SingleBusinessDateColumn,
   SingleProcessingDatetimeColumn,
   hasProcessingRange,
+  milestoningColumnsOf,
 } from '../model/milestoning';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
 import { DialectName, SqlDialect, dialectOf } from './dialect';
@@ -251,7 +253,7 @@ class RenderedSql extends RelationalOperationElement {
 function isCondition(op: unknown): boolean {
   return op instanceof ComparisonOperation || op instanceof LogicalOperation || op instanceof IsNullOperation
     || op instanceof IsNotNullOperation || op instanceof InOperation || op instanceof NotInOperation
-    || op instanceof ExistsOperation || op instanceof NotExistsOperation || op instanceof NotOperation;
+    || op instanceof ExistsOperation || op instanceof NotExistsOperation || op instanceof RelationExistsOperation || op instanceof NotOperation;
 }
 
 function sqlOperationToString(operation: RelationalOperationElement, d: SqlDialect): string {
@@ -345,6 +347,7 @@ function embeddedOf(ref: Attribute | ColumnWithJoin): Attribute | ColumnWithJoin
 function findColumn(operation: RelationalOperationElement): ColumnWithJoin {
   if (operation instanceof UnaryOperation) return findColumn(operation.element);
   if (operation instanceof ColumnWithJoin) return operation;
+  if (operation instanceof Column) return new ColumnWithJoin(operation); // a column of a query a class is mapped to
   throw new TypeError('Cannot find ColumnWithJoin in: ' + operation.constructor.name);
 }
 
@@ -449,10 +452,11 @@ function businessRangePredicate(
 function buildMilestoningFilterOperation(
   businessDate: Date | null,
   processingDatetime: Date | null,
-  table: MilestonedTable,
+  table: Table | TableAlias,
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
-  const mc = table.milestoningColumns;
+  const mc = milestoningColumnsOf(table);
+  if (mc === undefined) throw new Error(`${table.name} is not milestoned`);
   return andAll([processingPredicate(mc, processingDatetime, joinNode), businessPredicate(mc, businessDate, joinNode)]);
 }
 
@@ -471,11 +475,12 @@ function buildMilestoningFilterOperationForDateRange(
   businessDateFrom: Date | null,
   businessDateTo: Date | null,
   processingDatetime: Date | null,
-  table: MilestonedTable,
+  table: Table | TableAlias,
   joinNode?: JoinTreeNodeOperation,
   processingDatetimeTo: Date | null = null,
 ): Operation | null {
-  const mc = table.milestoningColumns;
+  const mc = milestoningColumnsOf(table);
+  if (mc === undefined) throw new Error(`${table.name} is not milestoned`);
   const processing = processingDatetime !== null && processingDatetimeTo !== null
     ? processingRangePredicate(mc, processingDatetime, processingDatetimeTo, joinNode)
     : processingPredicate(mc, processingDatetime, joinNode);
@@ -662,7 +667,7 @@ function buildQuerySpecification(
   processingDatetimeTo: Date | null = null,
 ): OrderedQuerySpecification {
   let filter = op;
-  const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) => {
+  const milestoningFor = (t: Table | TableAlias, node?: JoinTreeNodeOperation) => {
     const dates = node === undefined
       ? { businessDate, businessDateTo, processingDatetime, processingDatetimeTo }
       : datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
@@ -671,8 +676,8 @@ function buildQuerySpecification(
       : buildMilestoningFilterOperation(dates.businessDate, dates.processingDatetime, t, node);
   };
 
-  if (table instanceof MilestonedTable) {
-    const milestonedOp = milestoningFor(table);
+  if (milestoningColumnsOf(table) !== undefined) {
+    const milestonedOp = milestoningFor(table as Table | TableAlias);
     if (milestonedOp !== null) {
       filter = filter instanceof NoOperation
         ? milestonedOp
@@ -697,7 +702,7 @@ function buildQuerySpecification(
     if (Object.keys(node.join.filterKwargs).length > 0) {
       combined = buildJoinFilterFromProperties(node, node.join.filterKwargs, node.join.filterColumnMap);
     }
-    if (node.join.table instanceof MilestonedTable) {
+    if (milestoningColumnsOf(node.join.table) !== undefined) {
       const milestonedOp = milestoningFor(node.join.table, node);
       if (milestonedOp !== null) {
         combined = combined === undefined ? milestonedOp : new LogicalOperation(combined, LogicalOperator.AND, milestonedOp);
@@ -1192,6 +1197,10 @@ class SQLQueryGenerator {
     if (op instanceof ExistsOperation) {
       const col = op.node.join.keys()[1];
       return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NOT NULL';
+    }
+    if (op instanceof RelationExistsOperation) {
+      const inner = this._tableAliasForTable(op.relation);
+      return 'EXISTS (SELECT 1 FROM ' + this._relationSql(inner) + ' AS ' + inner.name + ' WHERE ' + this.buildFilter(op.condition) + ')';
     }
     if (op instanceof NotExistsOperation) {
       const col = op.node.join.keys()[1];

@@ -26,6 +26,7 @@ export {
   type ResultRow,
   type GroupKey,
   GroupedRows,
+  exists,
   registerRunner,
   clearRunner,
   getRunner,

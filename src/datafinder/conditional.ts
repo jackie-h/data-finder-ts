@@ -15,13 +15,14 @@ import {
   LogicalOperation,
   NotExistsOperation,
   NotInOperation,
+  RelationExistsOperation,
   Operation,
   RelationalOperationElement,
 } from '../model/relational';
 
 const CONDITIONS = [
   ComparisonOperation, LogicalOperation, IsNullOperation, IsNotNullOperation,
-  InOperation, NotInOperation, ExistsOperation, NotExistsOperation,
+  InOperation, NotInOperation, ExistsOperation, NotExistsOperation, RelationExistsOperation,
 ];
 
 /** What a branch can be: a column or expression as it is, a plain value as a constant. */

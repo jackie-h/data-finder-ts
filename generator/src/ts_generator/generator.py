@@ -16,8 +16,11 @@ from model.mapping import (
     SingleProcessingDatetimeMilestonePropertyMapping,
 )
 from model.relational import (
-    Column, ComparisonOperation, DecimalConstantOperation, FloatConstantOperation, IntegerConstantOperation,
-    IsNotNullOperation, IsNullOperation, LogicalOperation, NotOperation, StringConstantOperation, Table, TableAlias,
+    AggregateOperation, Alias, ArithmeticOperation, BooleanConstantOperation, CaseOperation, Column, ComparisonOperation,
+    ConcatOperation, CountAllOperation, DecimalConstantOperation, FloatConstantOperation, InOperation,
+    IntegerConstantOperation, IsNotNullOperation, IsNullOperation, LogicalOperation, NamedRelation, NoOperation,
+    NotInOperation, NotOperation, QueryExpression, QuerySpecification, ScalarFunctionOperation, StringConstantOperation,
+    Table, TableAlias, UnionOperation, query_of,
 )
 from model.relational_mapping import Join, EmbeddedSetMapping
 
@@ -61,9 +64,16 @@ def has_processing_snapshot(mapping: MilestonePropertyMapping) -> bool:
     return isinstance(mapping, SingleProcessingDatetimeMilestonePropertyMapping)
 
 
-def owner_code(table: Table) -> str:
+def _query_constant(alias: TableAlias) -> str:
+    """The name, in a generated finder module, of the query a class is mapped to."""
+    return "_QUERY_" + re.sub(r"\W", "_", alias.name).upper()
+
+
+def owner_code(table) -> str:
     """TypeScript source for the relation a column or an attribute belongs to: a table of that name, whose columns this
-    finder does not need to know."""
+    finder does not need to know; or, for a query a class is mapped to, the query, which has to be known to be written."""
+    if (query := query_of(table)) is not None:
+        return _query_constant(query)
     return f"new Table('{table_qualified_name(table)}', [])"
 
 
@@ -112,6 +122,136 @@ def condition_code(op, self_join: bool = False) -> str:
     return ("(plain, target) => " if self_join else "") + code(op)
 
 
+_OPERATORS = {'+': 'ADD', '-': 'SUBTRACT', '*': 'MULTIPLY', '/': 'DIVIDE'}
+
+
+class _QueryCode:
+    """TypeScript source for a query model read from SQL: a query specification or a union, with the aliases it reads under
+    made once each, so that what is read twice is one object."""
+
+    def __init__(self):
+        self.definitions: list[str] = []
+        self._names: dict[int, str] = {}
+
+    def relation(self, relation) -> str:
+        if (query := query_of(relation)) is not None:
+            return _query_constant(query)
+        if isinstance(relation, TableAlias):
+            if id(relation) not in self._names:
+                inner = self.relation(relation.relation) if not isinstance(relation.relation, QueryExpression) \
+                    else self.query(relation.relation)
+                name = f"a{len(self._names) + 1}"
+                self._names[id(relation)] = name
+                self.definitions.append(f"const {name} = new TableAlias({inner}, '{relation.name}');")
+            return self._names[id(relation)]
+        if isinstance(relation, Table):
+            return f"new Table('{table_qualified_name(relation)}', [])"
+        raise ValueError(f"A relation of a query cannot be generated from {relation!r}")
+
+    def query(self, query) -> str:
+        if isinstance(query, UnionOperation):
+            return f"new UnionOperation({self.query(query.left)}, {self.query(query.right)}, {'true' if query.all else 'false'})"
+        assert isinstance(query, QuerySpecification), f"Not a query: {query!r}"
+        columns = ", ".join(self.value(c) for c in query.columns)
+        group_by = ", ".join(self.value(g) for g in query.group_by)
+        joins = ", ".join(
+            f"new JoinOperation('{j.name}', {self.relation(j.target)}, {self.value(j.operation)}, JoinKind.{j.kind.name})"
+            for j in query.joins)
+        having = self.value(query.having) if query.having is not None else "undefined"
+        return (f"new QuerySpecification([{columns}], {self.value(query.filter)}, [{group_by}], {self.relation(query.table)}, "
+                f"new Map(), {'true' if query.distinct else 'false'}, {having}, new Map(), [{joins}])")
+
+    def value(self, node) -> str:
+        if isinstance(node, Column):
+            owner = node.owner if node.owner is not None else node.table
+            return f"new Column('{node.name}', '{node.type}', {self.relation(owner)})"
+        if isinstance(node, Alias):
+            return f"new Alias({self.value(node.element)}, {js_string(node.name)})"
+        if isinstance(node, NoOperation):
+            return "new NoOperation()"
+        if isinstance(node, ComparisonOperation):
+            return f"new ComparisonOperation({self.value(node.left)}, ComparisonOperator.{node.operator.name}, {self.value(node.right)})"
+        if isinstance(node, LogicalOperation):
+            return f"new LogicalOperation({self.value(node.left)}, LogicalOperator.{node.operator.name}, {self.value(node.right)})"
+        if isinstance(node, (IsNullOperation, IsNotNullOperation, NotOperation)):
+            return f"new {type(node).__name__}({self.value(node.element)})"
+        if isinstance(node, (InOperation, NotInOperation)):
+            return f"new {type(node).__name__}({self.value(node.element)}, [{', '.join(self.value(v) for v in node.values)}])"
+        if isinstance(node, ArithmeticOperation):
+            return f"new ArithmeticOperation({self.value(node.left)}, ArithmeticOperator.{node.operator.name}, {self.value(node.right)})"
+        if isinstance(node, ConcatOperation):
+            return f"new ConcatOperation([{', '.join(self.value(p) for p in node.parts)}])"
+        if isinstance(node, ScalarFunctionOperation):
+            return f"new ScalarFunctionOperation({self.value(node.element)}, ScalarFunction.{node.function.name})"
+        if isinstance(node, CaseOperation):
+            default = self.value(node.default) if node.default is not None else "undefined"
+            return f"new CaseOperation({self.value(node.condition)}, {self.value(node.then)}, {default})"
+        if isinstance(node, CountAllOperation):
+            return "new CountAllOperation('')"
+        if isinstance(node, AggregateOperation):
+            return f"new AggregateOperation({self.value(node.element)}, AggregateOperator.{node.operator.name})"
+        if isinstance(node, StringConstantOperation):
+            return f"new StringConstantOperation({js_string(node.value)})"
+        if isinstance(node, BooleanConstantOperation):
+            return f"new BooleanConstantOperation({'true' if node.value else 'false'})"
+        if isinstance(node, (IntegerConstantOperation, FloatConstantOperation, DecimalConstantOperation)):
+            return f"new {type(node).__name__}({node.value})"
+        raise ValueError(f"A query cannot be generated from {node!r}")
+
+
+def _queries_of(mapping) -> list[TableAlias]:
+    """The queries classes of the mapping are mapped to, and those they read, each after the queries it reads."""
+    found: list[TableAlias] = []
+
+    def add(alias: TableAlias) -> None:
+        if any(alias is f for f in found):
+            return
+        for read in alias.reads:
+            if (read_query := query_of(read)) is not None:
+                add(read_query)
+        found.append(alias)
+
+    for rcm in mapping.mappings:
+        query = query_of(rcm.main_relation)
+        if query is not None:
+            add(query)
+    return found
+
+
+def query_definitions(mapping) -> str:
+    """TypeScript source for the module of the queries the mapping's classes are mapped to: each is built where it is imported, from
+    the query model the loader read its SQL into, and a query over the class writes it as a derived table."""
+    blocks = []
+    for alias in _queries_of(mapping):
+        code = _QueryCode()
+        query = code.query(alias.relation)
+        columns = ", ".join(
+            f"new Column('{c.name}', '{c.type}', undefined{', true' if c.primary_key else ', false'}"
+            f"{'' if c.nullable or c.primary_key else ', false'})" for c in alias.columns if isinstance(c, Column))
+        constant = _query_constant(alias)
+        lines = [*("  " + d for d in code.definitions)]
+        body = "\n".join(lines + [f"  return new TableAlias({query}, '{alias.name}', [{columns}]);"])
+        block = f"export const {constant} = (() => {{\n{body}\n}})();"
+        if alias.milestoning_scheme is not None:
+            block += f"\n{constant}.milestoningColumns = {_scheme_columns_code(alias, constant)};"
+        blocks.append(block)
+    return "\n\n".join(blocks)
+
+
+def has_queries(mapping) -> bool:
+    return bool(_queries_of(mapping))
+
+
+def query_constants(mapping) -> list[str]:
+    return [_query_constant(a) for a in _queries_of(mapping)]
+
+
+def main_query(rcm) -> str:
+    """The name of the query a class is mapped to, or an empty string for a class mapped to a table."""
+    query = query_of(rcm.main_relation)
+    return _query_constant(query) if query is not None else ""
+
+
 def js_string(value: str) -> str:
     return "'" + value.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
@@ -129,16 +269,19 @@ def condition_args(join: Join, *rest) -> str:
             + (", true" if reverse and self_join else ""))
 
 
-def _scheme_columns_code(table: Table) -> str:
-    """TypeScript source for the milestoning columns of a table a join passes through, from its milestoning scheme."""
+def _scheme_columns_code(table, owned_by: str | None = None) -> str:
+    """TypeScript source for the milestoning columns of a table a join passes through, from its milestoning scheme. For a query
+    that a class is mapped to the columns are the query's own, which the constant ``owned_by`` gives."""
     scheme = table.milestoning_scheme
     assert scheme is not None
-    by_name = {c.name: c for c in table.columns}
+    by_name = {c.name: c for c in table.columns if isinstance(c, Column)}
 
     def col(name: str | None) -> str:
         column = by_name.get(name or "")
         if column is None:
             raise ValueError(f"Table '{table.name}': milestoning column '{name}' of scheme '{scheme.name}' is not a column")
+        if owned_by is not None:
+            return f"{owned_by}.column('{column.name}', '{column.type}')"
         return f"new Column('{column.name}', '{column.type}')"
 
     processing_infinite = f", '{scheme.processing_infinite_datetime}'" if scheme.processing_infinite_datetime else ""
@@ -160,8 +303,10 @@ def _scheme_columns_code(table: Table) -> str:
     raise ValueError(f"Milestoning scheme '{scheme.name}' has no columns")
 
 
-def table_code(table: Table) -> str:
+def table_code(table) -> str:
     """TypeScript source that builds ``table`` in a generated finder."""
+    if isinstance(table, TableAlias):
+        return _query_constant(table)
     qualified = table_qualified_name(table)
     if table.milestoning_scheme is not None:
         milestoned = {c.name for c in _scheme_milestoning_columns(table)}
@@ -281,6 +426,7 @@ class _ClassView:
     def __init__(self, rcm):
         self.clazz = rcm.clazz
         self.milestone_mapping = rcm.milestone_mapping
+        self.main_relation = rcm.main_relation
         self.property_mappings = [pm for pm in rcm.property_mappings if not isinstance(pm.target, EmbeddedSetMapping)]
         self.embedded_mappings = [pm for pm in rcm.property_mappings if isinstance(pm.target, EmbeddedSetMapping)]
 
@@ -474,7 +620,11 @@ def generate(mapping: Mapping, output_directory: str):
     assoc_lookup = _build_association_lookup(mapping)
     reverse_assoc_map = _build_reverse_assoc_map(mapping, assoc_lookup)
 
+    queries_module = _mapping_to_filename(mapping.name).replace('Context.ts', 'Queries')
     shared_context = dict(
+        queries_module=queries_module if has_queries(mapping) else '',
+        query_constants=query_constants(mapping),
+        main_query=main_query,
         class_module_map=class_module_map,
         class_module_map_base=class_module_map_base,
         is_primitive=is_primitive,
@@ -535,3 +685,18 @@ def generate(mapping: Mapping, output_directory: str):
                 f"export const {metadata_class}: MappingMetadata = "
                 f"{json.dumps(mapping_metadata(mapping, reverse_assoc_map), indent=2, ensure_ascii=False)};\n")
         print(f'... wrote {metadata_filename}')
+
+    if has_queries(mapping):
+        with open(os.path.join(output_directory, queries_module + '.ts'), mode='w', encoding='utf-8') as f:
+            f.write(
+                "import {\n  AggregateOperation, AggregateOperator, Alias, ArithmeticOperation, ArithmeticOperator, BooleanConstantOperation,\n"
+                "  CaseOperation, Column, ComparisonOperation, ComparisonOperator, ConcatOperation, CountAllOperation,\n"
+                "  DecimalConstantOperation, FloatConstantOperation, InOperation, IntegerConstantOperation, IsNotNullOperation,\n"
+                "  IsNullOperation, JoinKind, LogicalOperation, LogicalOperator, NoOperation, NotInOperation, NotOperation,\n"
+                "  JoinOperation, QuerySpecification, ScalarFunction, ScalarFunctionOperation, StringConstantOperation, Table, TableAlias,\n"
+                "  UnionOperation,\n} from '@model/relational';\n"
+                "import {\n  BiTemporalColumns, BusinessDateAndProcessingTemporalColumns, BusinessDateRangeColumns, ProcessingTemporalColumns,\n"
+                "  SingleBusinessDateColumn, SingleProcessingDatetimeColumn,\n} from '@model/milestoning';\n\n"
+                "/** The queries the classes of the mapping are mapped to: each is built where this module is imported. */\n"
+                + query_definitions(mapping) + "\n")
+        print(f'... wrote {queries_module}.ts')

@@ -1,7 +1,7 @@
 import { Attribute, Comparand } from './attribute';
 import { buildQuerySpecification, toSql } from './sql-generator';
 import { attributes, columnName } from './relation';
-import { MilestonedTable, hasProcessingRange } from '../model/milestoning';
+import { MilestonedTable, hasProcessingRange, milestoningColumnsOf } from '../model/milestoning';
 import { DialectName, SqlDialect } from './dialect';
 import {
   Alias,
@@ -9,6 +9,7 @@ import {
   TableAlias,
   UnionOperation,
   QueryExpression,
+  RelationExistsOperation,
   QuerySpecification,
   JoinOperation,
   JoinKind,
@@ -109,6 +110,28 @@ function rowOf(columns: Map<string, Attribute>): ResultRow {
     },
     set() { throw new Error('A row is read, not changed: use extend() to add a column'); },
   });
+}
+
+/**
+ * Whether `other` has a row for which `condition` holds, as Legend's `exists(e | ...)`, and SQL's `EXISTS`. It is a condition, for
+ * the `filter` of a result: the function is of a row of `other`, and it reads the row being filtered from the function it is in.
+ * `.not()` is `NOT EXISTS`, and conditions are combined with `and` / `or`:
+ *
+ *     lateLines.filter(l1 => exists(lines, l2 => l2.order.eq(l1.order).and(l2.supplier.ne(l1.supplier)))
+ *                              .and(exists(late, l3 => l3.order.eq(l1.order).and(l3.supplier.ne(l1.supplier))).not()))
+ */
+export function exists(other: FinderResult, condition: (row: ResultRow) => Operation): RelationExistsOperation {
+  if (typeof condition !== 'function') {
+    throw new TypeError('The condition of an exists is a function of a row of the other result: exists(other, o => o.key.eq(r.key))');
+  }
+  const { alias } = other.relation();
+  // a name of its own each time, so that a result tested against itself reads as two relations
+  const inner = new TableAlias(alias.relation, `relation${nextRelationNumber++}`);
+  const test = condition(rowOf(attributes(inner)));
+  if (!(test instanceof Operation)) {
+    throw new TypeError(`The condition of an exists gives a comparison, such as o.key.eq(r.key), not ${test === null ? 'null' : typeof test}`);
+  }
+  return new RelationExistsOperation(inner, test);
 }
 
 /** What a `groupBy` function of a row returns: a column, or several, or an expression named with `alias()`. */
@@ -514,7 +537,8 @@ export function convertInputsAndSelectForDateRange(
   if (businessDateFrom == null) throw new Error('businessDateFrom is required for findForDateRange');
   if (businessDateTo == null) throw new Error('businessDateTo is required for findForDateRange');
   // a table with no processing columns, such as a single business date, has no processing time to give
-  if (processingDatetime == null && table instanceof MilestonedTable && hasProcessingRange(table.milestoningColumns)) {
+  const milestoning = milestoningColumnsOf(table as unknown as Relation);
+  if (processingDatetime == null && milestoning !== undefined && hasProcessingRange(milestoning)) {
     throw new Error('processingTime is required for findForDateRange');
   }
   return new FinderResult(
