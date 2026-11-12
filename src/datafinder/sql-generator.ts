@@ -1,4 +1,5 @@
 import { Attribute, Comparand } from './attribute';
+import { TARGET_SIDE } from './finder';
 import {
   RelationalOperationElement,
   Operation,
@@ -87,12 +88,17 @@ class Join {
     readonly source: TableAliasColumn,
     readonly target: TableAliasColumn,
     readonly filterOp?: RelationalOperationElement,
+    /** The step it is, which says which side of it a column of its condition is on. */
+    readonly node?: JoinTreeNodeOperation,
   ) {}
 
-  /** `source = target`, written with the key column first as Legend writes a join defined as key = foreign key. */
+  /**
+   * `source = target`, written with the key column first as Legend writes a join defined as key = foreign key. A join that has a
+   * condition besides its keys is written as its mapping gives it, the source first.
+   */
   condition(): string {
     let [first, second] = [this.source, this.target];
-    if (second.column.primaryKey && !first.column.primaryKey) [first, second] = [second, first];
+    if (this.node?.join.filter === undefined && second.column.primaryKey && !first.column.primaryKey) [first, second] = [second, first];
     return first.tableAlias.name + '.' + first.column.name + ' = ' + second.tableAlias.name + '.' + second.column.name;
   }
 }
@@ -744,7 +750,6 @@ function reachesToMany(op: RelationalOperationElement): boolean {
   return false;
 }
 
-/** A column with any alias around it taken off. */
 /** The name a column of a result gets in a SELECT when it has not been given one with `alias()`. */
 export function displayAlias(col: RelationalOperationElement | Attribute): string {
   if (col instanceof Alias) return col.name;
@@ -775,6 +780,7 @@ export function displayAlias(col: RelationalOperationElement | Attribute): strin
   return 'Expression';
 }
 
+/** A column with any alias around it taken off. */
 function unaliased(op: unknown): unknown {
   return op instanceof Alias ? unaliased(op.element) : op;
 }
@@ -1154,7 +1160,33 @@ class SQLQueryGenerator {
     const filterOp = join.filter !== undefined && queryFilter !== undefined
       ? new LogicalOperation(join.filter as Operation, LogicalOperator.AND, queryFilter)
       : join.filter ?? queryFilter;
-    this._join.push(new Join(sc, tc, filterOp));
+    this._join.push(new Join(sc, tc, filterOp, node));
+  }
+
+  /** The step whose ON condition is being written: a column of the condition is on a side of that join, which its owner says. */
+  private _conditionNode?: JoinTreeNodeOperation;
+
+  private _joinFilter(join: Join): string {
+    this._conditionNode = join.node;
+    try {
+      const sql = this.buildFilter(join.filterOp!);
+      // an OR on its own is bracketed, as it is when it is one side of an AND with the keys
+      return join.filterOp instanceof LogicalOperation && join.filterOp.operator === LogicalOperator.OR ? '(' + sql + ')' : sql;
+    } finally {
+      this._conditionNode = undefined;
+    }
+  }
+
+  /** The alias a column of a join's condition is read under: the joined side's if its owner is the table the join reaches, else the side it starts from. */
+  private _conditionAlias(column: Column, node: JoinTreeNodeOperation): TableAlias {
+    const join = node.join;
+    const owner = column.ownerRelation;
+    const same = (a: Relation, b: Relation) => a === b || (a instanceof NamedRelation && b instanceof NamedRelation && a.qualifiedName === b.qualifiedName);
+    const selfJoin = same(join.left.ownerRelation, join.target);
+    if ((owner instanceof TableAlias && owner.name === TARGET_SIDE) || (!selfJoin && same(owner, join.target))) {
+      return this._tableAliasForTable(join.target, node);
+    }
+    return this._tableAliasForTable(owner, node.parent);
   }
 
   buildFilter(op: RelationalOperationElement): string {
@@ -1225,7 +1257,7 @@ class SQLQueryGenerator {
       return ta.name + '.' + column.name;
     }
     if (op instanceof Column) {
-      const ta = this._tableAliasForTable(op.ownerRelation);
+      const ta = this._conditionNode !== undefined ? this._conditionAlias(op, this._conditionNode) : this._tableAliasForTable(op.ownerRelation);
       return ta.name + '.' + op.name;
     }
     throw new Error('Unknown operation in buildFilter: ' + op.constructor.name);
@@ -1280,7 +1312,7 @@ class SQLQueryGenerator {
     const joins = this._join.map(j =>
       ' LEFT OUTER JOIN ' + this._relationSql(j.target.tableAlias) + ' AS ' + j.target.tableAlias.name +
       ' ON (' + j.condition() +
-      (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
+      (j.filterOp ? ' AND ' + this._joinFilter(j) : '') + ')',
     );
 
     // a relation joined on a condition is written in its JOIN, not listed in FROM because a column of it was read

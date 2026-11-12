@@ -15,7 +15,10 @@ from model.mapping import (
     BusinessDateRangeMilestonePropertyMapping,
     SingleProcessingDatetimeMilestonePropertyMapping,
 )
-from model.relational import Column, Table
+from model.relational import (
+    Column, ComparisonOperation, DecimalConstantOperation, FloatConstantOperation, IntegerConstantOperation,
+    IsNotNullOperation, IsNullOperation, LogicalOperation, NotOperation, StringConstantOperation, Table, TableAlias,
+)
 from model.relational_mapping import Join, EmbeddedSetMapping
 
 _TS_RESERVED = {
@@ -80,6 +83,48 @@ def _bitemporal_infinities(scheme) -> str:
     return f", {processing}{business}"
 
 
+def _is_self_join(lhs: Column, rhs: Column) -> bool:
+    """Whether a hop joins a table to itself, so a condition on it needs to say which side each column is on."""
+    return lhs.table is not None and rhs.table is not None and lhs.table.qualified_name == rhs.table.qualified_name
+
+
+def condition_code(op, self_join: bool = False) -> str:
+    """TypeScript source that builds the condition ``op`` of a join in a generated finder. For a join of a table to itself it
+    is a function of the two sides, ``(plain, target) => ...``, which tell the columns of the two ends apart."""
+    def code(node) -> str:
+        if isinstance(node, Column):
+            if not self_join:
+                return column_code(node, False)
+            side = "target" if isinstance(node.owner, TableAlias) else "plain"
+            return f"{side}.column('{node.name}', '{node.type}')"
+        if isinstance(node, ComparisonOperation):
+            return f"new ComparisonOperation({code(node.left)}, ComparisonOperator.{node.operator.name}, {code(node.right)})"
+        if isinstance(node, LogicalOperation):
+            return f"new LogicalOperation({code(node.left)}, LogicalOperator.{node.operator.name}, {code(node.right)})"
+        if isinstance(node, (IsNullOperation, IsNotNullOperation, NotOperation)):
+            return f"new {type(node).__name__}({code(node.element)})"
+        if isinstance(node, (StringConstantOperation,)):
+            return f"new StringConstantOperation({js_string(node.value)})"
+        if isinstance(node, (IntegerConstantOperation, FloatConstantOperation, DecimalConstantOperation)):
+            return f"new {type(node).__name__}({node.value})"
+        raise ValueError(f"A join condition cannot be generated from {node!r}")
+
+    return ("(plain, target) => " if self_join else "") + code(op)
+
+
+def js_string(value: str) -> str:
+    return "'" + value.replace('\\', '\\\\').replace("'", "\\'") + "'"
+
+
+def condition_call(join: Join, reverse: bool = False) -> str:
+    """The call that gives a finder the condition of the join it follows, or nothing. ``reverse`` is that the finder is
+    the one the join is followed to from its other end, which matters only to a join of a table to itself."""
+    if join.condition is None:
+        return ""
+    self_join = _is_self_join(join.lhs, join.rhs)
+    return f".withCondition({condition_code(join.condition, self_join)}" + (", true" if reverse and self_join else "") + ")"
+
+
 def _scheme_columns_code(table: Table) -> str:
     """TypeScript source for the milestoning columns of a table a join passes through, from its milestoning scheme."""
     scheme = table.milestoning_scheme
@@ -137,7 +182,10 @@ def parent_expr(join: Join, parent: str, with_dates: bool = False) -> str:
         return parent
     # The columns of a step through a class-less table are written without key flags, as the data-finder specs run them
     # (their expected SQL has the join's own order, not the key-first order the flags would give).
-    hops = ", ".join(f"[{column_code(lhs, False)}, {table_code(rhs.table)}, {column_code(rhs, False)}]" for lhs, rhs in join.via)
+    hops = ", ".join(
+        f"[{column_code(lhs, False)}, {table_code(rhs.table)}, {column_code(rhs, False)}"
+        + (f", {condition_code(condition, _is_self_join(lhs, rhs))}" if condition is not None else "") + "]"
+        for (lhs, rhs), condition in zip(join.via, join.via_conditions))
     dates = (", dates?.businessDate == null ? null : convertDate(dates.businessDate)"
              ", dates?.processingTime == null ? null : convertProcessingDate(dates.processingTime)") if with_dates else ""
     return f"viaJoins({parent}, [{hops}]{dates})"
@@ -433,6 +481,7 @@ def generate(mapping: Mapping, output_directory: str):
         has_business_date_range=has_business_date_range,
         has_processing_snapshot=has_processing_snapshot,
         parent_expr=parent_expr,
+        condition_call=condition_call,
         column_code=column_code,
         display_name=display_name,
         to_ts_name=to_ts_name,
