@@ -10,6 +10,7 @@ import {
   UnionOperation,
   QueryExpression,
   Table,
+  containsAggregate,
   Operation,
   SortOperation,
   NoOperation,
@@ -107,6 +108,53 @@ function rowOf(columns: Map<string, Attribute>): ResultRow {
   });
 }
 
+/** What a `groupBy` function of a row returns: a column, or several, or an expression named with `alias()`. */
+export type GroupKey = Attribute | Alias | readonly (Attribute | Alias)[];
+
+/** The rows of a result grouped by keys: what `groupBy(r => r.dept)` gives, which can only be aggregated. */
+export class GroupedRows {
+  private readonly _keys: (Attribute | Alias)[] = [];
+
+  constructor(private readonly _result: FinderResult, keys: readonly ((row: ResultRow) => GroupKey)[]) {
+    const row = _result.row();
+    for (const key of keys) {
+      const found = key(row);
+      this._keys.push(...(Array.isArray(found) ? found : [found as Attribute | Alias]));
+    }
+    for (const key of this._keys) {
+      if (key instanceof Attribute) continue;
+      if (key instanceof Alias && !(key.element instanceof Alias)) continue;
+      throw new TypeError('A groupBy key is a column, or an expression named with alias(): groupBy(r => r.shipDate.year().alias(\'year\'))');
+    }
+  }
+
+  /**
+   * The keys, and a column for each key of the object that is an aggregate of the rows of its group, as Legend's
+   * `groupBy(~dept, ~headcount : x | $x.id : y | $y->count())`:
+   *
+   *     rows.groupBy(r => r.dept).aggregate({ headcount: r => r.id.count(), avgSalary: r => r.salary.average() })
+   */
+  aggregate(columns: Record<string, (row: ResultRow) => RelationalOperationElement | Attribute>): FinderResult {
+    const entries = Object.entries(columns);
+    if (entries.length === 0) throw new Error('aggregate needs at least one column: aggregate({ total: r => r.price.sum() })');
+    const row = this._result.row();
+    const shown = this._keys.map(key => (key instanceof Alias ? key.name : key.displayName()));
+    const aggregates: Alias[] = [];
+    for (const [name, fn] of entries) {
+      if (typeof fn !== 'function') throw new TypeError(`The column '${name}' is a function of a row: aggregate({ ${name}: r => r.price.sum() })`);
+      const expression = fn(row);
+      const element = expression instanceof Attribute ? expression.cwj() : expression;
+      if (!containsAggregate(element)) {
+        throw new TypeError(`The column '${name}' is not an aggregate of the rows of a group (sum, count, average, min, max, ...), so it has no one value for the group`);
+      }
+      if (shown.includes(name) || aggregates.some(a => a.name === name)) throw new Error(`The column '${name}' is named twice in this aggregate`);
+      aggregates.push(new Alias(element, name));
+    }
+    const keys = this._keys.map(key => (key instanceof Alias ? key.element : key));
+    return this._result.step([...this._keys, ...aggregates], undefined, keys as Comparand[]);
+  }
+}
+
 export class FinderResult {
   private _relationName?: string;
   private _orderBy: SortOperation[] = [];
@@ -191,9 +239,19 @@ export class FinderResult {
   }
 
   /** A result that reads from this one: a query over this result's query, as Legend's relation functions are. */
-  private _next(display: (Attribute | RelationalOperationElement)[], op?: Operation): FinderResult {
+  private _next(display: (Attribute | RelationalOperationElement)[], op?: Operation, groupBy: Comparand[] = []): FinderResult {
     const { alias } = this.relation();
-    return new FinderResult(null, null, display, alias, op ?? new NoOperation());
+    const step = new FinderResult(null, null, display, alias, op ?? new NoOperation());
+    step._groupBy = groupBy;
+    return step;
+  }
+
+  /** @internal A row of this result, for the functions of a step. */
+  row(): ResultRow { return rowOf(this.relation().attributes); }
+
+  /** @internal */
+  step(display: (Attribute | RelationalOperationElement)[], op?: Operation, groupBy: Comparand[] = []): FinderResult {
+    return this._next(display, op, groupBy);
   }
 
   /**
@@ -264,9 +322,31 @@ export class FinderResult {
     return this;
   }
 
-  groupBy(...attrs: Comparand[]): this {
-    this._groupBy = attrs.map(a => this._own(a) as Comparand);
+  /**
+   * Group the rows. Given finder attributes (or expressions), the aggregates selected next to them are grouped by them, and
+   * the result is this one. Given a function of a row, as Legend's `groupBy(~dept, ...)`, the rows of this result are grouped
+   * by the key it returns (a column, an array of them, or an expression named with `alias()`), and the result of `aggregate`
+   * on that is a step over this one:
+   *
+   *     rows.groupBy(r => r.dept).aggregate({ headcount: r => r.id.count() })
+   *     rows.groupBy(r => [r.dept, r.title]).aggregate({ total: r => r.salary.sum() })
+   */
+  groupBy(...keys: ((row: ResultRow) => GroupKey)[]): GroupedRows;
+  groupBy(...attrs: Comparand[]): this;
+  groupBy(...keys: (Comparand | ((row: ResultRow) => GroupKey))[]): GroupedRows | this {
+    const functions = keys.map(k => typeof k === 'function');
+    if (keys.length > 0 && functions.every(Boolean)) return new GroupedRows(this, keys as ((row: ResultRow) => GroupKey)[]);
+    if (functions.some(Boolean)) throw new TypeError('groupBy takes finder attributes, or functions of a row (r => r.dept), not both');
+    this._groupBy = (keys as Comparand[]).map(a => this._own(a) as Comparand);
     return this;
+  }
+
+  /**
+   * One row for the whole of this result, each column named by its key and an aggregate of the rows, as Legend's
+   * `aggregate(~total : x | $x.salary : y | $y->plus())`: `rows.aggregate({ total: r => r.salary.sum() })`.
+   */
+  aggregate(columns: Record<string, (row: ResultRow) => RelationalOperationElement | Attribute>): FinderResult {
+    return new GroupedRows(this, []).aggregate(columns);
   }
 
   limit(n: number): this {

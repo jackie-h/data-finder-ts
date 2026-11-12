@@ -42,6 +42,34 @@ describe('the columns', () => {
   });
 });
 
+describe('groupBy and aggregate on a result', () => {
+  const byCategory = () => companies().groupBy(r => r.category).aggregate({ n: r => r.id.count(), top: r => r.id.max() });
+
+  it('are the keys and an aggregate for each group', () => {
+    expect(byCategory().columnNames()).toEqual(['category', 'n', 'top']);
+    expect(byCategory().toSql('duckdb')).toContain('GROUP BY t0.category');
+  });
+
+  it('take several keys, or an expression named with alias', () => {
+    expect(companies().groupBy(r => [r.category, r.company]).aggregate({ n: r => r.id.count() }).columnNames()).toEqual(['category', 'company', 'n']);
+    expect(() => companies().groupBy(r => r.id.plus(1) as never)).toThrow('named with alias');
+  });
+
+  it('refuse a column that is not an aggregate, a repeated name and nothing to aggregate', () => {
+    expect(() => companies().groupBy(r => r.category).aggregate({ x: r => r.id })).toThrow('not an aggregate');
+    expect(() => companies().groupBy(r => r.category).aggregate({ category: r => r.id.count() })).toThrow('named twice');
+    expect(() => companies().groupBy(r => r.category).aggregate({})).toThrow('at least one column');
+  });
+
+  it('are not mixed with finder attributes', () => {
+    expect(() => (companies().groupBy as (...a: unknown[]) => unknown)(f.category(), (r: Record<string, unknown>) => r.id)).toThrow('not both');
+  });
+
+  it('an aggregate in arithmetic is an aggregate', () => {
+    expect(companies().aggregate({ avg: r => r.id.sum().dividedBy(5) }).columnNames()).toEqual(['avg']);
+  });
+});
+
 describe('against DuckDB', () => {
   let instance: DuckDBInstance;
   let conn: DuckDBConnection;
@@ -66,5 +94,19 @@ describe('against DuckDB', () => {
   it('chains', async () => {
     const rows = companies().extend({ next: r => r.id.plus(1) }).filter(r => r.next.gt(5)).select('id', 'next');
     expect(await rows.toRows()).toEqual([[5, 6]]);
+  });
+
+  it('groups the rows of a result', async () => {
+    const rows = companies().groupBy(r => r.category).aggregate({ n: r => r.id.count() });
+    expect(await rows.orderBy(rows.column('category').ascending()).toRows()).toEqual([['Finance', 2n], ['Manufacturing', 1n], ['Technology', 2n]]);
+  });
+
+  it('aggregates the whole of a result into one row', async () => {
+    expect(await companies().aggregate({ total: r => r.id.sum(), highest: r => r.id.max() }).toRows()).toEqual([[15n, 5]]);
+  });
+
+  it('filters the groups', async () => {
+    const big = companies().groupBy(r => r.category).aggregate({ n: r => r.id.count() }).filter(r => r.n.gt(1)).select('category');
+    expect(await big.orderBy(big.column('category').ascending()).toRows()).toEqual([['Finance'], ['Technology']]);
   });
 });

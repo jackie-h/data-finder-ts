@@ -203,6 +203,17 @@ trades.extend({ top: r => r.price.max().over([r.account]) })          // a windo
 trades.select('sym', 'price');                                         // some columns, by name
 ```
 
+`groupBy` and `aggregate` are steps too, as Legend's `groupBy` and `aggregate`:
+
+```ts
+trades.groupBy(r => r.account).aggregate({ total: r => r.price.sum(), n: r => r.price.count() });   // the keys, and an aggregate of each group
+trades.groupBy(r => [r.account, r.sym]).aggregate({ total: r => r.price.sum() });                    // several keys
+trades.groupBy(r => r.date.year().alias('year')).aggregate({ n: r => r.price.count() });             // an expression is named with alias()
+trades.aggregate({ total: r => r.price.sum(), average: r => r.price.sum().dividedBy(5) });            // one row for the whole result
+```
+
+Each aggregate column must be an aggregate of the rows of its group (`sum`, `count`, `average`, `min`, `max`, ... also inside arithmetic). `groupBy` with finder attributes (`f.findAll([...]).groupBy(f.category())`) is as before; the two forms are told apart by their arguments and cannot be mixed. A step after it, such as `filter`, reads the groups' columns (a `HAVING`, written as a `WHERE` over the grouped query).
+
 The result of a step is a result: order it with `.column(name)` (`rows.orderBy(rows.column('price').ascending())`), limit it, concatenate it. A row's attributes are loosely typed (`ResultRow`): a column's type is known when the query is built, not by the compiler.
 
 ## Sorting
