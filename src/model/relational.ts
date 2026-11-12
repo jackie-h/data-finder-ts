@@ -754,7 +754,7 @@ export class QuerySpecification extends QueryExpression {
     readonly columns: readonly RelationalOperationElement[],
     readonly filter: RelationalOperationElement,
     readonly groupBy: RelationalOperationElement[] = [],
-    readonly table?: Table,
+    readonly table?: Relation,
     /**
      * Extra ON conditions for this query's joins (milestoning and property filters), keyed by join node.
      * Held here rather than on the shared JoinOperation, so queries that use the same node can't affect each other.
@@ -784,7 +784,7 @@ export class OrderedQuerySpecification extends QuerySpecification {
     groupBy: RelationalOperationElement[] = [],
     /** How many rows are returned at most. */
     readonly limit?: number,
-    table?: Table,
+    table?: Relation,
     joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map(),
     distinct: boolean = false,
     /** How many rows to skip before the first one returned. */
@@ -792,6 +792,25 @@ export class OrderedQuerySpecification extends QuerySpecification {
     having?: Operation,
     subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map(),
   ) { super(columns, filter, groupBy, table, joinFilters, distinct, having, subSelects); }
+}
+
+/**
+ * Two query expressions whose rows are put together: `left UNION right` (the distinct rows), or `UNION ALL` with `all`.
+ * ANSI SQL's `<query expression body>` with a set operator, and Legend's `concatenate`. The two have the same number of
+ * columns, and the result's columns are the left one's. Either side can be a union itself.
+ *
+ * As a query expression it has no ORDER BY or row limit; a query that reads from it, through a table alias, has.
+ */
+export class UnionOperation extends QueryExpression {
+  constructor(readonly left: QueryExpression, readonly right: QueryExpression, readonly all: boolean = false) {
+    super();
+    if (left.columns.length !== right.columns.length) {
+      throw new Error(`A union is of queries with the same columns: ${left.columns.length} and ${right.columns.length} columns`);
+    }
+  }
+
+  /** The columns of the left side name the result's columns. */
+  get columns(): readonly RelationalOperationElement[] { return this.left.columns; }
 }
 
 /** Whether `op` holds an aggregate, a window function or a count. */

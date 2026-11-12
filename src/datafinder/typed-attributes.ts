@@ -573,3 +573,21 @@ applyMixins(DateAttribute, [MinMax, DateFunctions]);
 
 export interface DateTimeAttribute extends MinMax<DateTimeAggregateOperation>, DateTimeFunctions {}
 applyMixins(DateTimeAttribute, [MinMax, DateTimeFunctions]);
+
+/**
+ * The attribute for a column of the database type `dbType`, of the class that compares, does arithmetic and aggregates as
+ * that type does: an `INT` is an `IntegerAttribute`, a `VARCHAR` a `StringAttribute`. Its display name is the column's name.
+ */
+export function typedAttribute(name: string, dbType: string, owner: Relation): Attribute {
+  const kind = dbType.toUpperCase().split('(')[0].trim();
+  let factory: new (displayName: string, columnName: string, columnDbType: string, owner: Relation) => Attribute;
+  if (['INT', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'HUGEINT'].includes(kind)) factory = IntegerAttribute;
+  else if (['DOUBLE', 'FLOAT', 'REAL'].includes(kind)) factory = DoubleAttribute;
+  else if (['DECIMAL', 'NUMERIC'].includes(kind)) factory = DecimalAttribute;
+  else if (kind === 'DATE') factory = DateAttribute;
+  else if (kind.startsWith('TIMESTAMP') || kind === 'DATETIME') factory = DateTimeAttribute;
+  else if (['BOOLEAN', 'BOOL'].includes(kind)) factory = BooleanAttribute;
+  else if (kind === 'INTERVAL') factory = IntervalAttribute;
+  else factory = StringAttribute;
+  return new factory(name, name, dbType, owner);
+}

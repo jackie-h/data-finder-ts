@@ -46,6 +46,8 @@ import {
   NotExistsOperation,
   QuerySpecification,
   OrderedQuerySpecification,
+  QueryExpression,
+  UnionOperation,
   BinaryOperation,
   CaseOperation,
   ConcatOperation,
@@ -643,7 +645,7 @@ function buildQuerySpecification(
   businessDate: Date | null,
   processingDatetime: Date | null,
   columns: (Attribute | RelationalOperationElement)[],
-  table: Table,
+  table: Relation,
   op: RelationalOperationElement,
   orderBy: SortOperation[] = [],
   groupBy: Comparand[] = [],
@@ -741,6 +743,36 @@ function reachesToMany(op: RelationalOperationElement): boolean {
 }
 
 /** A column with any alias around it taken off. */
+/** The name a column of a result gets in a SELECT when it has not been given one with `alias()`. */
+export function displayAlias(col: RelationalOperationElement | Attribute): string {
+  if (col instanceof Alias) return col.name;
+  if (col instanceof CountAllOperation) return 'Count';
+  if (col instanceof ConstantOperation) return 'Constant';
+  if (col instanceof Attribute) return col.displayName();
+  if (col instanceof Column) return col.name;
+  const element = (col as { element?: unknown }).element;
+  const ofColumn = () => findColumn(col as RelationalOperationElement).column.name;
+  if (col instanceof WindowFunctionOperation) {
+    if (col.displayName) return col.displayName;
+    if ([WindowFunction.ROW_NUMBER, WindowFunction.RANK, WindowFunction.DENSE_RANK].includes(col.func)) {
+      return col.func.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+    return col.element ? col.func + ' ' + ofColumn() : col.func;
+  }
+  if (col instanceof AggregateOperation) {
+    return col.displayName ?? (element instanceof ColumnWithJoin ? col.operator + ' ' + ofColumn() : 'Expression');
+  }
+  if (col instanceof ScalarFunctionOperation) return col.displayName ?? col.func + ' ' + ofColumn();
+  if (col instanceof DateDiffOperation || col instanceof DateTruncOperation) return col.displayName ?? ofColumn();
+  if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation) {
+    return col.displayName ?? (element instanceof ColumnWithJoin ? ofColumn() : 'Expression');
+  }
+  if (col instanceof CaseOperation || col instanceof ConcatOperation || col instanceof ArithmeticOperation || col instanceof IntervalOperation) {
+    return col.displayName ?? 'Expression';
+  }
+  return 'Expression';
+}
+
 function unaliased(op: unknown): unknown {
   return op instanceof Alias ? unaliased(op.element) : op;
 }
@@ -763,7 +795,7 @@ class SQLQueryGenerator {
   private _tableAliasIncr: number;
   private _tableAliasesByTable = new Map<unknown, TableAlias>();
   private _addedJoinIds = new Set<JoinTreeNodeOperation>();
-  private _rootTable?: Table;
+  private _rootTable?: Relation;
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
   private _subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map();
@@ -822,8 +854,8 @@ class SQLQueryGenerator {
     }
     const aggregates = query.columns.filter(containsAggregate);
     if (aggregates.length === 0) return [];
-    const perRoot = query.table !== undefined && aggregates.some(reachesToMany);
-    const keys = perRoot ? query.table!.columns.filter(c => c.primaryKey).map(c => this._columnToString(c)) : [];
+    const perRoot = query.table instanceof Table && aggregates.some(reachesToMany);
+    const keys = perRoot ? (query.table as Table).columns.filter(c => c.primaryKey).map(c => this._columnToString(c)) : [];
     const grouped = query.columns
       .map((column, i) => ({ column, shown: this._select[i] }))
       .filter(({ column }) => !containsAggregateOrWindow(column) && !(unaliased(column) instanceof ConstantOperation))
@@ -1201,7 +1233,8 @@ class SQLQueryGenerator {
       return this._tableAliasesByTable.get(cacheKey)!;
     }
     const subSelect = key instanceof JoinTreeNodeOperation ? this._subSelects.get(key) : undefined;
-    const ta = new TableAlias(subSelect ?? table, 't' + this._tableAliasIncr++);
+    // a relation read under a name (a result used as a table): the relation itself is what is written
+    const ta = new TableAlias(subSelect ?? (table instanceof TableAlias ? table.relation : table), 't' + this._tableAliasIncr++);
     this._tableAliasesByTable.set(cacheKey, ta);
     return ta;
   }
@@ -1210,11 +1243,31 @@ class SQLQueryGenerator {
   private _relationSql(alias: TableAlias): string {
     const relation = alias.relation;
     if (relation instanceof Table) return relation.qualifiedName;
+    if (!(relation instanceof QueryExpression)) throw new TypeError('Cannot read ' + relation.constructor.name + ' in a query');
+    return '(' + this._querySql(relation) + ')';
+  }
+
+  /** A query written by a generator of its own that numbers its aliases after this one's; a union is its two queries. */
+  private _querySql(relation: QueryExpression): string {
+    if (relation instanceof UnionOperation) {
+      return this._unionSideSql(relation.left) + (relation.all ? ' UNION ALL ' : ' UNION ') + this._unionSideSql(relation.right);
+    }
     if (!(relation instanceof QuerySpecification)) throw new TypeError('Cannot read ' + relation.constructor.name + ' in a query');
     const nested = new SQLQueryGenerator(this._dialect, this._tableAliasIncr);
     nested.generate(relation);
+    const sql = nested.buildQueryString(); // it names its own relations as it is written, so read its count after
     this._tableAliasIncr = nested._tableAliasIncr;
-    return '(' + nested.buildQueryString() + ')';
+    return sql;
+  }
+
+  /**
+   * One side of a union: in brackets if it has an ORDER BY, a row limit or an offset, as SQL needs for them to belong to
+   * that side and not to the whole union.
+   */
+  private _unionSideSql(side: QueryExpression): string {
+    const sql = this._querySql(side);
+    return side instanceof OrderedQuerySpecification && (side.orderBy.length > 0 || side.limit !== undefined || side.offset)
+      ? '(' + sql + ')' : sql;
   }
 
   buildQueryString(): string {
@@ -1266,7 +1319,7 @@ export function toSql(
   businessDate: Date | null,
   processingDatetime: Date | null,
   columns: (Attribute | RelationalOperationElement)[],
-  table: Table,
+  table: Relation,
   op: RelationalOperationElement,
   orderBy: SortOperation[] = [],
   groupBy: Comparand[] = [],

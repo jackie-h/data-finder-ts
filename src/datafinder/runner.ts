@@ -1,8 +1,14 @@
 import { Attribute, Comparand } from './attribute';
-import { toSql } from './sql-generator';
+import { buildQuerySpecification, toSql } from './sql-generator';
+import { attributes, columnName } from './relation';
 import { MilestonedTable, hasProcessingRange } from '../model/milestoning';
 import { DialectName, SqlDialect } from './dialect';
 import {
+  Alias,
+  Relation,
+  TableAlias,
+  UnionOperation,
+  QueryExpression,
   Table,
   Operation,
   SortOperation,
@@ -79,7 +85,10 @@ function sortTarget(sort: SortOperation): string {
   return JSON.stringify([column.column.ownerName, column.column.name, joins]);
 }
 
+let nextRelationNumber = 1;
+
 export class FinderResult {
+  private _relationName?: string;
   private _orderBy: SortOperation[] = [];
   private _groupBy: Comparand[] = [];
   private _limit?: number;
@@ -98,18 +107,96 @@ export class FinderResult {
     private readonly _processingDatetimeTo: Date | null = null,
   ) {}
 
+  // --- a result as a relation, for what follows it -------------------------------------------------------------------
+
+  /** @internal This result as a relation: its query, with each column named for what reads it. */
+  relation(): { alias: TableAlias; attributes: Map<string, Attribute> } {
+    this._relationName ??= `relation${nextRelationNumber++}`;
+    const display = this._columns.map(c => (c instanceof Alias ? c : c instanceof Attribute ? c.alias(columnName(c)) : new Alias(c, columnName(c))));
+    const query = buildQuerySpecification(
+      this._businessDate, this._processingDatetime, display, this._table as unknown as Relation, this._op, this._orderBy, this._groupBy,
+      this._limit, this._businessDateTo, this._distinct, this._offset, this._having, this._processingDatetimeTo);
+    const alias = new TableAlias(query, this._relationName);
+    return { alias, attributes: attributes(alias) };
+  }
+
+  /** The names of this result's columns, as what follows it reads them: the name `alias()` gave, or the display name in snake_case. */
+  columnNames(): string[] {
+    return [...this.relation().attributes.keys()];
+  }
+
+  /**
+   * A column of this result by name, to order a concatenated result by: `rows.orderBy(rows.column('name').ascending())`. It is a
+   * typed attribute of the type the column holds.
+   */
+  column(name: string): Attribute {
+    const { attributes: columns } = this.relation();
+    const found = columns.get(name);
+    if (found === undefined) throw new Error(`No column '${name}' in this result: its columns are ${JSON.stringify([...columns.keys()])}`);
+    return found;
+  }
+
+  /**
+   * The rows of this result and of `other`, which has the same columns: `UNION` (each distinct row once), or `UNION ALL`
+   * with `{ all: true }`, as Legend's `concatenate`. The result is a result like any other: it can be ordered, limited and
+   * concatenated again. Its columns are named as `columnNames()` gives them.
+   */
+  concatenate(other: FinderResult, options: { all?: boolean } = {}): FinderResult {
+    const { alias: leftAlias, attributes: left } = this.relation();
+    const { alias: rightAlias, attributes: right } = other.relation();
+    const leftNames = [...left.keys()];
+    const rightNames = [...right.keys()];
+    if (leftNames.join('\u0000') !== rightNames.join('\u0000')) {
+      throw new Error(`Concatenated results need the same columns: ${JSON.stringify(leftNames)} and ${JSON.stringify(rightNames)} differ`);
+    }
+    const all = options.all ?? false;
+    const union = new TableAlias(
+      new UnionOperation(this._unionSide(leftAlias, all), other._unionSide(rightAlias, all), all),
+      `relation${nextRelationNumber++}`);
+    // each column keeps the name it has, so a chain of unions has the first one's names
+    return new FinderResult(null, null, [...attributes(union)].map(([name, attribute]) => attribute.alias(name)), union, new NoOperation());
+  }
+
+  /**
+   * This result as one side of a union. A result that is only the union of two more with the same operator is that union
+   * itself, not a SELECT over it, so `a.concatenate(b).concatenate(c)` is one flat chain of unions.
+   */
+  private _unionSide(asRelation: TableAlias, all: boolean): QueryExpression {
+    const source = this._table as unknown;
+    const bare = source instanceof TableAlias && source.relation instanceof UnionOperation && source.relation.all === all
+      && this._op instanceof NoOperation
+      && this._orderBy.length === 0 && this._groupBy.length === 0 && !this._distinct && this._having === undefined
+      && this._limit === undefined && this._offset === undefined;
+    return (bare ? (source as TableAlias).relation : asRelation.relation) as QueryExpression;
+  }
+
+  /**
+   * A column of this result, as `column(name)` gives it, is what this result shows under that name: so
+   * `rows.orderBy(rows.column('name').ascending())` orders by the column, not by a column of a later query.
+   */
+  private _own<T extends RelationalOperationElement | Attribute>(element: T): T | RelationalOperationElement | Attribute {
+    const column = element instanceof Attribute ? element.column() : element instanceof ColumnWithJoin ? element.column : undefined;
+    if (column === undefined || this._relationName === undefined) return element;
+    const owner = column.owner;
+    if (!(owner instanceof TableAlias) || owner.name !== this._relationName) return element;
+    const shown = new Map(this._columns.map(c => [columnName(c), c instanceof Alias ? c.element : c]));
+    const found = shown.get(column.name) ?? element;
+    return found instanceof Attribute ? found.cwj() : found;
+  }
+
   /**
    * Order the rows. Calls accumulate: the sorts of the latest call take priority and earlier ones order the
    * rows it leaves tied, as in a chain of `sortBy` calls. Sorting a column again replaces its earlier direction.
    */
-  orderBy(...sorts: SortOperation[]): this {
+  orderBy(...given: SortOperation[]): this {
+    const sorts = given.map(s => new SortOperation(this._own(s.column) as RelationalOperationElement, s.direction));
     const resorted = new Set(sorts.map(sortTarget));
     this._orderBy = [...sorts, ...this._orderBy.filter(s => !resorted.has(sortTarget(s)))];
     return this;
   }
 
   groupBy(...attrs: Comparand[]): this {
-    this._groupBy = attrs;
+    this._groupBy = attrs.map(a => this._own(a) as Comparand);
     return this;
   }
 
