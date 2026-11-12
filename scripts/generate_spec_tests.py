@@ -101,7 +101,7 @@ SKIPPED_MODULES = {
 # Expectations of the Python specs for features that are not ported yet, by the pattern their names match. Each is generated
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 UNPORTED = [
-    (r'^(chain_group_by|chain_filter_the_groups|chain_aggregate|join_|exists_keeps|not_exists_keeps)', 'group_by, aggregate, join and exists on a result are not ported yet'),
+    (r'^(join_|exists_keeps|not_exists_keeps)', 'join and exists on a result are not ported yet'),
 ]
 
 
@@ -236,6 +236,9 @@ class Translator:
         assert isinstance(gen.target, ast.Name) and not gen.ifs, ast.dump(node)
         return f'{self.expr(gen.iter)}.map({gen.target.id} => {self.expr(node.elt)})'
 
+    def visit_Tuple(self, node: ast.Tuple) -> str:
+        return '[' + ', '.join(self.expr(e) for e in node.elts) + ']'
+
     def visit_Lambda(self, node: ast.Lambda) -> str:
         """A function of a row of a result (`lambda r: r.price > 250.0`): the row's columns are attributes."""
         names = [a.arg for a in node.args.args]
@@ -364,8 +367,6 @@ class Translator:
             return f'{self.expr(owner)}.{name}({", ".join(args + [self.expr(kw.value)])})'
         if func.attr == 'join' and any(k.arg == 'how' for k in node.keywords):
             raise NotImplementedError('a join of two results')
-        if func.attr == 'aggregate' or (func.attr == 'group_by' and node.args and isinstance(node.args[0], ast.Lambda)):
-            raise NotImplementedError('group_by and aggregate on a result')
         if func.attr == 'join' and node.keywords:
             # join(",", order_by=[...]): the order the values are joined in is the second argument
             (kw,) = node.keywords
@@ -374,10 +375,10 @@ class Translator:
             if not isinstance(kw.value, ast.List):
                 order = f'[{order}]'
             return f'{self.expr(owner)}.{name}({", ".join((args or ["\'\'"]) + [order])})'
-        if func.attr == 'extend' and node.keywords:
+        if func.attr in ('extend', 'aggregate') and node.keywords:
             # extend(top=lambda r: ...): the new columns are one object, by name
             columns = ', '.join(f'{k.arg}: {self.expr(k.value)}' for k in node.keywords)
-            return f'{self.expr(owner)}.extend({{ {columns} }})'
+            return f'{self.expr(owner)}.{func.attr}({{ {columns} }})'
         if func.attr == 'concatenate' and node.keywords:
             # concatenate(other, all=True): UNION ALL, as an option
             (kw,) = node.keywords

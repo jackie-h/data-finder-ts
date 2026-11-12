@@ -43,23 +43,23 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'join_per_group_in_an_order',
-    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
+    query: () => { throw new Error('join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
   },
   {
     name: 'join_descending',
-    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
+    query: () => { throw new Error('join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
   },
   {
     name: 'join_of_the_whole_result',
-    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
+    query: () => { throw new Error('join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
   },
   {
     name: 'join_without_an_order_joins_every_value',
-    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
+    query: () => { throw new Error('join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'join and exists on a result are not ported yet' },
   },
   {
     name: 'count_all_counts_rows_per_group',

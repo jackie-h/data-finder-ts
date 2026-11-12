@@ -24,6 +24,8 @@ export {
   type QueryTarget,
   type Row,
   type ResultRow,
+  type GroupKey,
+  GroupedRows,
   registerRunner,
   clearRunner,
   getRunner,

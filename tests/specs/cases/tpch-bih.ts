@@ -46,6 +46,13 @@ export function _minimum_cost_supplier(ps: any, p: any) {
   return cheapest.orderBy(cheapest.column('s_acctbal').descending(), cheapest.column('n_name').ascending(), cheapest.column('s_name').ascending(), cheapest.column('p_partkey').ascending()).limit(100);
 }
 
+export function _small_quantity_order_revenue(lines: any, p: any) {
+  let rows = lines.findAll(p.APP_TIME, p.SYS_TIME, [lines.part().partKey().alias('partkey'), lines.quantity().alias('quantity'), lines.extendedPrice().alias('price')], lines.part().brand().eq(p.BRAND).and(lines.part().container().eq(p.CONTAINER)));
+  let with_average = rows.extend({ average: (r: any) => r.quantity.average().over([r.partkey]) });
+  let small = with_average.filter((r: any) => r.quantity.lt(r.average.times(0.2)));
+  return small.aggregate({ avg_yearly: (r: any) => r.price.sum().dividedBy(7.0) });
+}
+
 export function _order(o: any) {
   return [o.orderKey(), o.orderStatus(), o.totalPrice(), o.orderDate(), o.orderPriority(), o.shipPriority()];
 }
@@ -2175,8 +2182,13 @@ export const TPCH_BIH_SPECS: SpecCase<TpchBihFinders>[] = [
   },
   {
     name: 'Q17',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['avg_yearly'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME: new Date(Date.UTC(2010, 0, 1, 0, 0, 0)), APP_TIME: new DateOnly('2009-01-01T00:00:00Z'), BRAND: 'Brand#32', CONTAINER: 'MED PACK' };
+      return _small_quantity_order_revenue(q.lineitem, p);
+    },
+    expected: { columns: ['avg_yearly'], rows: [
+        [130.858571428571],
+      ] },
   },
   {
     name: 'Q18',
