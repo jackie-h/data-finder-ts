@@ -1,0 +1,6 @@
+{
+  "targets": [
+    { "name": "Databricks (through the proxy)", "host": "", "warehouseId": "set-your-warehouse-id", "catalog": "", "schema": "" },
+    { "name": "Demo data (proxy started with DEMO=1)", "host": "", "warehouseId": "demo" }
+  ]
+}

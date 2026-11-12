@@ -7,7 +7,7 @@
  * credentials, in which case no `token` is needed here).
  */
 import { Attribute } from './attribute';
-import { DEFAULT_TIMEOUT_MS, QueryRunner, QueryTarget, QueryTimeoutError, Row } from './runner';
+import { DEFAULT_TIMEOUT_MS, QueryTimeoutError, type QueryRunner, type QueryTarget, type Row } from './runner';
 import { toSql } from './sql-generator';
 import {
   DateOnly,
