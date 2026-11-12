@@ -14,7 +14,9 @@
     "positions_model.md",
     "business_range_model.md",
     "processing_snapshot_model.md",
-    "joins_through_tables_model.md"
+    "joins_through_tables_model.md",
+    "bitemporal_dates_model.md",
+    "bitemporal_infinity_model.md"
   ],
   "mappings": [
     "companies_mapping.md",
@@ -28,6 +30,9 @@
     "positions_mapping.md",
     "business_range_mapping.md",
     "processing_snapshot_mapping.md",
-    "joins_through_tables_mapping.md"
+    "joins_through_tables_mapping.md",
+    "bitemporal_dates_mapping.md",
+    "bitemporal_infinity_mapping.md",
+    "business_range_infinity_mapping.md"
   ]
 }

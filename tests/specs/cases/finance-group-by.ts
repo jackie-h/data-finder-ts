@@ -3,6 +3,9 @@ import { ts, type SpecCase } from '../../spec-harness';
 import type { TradeFinder } from '../../generated_examples/finance/TradeFinder';
 
 export const _AT = '2030-01-01 00:00:00';
+export function _trades(f: any) {
+  return f.findAll(null, _AT, [f.account().name().alias('account'), f.symbol().alias('sym'), f.price().alias('price')]);
+}
 
 export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
@@ -40,6 +43,71 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
         ['Beta Fund', 2],
         ['Gamma Fund', 1],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
+  },
+  {
+    name: 'chain_filter_on_a_column',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'chain_window_then_filter_on_it',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'chain_window_over_all_rows',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'chain_extend_an_expression_and_select',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'chain_group_by_a_column_and_aggregate',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'chain_filter_the_groups',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'chain_aggregate_the_whole_relation',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'join_inner_on_a_column_of_each',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'join_left_keeps_the_rows_that_find_no_match',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'exists_keeps_the_rows_that_have_a_match',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'not_exists_keeps_the_rows_that_have_none',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'join_right_keeps_every_row_of_the_right',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+  },
+  {
+    name: 'join_full_keeps_the_rows_of_both_that_find_no_match',
+    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
   },
 ];
 

@@ -70,6 +70,16 @@ def column_code(column: Column, keyed: bool = True) -> str:
     return f"new Column('{column.name}', '{column.type}', {owner_code(column.table)}{key})"
 
 
+def _bitemporal_infinities(scheme) -> str:
+    """The infinite datetimes of a bitemporal scheme's two axes, as the trailing arguments of its constructor: the
+    processing one (``undefined`` when that axis ends in NULL) and then the business one."""
+    if not (scheme.processing_infinite_datetime or scheme.business_infinite_datetime):
+        return ""
+    processing = f"'{scheme.processing_infinite_datetime}'" if scheme.processing_infinite_datetime else "undefined"
+    business = f", '{scheme.business_infinite_datetime}'" if scheme.business_infinite_datetime else ""
+    return f", {processing}{business}"
+
+
 def _scheme_columns_code(table: Table) -> str:
     """TypeScript source for the milestoning columns of a table a join passes through, from its milestoning scheme."""
     scheme = table.milestoning_scheme
@@ -82,19 +92,20 @@ def _scheme_columns_code(table: Table) -> str:
             raise ValueError(f"Table '{table.name}': milestoning column '{name}' of scheme '{scheme.name}' is not a column")
         return f"new Column('{column.name}', '{column.type}')"
 
-    infinite = f", '{scheme.infinite_datetime}'" if scheme.infinite_datetime else ""
+    processing_infinite = f", '{scheme.processing_infinite_datetime}'" if scheme.processing_infinite_datetime else ""
+    business_infinite = f", '{scheme.business_infinite_datetime}'" if scheme.business_infinite_datetime else ""
     if scheme.processing_datetime:
         return f"new SingleProcessingDatetimeColumn({col(scheme.processing_datetime)})"
     if scheme.processing_start and (scheme.business_date_from or scheme.business_date_to):
         return (f"new BiTemporalColumns({col(scheme.business_date_from)}, {col(scheme.business_date_to)}, "
-                f"{col(scheme.processing_start)}, {col(scheme.processing_end)}{infinite})")
+                f"{col(scheme.processing_start)}, {col(scheme.processing_end)}{_bitemporal_infinities(scheme)})")
     if scheme.processing_start and scheme.business_date:
         return (f"new BusinessDateAndProcessingTemporalColumns({col(scheme.business_date)}, {col(scheme.processing_start)}, "
-                f"{col(scheme.processing_end)}{infinite})")
+                f"{col(scheme.processing_end)}{processing_infinite})")
     if scheme.processing_start:
-        return f"new ProcessingTemporalColumns({col(scheme.processing_start)}, {col(scheme.processing_end)}{infinite})"
+        return f"new ProcessingTemporalColumns({col(scheme.processing_start)}, {col(scheme.processing_end)}{processing_infinite})"
     if scheme.business_date_from or scheme.business_date_to:
-        return f"new BusinessDateRangeColumns({col(scheme.business_date_from)}, {col(scheme.business_date_to)}{infinite})"
+        return f"new BusinessDateRangeColumns({col(scheme.business_date_from)}, {col(scheme.business_date_to)}{business_infinite})"
     if scheme.business_date:
         return f"new SingleBusinessDateColumn({col(scheme.business_date)})"
     raise ValueError(f"Milestoning scheme '{scheme.name}' has no columns")

@@ -372,7 +372,7 @@ function processingPredicate(
   if (!hasProcessingRange(mc)) return null;
   const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.ownerRelation, joinNode);
   const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.ownerRelation, joinNode);
-  return new LogicalOperation(startAt.lte(processingDatetime), LogicalOperator.AND, openEndClause(endAt, processingDatetime, mc.infiniteDatetime));
+  return new LogicalOperation(startAt.lte(processingDatetime), LogicalOperator.AND, openEndClause(endAt, processingDatetime, mc.processingInfiniteDatetime));
 }
 
 function snapshotAttribute(mc: SingleProcessingDatetimeColumn, joinNode?: JoinTreeNodeOperation): DateTimeAttribute {
@@ -394,7 +394,7 @@ function processingRangePredicate(
   if (!hasProcessingRange(mc)) return null;
   const startAt = new DateTimeAttribute('start_at', mc.startAtColumn.name, mc.startAtColumn.type, mc.startAtColumn.ownerRelation, joinNode);
   const endAt = new DateTimeAttribute('end_at', mc.endAtColumn.name, mc.endAtColumn.type, mc.endAtColumn.ownerRelation, joinNode);
-  return new LogicalOperation(startAt.lte(processingTo), LogicalOperator.AND, openEndClause(endAt, processingFrom, mc.infiniteDatetime));
+  return new LogicalOperation(startAt.lte(processingTo), LogicalOperator.AND, openEndClause(endAt, processingFrom, mc.processingInfiniteDatetime));
 }
 
 /** The table's business range contains the business date, or its business date column equals it. */
@@ -407,7 +407,7 @@ function businessPredicate(
   if (mc instanceof BusinessDateRangeColumns) {
     const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.ownerRelation, joinNode);
     const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.ownerRelation, joinNode);
-    return new LogicalOperation(dateFrom.lte(businessDate), LogicalOperator.AND, openEndClause(dateTo, businessDate, mc.infiniteDatetime));
+    return new LogicalOperation(dateFrom.lte(businessDate), LogicalOperator.AND, openEndClause(dateTo, businessDate, mc.businessInfiniteDatetime));
   }
   if (mc instanceof BusinessDateAndProcessingTemporalColumns || mc instanceof SingleBusinessDateColumn) {
     const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.ownerRelation, joinNode);
@@ -427,7 +427,7 @@ function businessRangePredicate(
   if (mc instanceof BusinessDateRangeColumns) {
     const dateFrom = new DateAttribute('business_date_from', mc.businessDateFromColumn.name, mc.businessDateFromColumn.type, mc.businessDateFromColumn.ownerRelation, joinNode);
     const dateTo = new DateAttribute('business_date_to', mc.businessDateToColumn.name, mc.businessDateToColumn.type, mc.businessDateToColumn.ownerRelation, joinNode);
-    return new LogicalOperation(dateFrom.lte(businessDateTo), LogicalOperator.AND, openEndClause(dateTo, businessDateFrom, mc.infiniteDatetime));
+    return new LogicalOperation(dateFrom.lte(businessDateTo), LogicalOperator.AND, openEndClause(dateTo, businessDateFrom, mc.businessInfiniteDatetime));
   }
   if (mc instanceof BusinessDateAndProcessingTemporalColumns || mc instanceof SingleBusinessDateColumn) {
     const businessAtt = new DateAttribute('business_date', mc.businessDateColumn.name, mc.businessDateColumn.type, mc.businessDateColumn.ownerRelation, joinNode);

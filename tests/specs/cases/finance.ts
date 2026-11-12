@@ -400,6 +400,31 @@ export const TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
         [60],
       ] },
   },
+  {
+    name: 'interval_between_two_datetimes',
+    query: () => { throw new Error('the interval between two datetimes is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'the interval between two datetimes is not ported yet' },
+  },
+  {
+    name: 'interval_compared_with_a_timedelta',
+    query: () => { throw new Error('the interval between two datetimes is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'the interval between two datetimes is not ported yet' },
+  },
+  {
+    name: 'interval_compared_with_a_timedelta_that_none_exceeds',
+    query: () => { throw new Error('the interval between two datetimes is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'the interval between two datetimes is not ported yet' },
+  },
+  {
+    name: 'interval_against_a_datetime',
+    query: () => { throw new Error('the interval between two datetimes is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'the interval between two datetimes is not ported yet' },
+  },
+  {
+    name: 'interval_smallest',
+    query: () => { throw new Error('the interval between two datetimes is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'the interval between two datetimes is not ported yet' },
+  },
 ];
 
 export const TRADE_MULTI_HOP_FINDER_SPECS: SpecCase<TradeFinder>[] = [
