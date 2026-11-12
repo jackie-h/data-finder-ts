@@ -17,8 +17,8 @@ describe('on keys', () => {
     expect(join.operation).toBeInstanceOf(ComparisonOperation);
     expect(join.table.name).toBe('org.firms');
     const [source, target] = join.keys();
-    expect(source.ownerRelation.name).toBe('org.persons');
-    expect(target.ownerRelation.name).toBe('org.firms');
+    expect((source.ownerRelation as Table).name).toBe('org.persons');
+    expect((target.ownerRelation as Table).name).toBe('org.firms');
     expect(join.columns().map(c => c.name)).toEqual(['firm_id', 'id']);
   });
 
