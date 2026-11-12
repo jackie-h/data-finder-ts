@@ -1,19 +1,26 @@
 import { useMemo } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { themeQuartz, colorSchemeDark, colorSchemeLight, type ColDef } from 'ag-grid-community';
+import { themeQuartz, type ColDef } from 'ag-grid-community';
 import { displayValue } from '../lib/format';
 
-/** Tight rows and small type, so more of a result is on screen at once. */
-const compact = themeQuartz.withParams({
+/**
+ * Tight rows and small type, so more of a result is on screen at once, in the page's own colours: they are CSS variables,
+ * so the grid follows the light and dark themes with the rest of the page instead of AG Grid's greys.
+ */
+const theme = themeQuartz.withParams({
   spacing: 4, fontSize: 12, rowHeight: 24, headerHeight: 28, headerFontSize: 12, cellHorizontalPadding: 8,
+  backgroundColor: 'var(--panel)',
+  foregroundColor: 'var(--fg)',
+  borderColor: 'var(--line)',
+  headerBackgroundColor: 'var(--head)',
+  headerTextColor: 'var(--fg)',
+  rowHoverColor: 'var(--accent-soft)',
+  selectedRowBackgroundColor: 'var(--accent-soft)',
+  accentColor: 'var(--accent)',
+  chromeBackgroundColor: 'var(--head)',
+  inputBackgroundColor: 'var(--panel)',
+  wrapperBorderRadius: 5,
 });
-const lightTheme = compact.withPart(colorSchemeLight);
-const darkTheme = compact.withPart(colorSchemeDark);
-
-function useDark(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
-    && document.documentElement.dataset.theme !== 'light';
-}
 
 interface Props { columns: string[]; rows: unknown[][] }
 
@@ -32,11 +39,10 @@ export function ResultsGrid({ columns, rows }: Props) {
   }), [columns, rows]);
 
   const rowData = useMemo(() => rows.map(r => Object.fromEntries(r.map((v, i) => [`c${i}`, v]))), [rows]);
-  const dark = useDark();
 
   return (
     <div className="grid-host">
-      <AgGridReact theme={dark ? darkTheme : lightTheme} columnDefs={columnDefs} rowData={rowData}
+      <AgGridReact theme={theme} columnDefs={columnDefs} rowData={rowData}
         defaultColDef={{ sortable: true, resizable: true, floatingFilter: true, minWidth: 90 }}
         floatingFiltersHeight={26}
         enableCellTextSelection suppressFieldDotNotation />
