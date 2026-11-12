@@ -124,7 +124,8 @@ const AGGREGATE_SQL_NAMES: Partial<Record<AggregateOperator, string>> = {
 
 /**
  * Comparisons that are never true for a missing value. Legend guards these on an optional property with IS NOT NULL;
- * it does not guard `=` (which a missing value never matches either) or `<>`.
+ * it does not guard `=` (which a missing value never matches either). A `<>` of a column and a value is not guarded but
+ * widened: `<> x OR IS NULL`.
  */
 const GUARDED_COMPARISONS = new Set<ComparisonOperator>([
   ComparisonOperator.LESS_THAN, ComparisonOperator.GREATER_THAN, ComparisonOperator.LESS_THAN_OR_EQUAL_TO,
@@ -885,7 +886,8 @@ class SQLQueryGenerator {
 
   /**
    * The condition with an explicit `IS NOT NULL` before each ordering or pattern comparison on a value that can be
-   * missing, as Legend writes it for what a query asks of a class. The guard changes no row. It is not added to a
+   * missing, as Legend writes it for what a query asks of a class. The guard changes no row. A `<>` of a column and a value
+   * also matches a missing value, as Legend writes it for any column: `<> x OR IS NULL`. It is not added to a
    * join's own filter (its milestoning dates and property values) or to HAVING, which are not that, so they are
    * never passed through here.
    */
@@ -896,6 +898,11 @@ class SQLQueryGenerator {
     if (op instanceof ComparisonOperation && GUARDED_COMPARISONS.has(op.operator) && op.left instanceof ColumnWithJoin
       && this._resolveOptional(op.left)) {
       return new LogicalOperation(new IsNotNullOperation(op.left), LogicalOperator.AND, op);
+    }
+    if (op instanceof ComparisonOperation && op.operator === ComparisonOperator.NOT_EQUAL && op.left instanceof ColumnWithJoin
+      && op.right instanceof ConstantOperation) {
+      // a missing value is different from any value, as Legend writes it: <> x OR is null
+      return new LogicalOperation(op, LogicalOperator.OR, new IsNullOperation(op.left));
     }
     return op;
   }

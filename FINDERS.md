@@ -137,6 +137,8 @@ Custom `QueryRunner`s receive the timeout as the last argument to `select`.
 | `DateAttribute` `DateTimeAttribute` | `.eq(v)` `.gt(v)` `.lt(v)` `.gte(v)` `.lte(v)` |
 | `BooleanAttribute` | `.eq(v)` |
 
+`.ne(v)` (not equal) is on every type, and it matches a row with no value, as Legend writes it: `category.ne('Finance')` is `category <> 'Finance' OR category IS NULL`, whatever the column. `.eq` never matches a missing value. Ordering comparisons on an optional property are written with an `IS NOT NULL` guard, which changes no row.
+
 Combine with `.and()` and `.or()`. A chain reads left to right, each call taking everything before it as its left side, so the first line below is `(name is Acme or name is Beta) and id > 100` and the second is `(name is Acme and id > 100) or name is Beta`:
 
 ```ts
