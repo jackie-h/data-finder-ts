@@ -92,6 +92,8 @@ export enum SortDirection {
   DESC = 'DESC',
 }
 
+import type { MilestoningColumns } from './milestoning';
+
 export abstract class RelationalOperationElement {}
 
 /**
@@ -583,18 +585,26 @@ export class Table extends NamedRelation {
  * which alias they belong to by its name. A table is already named, so this is for a relation that is not: a query.
  */
 export class TableAlias extends NamedRelation {
+  /** For a query a class is mapped to with a milestoning scheme: the columns the query gives that milestone it, which the alias owns. */
+  milestoningColumns?: MilestoningColumns;
   private _columns: readonly RelationalOperationElement[];
 
   /**
    * An alias of a table has columns of its own, with the same names and types and the alias as their owner: that is what tells
    * `employee.manager_id` from `manager.id` when one table is on both sides of a join. An alias of a query has the query's
-   * columns, which are expressions and have no owner to change.
+   * columns, which are expressions and have no owner to change. `own` are the columns of an alias of a query a class is mapped to:
+   * typed columns the alias owns, which a finder's attributes read.
    */
-  constructor(readonly relation: Relation, name: string) {
+  constructor(readonly relation: Relation, name: string, own?: Column[]) {
     super(name);
-    this._columns = relation instanceof Table
-      ? relation.columns.map(c => new Column(c.name, c.type, this, c.primaryKey, c.nullable))
-      : relation.columns;
+    if (own !== undefined) {
+      this._columns = own;
+      for (const column of own) column.owner = this;
+    } else {
+      this._columns = relation instanceof Table
+        ? relation.columns.map(c => new Column(c.name, c.type, this, c.primaryKey, c.nullable))
+        : relation.columns;
+    }
   }
 
   get columns(): readonly RelationalOperationElement[] { return this._columns; }
@@ -655,7 +665,7 @@ export class JoinOperation {
    * `table` joined where its `target` column equals the `source` column of what is joined from. When that is the same table, the
    * target is an alias of it named `name`, so the two sides can be told apart.
    */
-  static onKeys(name: string, table: Table, source: Column, target: Column, kind: JoinKind): JoinOperation {
+  static onKeys(name: string, table: Table | TableAlias, source: Column, target: Column, kind: JoinKind): JoinOperation {
     if (sameRelation(source.ownerRelation, table)) {
       const alias = new TableAlias(table, name || table.name + '_joined');
       return new JoinOperation(name, alias, new ComparisonOperation(source, ComparisonOperator.EQUAL, alias.column(target.name, target.type)), kind);
@@ -663,10 +673,10 @@ export class JoinOperation {
     return new JoinOperation(name, table, new ComparisonOperation(source, ComparisonOperator.EQUAL, target), kind);
   }
 
-  /** The table that is joined: the target, or what the target is an alias of. */
-  get table(): Table {
-    const target = this.target instanceof TableAlias ? this.target.relation : this.target;
-    if (!(target instanceof Table)) throw new Error(`Not a table: ${String(target)}`);
+  /** The table that is joined: the target, or what the target is an alias of; a query that is joined is itself. */
+  get table(): Table | TableAlias {
+    const target = this.target instanceof TableAlias && this.target.relation instanceof Table ? this.target.relation : this.target;
+    if (!(target instanceof Table || target instanceof TableAlias)) throw new Error(`Not a table: ${String(target)}`);
     return target;
   }
 

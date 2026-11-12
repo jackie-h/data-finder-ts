@@ -1,5 +1,5 @@
 import {
-  Column, Table, NoOperation, JoinKind, JoinTreeNodeOperation, CountAllOperation,
+  Column, Table, TableAlias, Relation, NoOperation, JoinKind, JoinTreeNodeOperation, CountAllOperation,
   Operation, RelationalOperationElement,
   ComparisonOperation, ComparisonOperator, LogicalOperation, LogicalOperator, IsNullOperation, IsNotNullOperation, NotOperation,
   StringConstantOperation, IntegerConstantOperation, FloatConstantOperation, DecimalConstantOperation,
@@ -43,6 +43,9 @@ import type { {{source_rcm.clazz.name}}Filter } from '{{class_module_map_base[so
 import { registerRelatedFinderClass, getRelatedFinderClass } from '@datafinder/finder-registry';
 {% else %}
 import { registerRelatedFinderClass } from '@datafinder/finder-registry';
+{% if queries_module %}
+import { {{query_constants | join(', ')}} } from './{{queries_module}}';
+{% endif %}
 {% endif %}
 
 {% for rpm in rcm.property_mappings %}
@@ -129,7 +132,9 @@ export class {{ec.name}} {
 {% endif %}
 export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFinderBase {
 
-{% if rcm.milestone_mapping %}
+{% if main_query(rcm) %}
+  private static readonly _table = {{main_query(rcm)}};
+{% elif rcm.milestone_mapping %}
 {% if has_bitemporal(rcm.milestone_mapping) %}
   private static readonly _milestoningColumns = new BiTemporalColumns(
     new Column('{{rcm.milestone_mapping._date_from.target.name}}', '{{rcm.milestone_mapping._date_from.target.type}}'),
@@ -171,7 +176,7 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% endif %}
 
   /** Property id -> [column, type, table] for the filters accepted by related-finder accessors. */
-  private static readonly _filterColumns: Record<string, [string, string, Table]> = {
+  private static readonly _filterColumns: Record<string, [string, string, Relation]> = {
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
     '{{rpm.property.id}}': ['{{rpm.target.name}}', '{{rpm.target.type}}', {{owner_code(rpm.target.table)}}],
@@ -282,7 +287,9 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
 {% endif %}
 export class {{rcm.clazz.name}}Finder extends {{rcm.clazz.name}}FinderBase {
 
-{% if rcm.milestone_mapping %}
+{% if main_query(rcm) %}
+  private static readonly _table = {{main_query(rcm)}};
+{% elif rcm.milestone_mapping %}
 {% if has_bitemporal(rcm.milestone_mapping) %}
   private static readonly _milestoningColumns = new BiTemporalColumns(
     new Column('{{rcm.milestone_mapping._date_from.target.name}}', '{{rcm.milestone_mapping._date_from.target.type}}'),

@@ -66,7 +66,7 @@ export type JoinCondition = Operation | ((plain: JoinSide, target: JoinSide) => 
  * `personTable.MANAGERID = {target}.ID`. `reverse` is that the join is followed from the other end, so the sides trade places.
  */
 export function keysJoin(
-  name: string, table: Table, source: Column, target: Column, kind: JoinKind, condition?: JoinCondition, reverse = false,
+  name: string, table: Table | TableAlias, source: Column, target: Column, kind: JoinKind, condition?: JoinCondition, reverse = false,
 ): JoinOperation {
   const join = JoinOperation.onKeys(name, table, source, target, kind);
   if (condition === undefined) return join;

@@ -1,7 +1,7 @@
 import { Attribute, Comparand } from './attribute';
 import { buildQuerySpecification, toSql } from './sql-generator';
 import { attributes, columnName } from './relation';
-import { MilestonedTable, hasProcessingRange } from '../model/milestoning';
+import { MilestonedTable, hasProcessingRange, milestoningColumnsOf } from '../model/milestoning';
 import { DialectName, SqlDialect } from './dialect';
 import {
   Alias,
@@ -537,7 +537,8 @@ export function convertInputsAndSelectForDateRange(
   if (businessDateFrom == null) throw new Error('businessDateFrom is required for findForDateRange');
   if (businessDateTo == null) throw new Error('businessDateTo is required for findForDateRange');
   // a table with no processing columns, such as a single business date, has no processing time to give
-  if (processingDatetime == null && table instanceof MilestonedTable && hasProcessingRange(table.milestoningColumns)) {
+  const milestoning = milestoningColumnsOf(table as unknown as Relation);
+  if (processingDatetime == null && milestoning !== undefined && hasProcessingRange(milestoning)) {
     throw new Error('processingTime is required for findForDateRange');
   }
   return new FinderResult(

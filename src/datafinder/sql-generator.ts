@@ -74,6 +74,7 @@ import {
   SingleBusinessDateColumn,
   SingleProcessingDatetimeColumn,
   hasProcessingRange,
+  milestoningColumnsOf,
 } from '../model/milestoning';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
 import { DialectName, SqlDialect, dialectOf } from './dialect';
@@ -346,6 +347,7 @@ function embeddedOf(ref: Attribute | ColumnWithJoin): Attribute | ColumnWithJoin
 function findColumn(operation: RelationalOperationElement): ColumnWithJoin {
   if (operation instanceof UnaryOperation) return findColumn(operation.element);
   if (operation instanceof ColumnWithJoin) return operation;
+  if (operation instanceof Column) return new ColumnWithJoin(operation); // a column of a query a class is mapped to
   throw new TypeError('Cannot find ColumnWithJoin in: ' + operation.constructor.name);
 }
 
@@ -450,10 +452,11 @@ function businessRangePredicate(
 function buildMilestoningFilterOperation(
   businessDate: Date | null,
   processingDatetime: Date | null,
-  table: MilestonedTable,
+  table: Table | TableAlias,
   joinNode?: JoinTreeNodeOperation,
 ): Operation | null {
-  const mc = table.milestoningColumns;
+  const mc = milestoningColumnsOf(table);
+  if (mc === undefined) throw new Error(`${table.name} is not milestoned`);
   return andAll([processingPredicate(mc, processingDatetime, joinNode), businessPredicate(mc, businessDate, joinNode)]);
 }
 
@@ -472,11 +475,12 @@ function buildMilestoningFilterOperationForDateRange(
   businessDateFrom: Date | null,
   businessDateTo: Date | null,
   processingDatetime: Date | null,
-  table: MilestonedTable,
+  table: Table | TableAlias,
   joinNode?: JoinTreeNodeOperation,
   processingDatetimeTo: Date | null = null,
 ): Operation | null {
-  const mc = table.milestoningColumns;
+  const mc = milestoningColumnsOf(table);
+  if (mc === undefined) throw new Error(`${table.name} is not milestoned`);
   const processing = processingDatetime !== null && processingDatetimeTo !== null
     ? processingRangePredicate(mc, processingDatetime, processingDatetimeTo, joinNode)
     : processingPredicate(mc, processingDatetime, joinNode);
@@ -663,7 +667,7 @@ function buildQuerySpecification(
   processingDatetimeTo: Date | null = null,
 ): OrderedQuerySpecification {
   let filter = op;
-  const milestoningFor = (t: MilestonedTable, node?: JoinTreeNodeOperation) => {
+  const milestoningFor = (t: Table | TableAlias, node?: JoinTreeNodeOperation) => {
     const dates = node === undefined
       ? { businessDate, businessDateTo, processingDatetime, processingDatetimeTo }
       : datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
@@ -672,8 +676,8 @@ function buildQuerySpecification(
       : buildMilestoningFilterOperation(dates.businessDate, dates.processingDatetime, t, node);
   };
 
-  if (table instanceof MilestonedTable) {
-    const milestonedOp = milestoningFor(table);
+  if (milestoningColumnsOf(table) !== undefined) {
+    const milestonedOp = milestoningFor(table as Table | TableAlias);
     if (milestonedOp !== null) {
       filter = filter instanceof NoOperation
         ? milestonedOp
@@ -698,7 +702,7 @@ function buildQuerySpecification(
     if (Object.keys(node.join.filterKwargs).length > 0) {
       combined = buildJoinFilterFromProperties(node, node.join.filterKwargs, node.join.filterColumnMap);
     }
-    if (node.join.table instanceof MilestonedTable) {
+    if (milestoningColumnsOf(node.join.table) !== undefined) {
       const milestonedOp = milestoningFor(node.join.table, node);
       if (milestonedOp !== null) {
         combined = combined === undefined ? milestonedOp : new LogicalOperation(combined, LogicalOperator.AND, milestonedOp);
