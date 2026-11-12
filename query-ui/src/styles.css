@@ -43,13 +43,14 @@ code { font-family: var(--mono); font-size: 12.5px; background: var(--head); pad
 .field { display: grid; gap: 3px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; min-width: 0; }
 .field.full { grid-column: 1 / -1; }
 .field .hint { text-transform: none; letter-spacing: 0; font-weight: 400; }
-select, input[type='text'], input[type='number'], textarea {
+/* AG Grid draws its own inputs and buttons: the page's styles must not reach them */
+select:where(:not([class*='ag-'])), input[type='text']:where(:not([class*='ag-'])), input[type='number']:where(:not([class*='ag-'])), textarea:where(:not([class*='ag-'])) {
   font: inherit; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--fg); background: var(--panel);
   border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; min-width: 0; width: 100%;
 }
 textarea { font-family: var(--mono); font-size: 12.5px; background: var(--head); resize: vertical; }
-button { font: inherit; cursor: pointer; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 6px 12px; }
-button:disabled { opacity: .5; cursor: not-allowed; }
+button:where(:not([class*='ag-'])) { font: inherit; cursor: pointer; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 6px 12px; }
+button:where(:not([class*='ag-'])):disabled { opacity: .5; cursor: not-allowed; }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
 button.icon { padding: 3px 8px; }
 button.link { border: 0; background: none; color: var(--accent); padding: 2px 0; text-align: left; }

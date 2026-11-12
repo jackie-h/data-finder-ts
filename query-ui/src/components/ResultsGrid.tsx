@@ -43,8 +43,7 @@ export function ResultsGrid({ columns, rows }: Props) {
   return (
     <div className="grid-host">
       <AgGridReact theme={theme} columnDefs={columnDefs} rowData={rowData}
-        defaultColDef={{ sortable: true, resizable: true, floatingFilter: true, minWidth: 90 }}
-        floatingFiltersHeight={26}
+        defaultColDef={{ sortable: true, resizable: true, floatingFilter: true, minWidth: 90, flex: 1 }}
         enableCellTextSelection suppressFieldDotNotation />
     </div>
   );
