@@ -176,6 +176,17 @@ A numeric column, aggregate, number function or another calculation has `.plus()
 
 `a.minus(b)` on a timestamp (a column, an expression or a constant) is `a - b`, an interval, as Python's `datetime - datetime` is a `timedelta`: `tf.validTo().minus(tf.validFrom())`. `b` is another timestamp column or expression, or a `Date`. An interval is compared with an `Interval` (`Interval.days(731)`, `Interval.hours(36)`, `Interval.seconds(1.5)`) or another interval, sorted and aliased, and its `min()` and `max()` are intervals. It is not a number, so it has no arithmetic, `sum` or `average` (use `diffDays` or `diffSeconds` for a number). `constant(Interval.days(1))` and `when(...).then(Interval.days(1))` take one too, and `IntervalAttribute` is a column that holds one. The SQL is the difference of the two timestamps, compared with `INTERVAL '<seconds>' SECOND`. The DuckDB runner gives an interval as the value its driver gives (days and microseconds); an interval of months has no fixed length. The GraphQL runner does not compute it on the client.
 
+## Concatenating results
+
+`a.concatenate(b)` is the rows of two results that have the same columns, `UNION` (each distinct row once), and `a.concatenate(b, { all: true })` is `UNION ALL`, as Legend's `concatenate`. It is a result like any other: order it, limit it, offset it, or concatenate it again (`a.concatenate(b).concatenate(c)` is one flat chain of unions). A column of a result is named as `alias()` names it, or by its display name in snake_case (`Category` is `category`); `result.columnNames()` lists them and `result.column('category')` is the column as a typed attribute, to order a concatenated result by:
+
+```ts
+const rows = low.concatenate(high);
+rows.orderBy(rows.column('category').ascending()).offset(1).limit(3);
+```
+
+The two results need the same column names, in the same order, each named once (name a repeated column with `alias()`). A side keeps its own `orderBy` and `limit` (in brackets in the SQL). The GraphQL runner has no union.
+
 ## Sorting
 
 Sort with `.orderBy()` and limit with `.limit()`. Several `orderBy` calls accumulate: the latest call takes priority and the earlier ones break its ties, so the two sorts below order by category and then by name. Sorting a column again replaces its earlier direction.

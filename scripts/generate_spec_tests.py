@@ -101,7 +101,6 @@ SKIPPED_MODULES = {
 # Expectations of the Python specs for features that are not ported yet, by the pattern their names match. Each is generated
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 UNPORTED = [
-    (r'^concatenate', 'concatenate (UNION) is not ported yet'),
     (r'^(chain_|join_|exists_keeps|not_exists_keeps)', 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'),
     (r'^(not_equal|ne_matches)', '!= matching a missing value is not ported yet'),
 ]
@@ -235,6 +234,11 @@ class Translator:
         assert isinstance(gen.target, ast.Name) and not gen.ifs, ast.dump(node)
         return f'{self.expr(gen.iter)}.map({gen.target.id} => {self.expr(node.elt)})'
 
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> str:
+        (gen,) = node.generators
+        assert isinstance(gen.target, ast.Name) and not gen.ifs, ast.dump(node)
+        return f'{self.expr(gen.iter)}.map({gen.target.id} => {self.expr(node.elt)})'
+
     def visit_IfExp(self, node: ast.IfExp) -> str:
         return f'({self.expr(node.test)} ? {self.expr(node.body)} : {self.expr(node.orelse)})'
 
@@ -294,7 +298,8 @@ class Translator:
         """Mirror StringAttribute.__getitem__."""
         base = self.expr(node.value)
         sl = node.slice
-        assert isinstance(sl, ast.Slice)
+        if not isinstance(sl, ast.Slice):   # result["name"]: a column of a result
+            return f'{base}.column({self.expr(sl)})'
         const = lambda n: None if n is None else ast.literal_eval(n)  # noqa: E731
         start, stop, step = const(sl.lower), const(sl.upper), const(sl.step)
         if step == -1 and start is None and stop is None:
@@ -354,6 +359,11 @@ class Translator:
             if not isinstance(kw.value, ast.List):
                 order = f'[{order}]'
             return f'{self.expr(owner)}.{name}({", ".join((args or ["\'\'"]) + [order])})'
+        if func.attr == 'concatenate' and node.keywords:
+            # concatenate(other, all=True): UNION ALL, as an option
+            (kw,) = node.keywords
+            assert kw.arg == 'all', ast.dump(node)
+            return f'{self.expr(owner)}.{name}({", ".join(args + ["{ all: " + self.expr(kw.value) + " }"])})'
         if func.attr == 'over' and node.keywords:
             # over(partition_by=[...], order_by=[...]): positional in TypeScript
             given = {k.arg: self.expr(k.value) for k in node.keywords}
@@ -424,7 +434,7 @@ def mapping_dir(mapping_file: str) -> str:
 
 def translate_helper(translator: 'Translator', stmt: ast.FunctionDef) -> str:
     """A module-level helper function of a spec module as a TypeScript function."""
-    args = ', '.join(f'{a.arg}: any' for a in stmt.args.args)
+    args = ', '.join([f'{a.arg}: any' for a in stmt.args.args] + ([f'...{stmt.args.vararg.arg}: any[]'] if stmt.args.vararg else []))
     lines = []
     for inner in stmt.body:
         if isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Constant):
