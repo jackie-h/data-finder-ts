@@ -51,6 +51,8 @@ import {
   ConcatOperation,
   DateTruncOperation,
   ArithmeticOperation,
+  IntervalOperation,
+  IntervalConstantOperation,
   ArithmeticOperator,
   containsAggregate,
   containsAggregateOrWindow,
@@ -185,6 +187,7 @@ function constantValueString(op: ConstantOperation, d: SqlDialect): string {
   if (op instanceof FloatConstantOperation) return Number.isInteger(op.value) && Math.abs(op.value) < 1e21 ? op.value.toFixed(1) : String(op.value); // 200.0, so it stays a float
   if (op instanceof BooleanConstantOperation) return op.value ? 'TRUE' : 'FALSE';
   if (op instanceof DecimalConstantOperation) return String(op.value);
+  if (op instanceof IntervalConstantOperation) return "INTERVAL '" + op.value.totalSeconds() + "' SECOND";
   throw new Error('Unknown constant operation');
 }
 
@@ -317,6 +320,9 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
   if (operation instanceof ConstantOperation) return selectedConstantString(operation, d);
   if (operation instanceof RenderedSql) return operation.sql;
   if (operation instanceof ConcatOperation) return operation.parts.map(part => operandString(part, d)).join(' || ');
+  if (operation instanceof IntervalOperation) { // the timestamps are typed, as a select list's constants are
+    return sqlOperationToString(operation.left, d) + ' - ' + sqlOperationToString(operation.right, d);
+  }
   if (operation instanceof ArithmeticOperation) {
     let left = operandString(operation.left, d);
     let right = operandString(operation.right, d);
@@ -515,7 +521,7 @@ function walkRefs(
     walkRefs(op.element, visit, visitExists);
   } else if (op instanceof ConcatOperation) {
     for (const part of op.parts) walkRefs(part, visit, visitExists);
-  } else if (op instanceof ArithmeticOperation) {
+  } else if (op instanceof ArithmeticOperation || op instanceof IntervalOperation) {
     walkRefs(op.left, visit, visitExists);
     walkRefs(op.right, visit, visitExists);
   } else if (op instanceof CaseOperation) {
@@ -940,6 +946,9 @@ class SQLQueryGenerator {
     if (op instanceof CaseOperation) return new RenderedSql(this._caseSql(op));
     if (isCondition(op)) return new RenderedSql(this.buildFilter(op as Operation)); // a condition inside an expression, such as the argument of an aggregate
     if (op instanceof ConcatOperation) return new ConcatOperation(op.parts.map(part => this._rewriteOperation(part)), op.displayName);
+    if (op instanceof IntervalOperation) {
+      return new IntervalOperation(this._rewriteOperation(op.left), this._rewriteOperation(op.right), op.displayName);
+    }
     if (op instanceof ArithmeticOperation) {
       return new ArithmeticOperation(this._rewriteOperation(op.left), op.operator, this._rewriteOperation(op.right), op.displayName);
     }
@@ -1076,7 +1085,7 @@ class SQLQueryGenerator {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (col instanceof ConcatOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
-    } else if (col instanceof ArithmeticOperation) {
+    } else if (col instanceof ArithmeticOperation || col instanceof IntervalOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (col instanceof DateTruncOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? findColumn(col).column.name));
@@ -1157,8 +1166,8 @@ class SQLQueryGenerator {
       return sql;
     }
     if (op instanceof ConstantOperation) return constantValueString(op, this._dialect);
-    if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation || op instanceof ConcatOperation
-        || op instanceof DateTruncOperation || op instanceof DateExtractOperation || op instanceof DateArithmeticOperation
+    if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation || op instanceof IntervalOperation
+        || op instanceof ConcatOperation || op instanceof DateTruncOperation || op instanceof DateExtractOperation || op instanceof DateArithmeticOperation
         || op instanceof DateDiffOperation || op instanceof AggregateOperation || op instanceof CountAllOperation) {
       // an expression compared in a filter needs its columns' joins, then is written as in a select list
       const required = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();

@@ -18,6 +18,7 @@ import {
   Alias,
   RelationalOperationElement,
   Aliasable,
+  Interval,
   ScalarFunction,
   ScalarFunctionOperation,
   WindowFunction,
@@ -26,7 +27,7 @@ import {
 } from '../model/relational';
 
 /** A value an attribute can be compared with in `isIn` / `isNotIn`. */
-export type AttributeValue = string | number | boolean | Date;
+export type AttributeValue = string | number | boolean | Date | Interval;
 
 /** What a column can be compared with besides a value: another column, or an expression. */
 export type Comparand = Attribute | RelationalOperationElement;

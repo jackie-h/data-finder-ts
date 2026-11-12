@@ -174,6 +174,10 @@ A numeric column, aggregate, number function or another calculation has `.plus()
 
 `.firstDayOfWeek()` (a Monday), `.firstDayOfMonth()`, `.firstDayOfQuarter()` and `.firstDayOfYear()` on a date or timestamp attribute give the date the period starts, as a date: `pf.tradeDate().firstDayOfMonth()`. The result is named after the function and the column (`First Day Of Month Trade Date`), and can be compared (`.eq(new DateOnly('2024-07-01'))`), sorted and aliased.
 
+### The time between two timestamps
+
+`a.minus(b)` on a timestamp (a column, an expression or a constant) is `a - b`, an interval, as Python's `datetime - datetime` is a `timedelta`: `tf.validTo().minus(tf.validFrom())`. `b` is another timestamp column or expression, or a `Date`. An interval is compared with an `Interval` (`Interval.days(731)`, `Interval.hours(36)`, `Interval.seconds(1.5)`) or another interval, sorted and aliased, and its `min()` and `max()` are intervals. It is not a number, so it has no arithmetic, `sum` or `average` (use `diffDays` or `diffSeconds` for a number). `constant(Interval.days(1))` and `when(...).then(Interval.days(1))` take one too, and `IntervalAttribute` is a column that holds one. The SQL is the difference of the two timestamps, compared with `INTERVAL '<seconds>' SECOND`. The DuckDB runner gives an interval as the value its driver gives (days and microseconds); an interval of months has no fixed length. The GraphQL runner does not compute it on the client.
+
 ## Sorting
 
 Sort with `.orderBy()` and limit with `.limit()`. Several `orderBy` calls accumulate: the latest call takes priority and the earlier ones break its ties, so the two sorts below order by category and then by name. Sorting a column again replaces its earlier direction.

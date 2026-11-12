@@ -103,7 +103,6 @@ SKIPPED_MODULES = {
 UNPORTED = [
     (r'^concatenate', 'concatenate (UNION) is not ported yet'),
     (r'^(chain_|join_|exists_keeps|not_exists_keeps)', 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'),
-    (r'^interval_', 'the interval between two datetimes is not ported yet'),
 ]
 
 
@@ -180,6 +179,8 @@ class Translator:
             return self.type_of(node.operand)
         if isinstance(node, ast.BinOp):
             left, right = self.type_of(node.left), self.type_of(node.right)
+            if isinstance(node.op, ast.Sub) and 'datetime' in (left, right) and 'timedelta' not in (left, right):
+                return 'interval'   # the time between two datetimes
             if isinstance(node.op, ast.Add) and 'text' in (left, right):
                 return 'text'
             if isinstance(node.op, ast.Mult) and left == 'text':
@@ -189,12 +190,14 @@ class Translator:
             func = node.func
             if isinstance(func, ast.Name):
                 return self.type_of(node.args[0]) if func.id == 'constant' else None
+            if isinstance(func.value, ast.Name) and func.value.id == 'datetime':
+                return {'datetime': 'datetime', 'timedelta': 'timedelta'}.get(func.attr)
             if func.attr in TEXT_METHODS:
                 return 'text'
             if func.attr in NUMBER_METHODS:
                 return 'number'
             kind = self.properties.get(func.attr)
-            return {'String': 'text', 'Integer': 'number', 'Float': 'number', 'Decimal': 'number'}.get(kind)
+            return {'String': 'text', 'Integer': 'number', 'Float': 'number', 'Decimal': 'number', 'DateTime': 'datetime'}.get(kind)
         return None
 
     def expr(self, node: ast.AST) -> str:
@@ -257,6 +260,10 @@ class Translator:
         except (ValueError, TypeError):
             pass
         kinds = self.type_of(node.left), self.type_of(node.right)
+        if isinstance(node.op, ast.Sub) and 'datetime' in kinds:   # the time between two datetimes, an interval
+            if kinds[0] != 'datetime':
+                raise NotImplementedError(ast.dump(node))
+            return f'{left}.minus({self.expr(right)})'
         plain = lambda n: isinstance(n, ast.Constant) or (isinstance(n, ast.Name) and n.id in self.plain)  # noqa: E731
         if plain(node.left) and plain(node.right) and any(isinstance(n, ast.Name) for n in (node.left, node.right)):
             # a plain value (a helper's `quantity: float`) with a number: a number, not an expression
@@ -317,6 +324,11 @@ class Translator:
             return f'{FREE_FUNCTIONS[func.id]}({", ".join(self.expr(a) for a in node.args)})'
         assert isinstance(func, ast.Attribute), ast.dump(node)
         owner = func.value
+        # datetime.timedelta(days=2): a length of time
+        if isinstance(owner, ast.Name) and owner.id == 'datetime' and func.attr == 'timedelta':
+            self.model_used.add('Interval')
+            (kw,) = node.keywords
+            return f'Interval.{kw.arg}({self.expr(kw.value)})'
         # datetime.datetime(...) / datetime.date(...)
         if isinstance(owner, ast.Name) and owner.id == 'datetime':
             parts = [ast.literal_eval(a) for a in node.args]
@@ -375,6 +387,8 @@ def ts_value(value) -> str:
         return repr(float(f'{float(value):.15g}'))
     if isinstance(value, str):
         return js_str(value)
+    if isinstance(value, datetime.timedelta):
+        return f'new Interval({value / datetime.timedelta(milliseconds=1)})'
     if isinstance(value, (datetime.datetime, datetime.date)):
         return f"ts({js_str(value.isoformat())})"
     raise NotImplementedError(repr(value))
@@ -565,6 +579,8 @@ describe('trade specs do not depend on order', () => {{
         banner,
         "import { ts, type SpecCase } from '../../spec-harness';",
     ]
+    if any('new Interval(' in block for block in case_blocks):
+        translator.model_used.add('Interval')
     if translator.model_used:
         cases_header.append(f"import {{ {', '.join(sorted(translator.model_used))} }} from '../../../src/model/relational';")
     if translator.used:

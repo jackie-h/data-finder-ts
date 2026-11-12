@@ -820,7 +820,8 @@ export function valueOperand(value: unknown): ConstantOperation {
   if (typeof value === 'string') return new StringConstantOperation(value);
   if (value instanceof DateOnly) return new DateConstantOperation(value); // before Date: DateOnly is a Date
   if (value instanceof Date) return new DateTimeConstantOperation(value);
-  throw new TypeError(`A value to compare with is a boolean, a finite number, a string or a date, not ${value === null ? 'null' : typeof value}`);
+  if (value instanceof Interval) return new IntervalConstantOperation(value);
+  throw new TypeError(`A value to compare with is a boolean, a finite number, a string, a date or an interval, not ${value === null ? 'null' : typeof value}`);
 }
 
 /** The thing to compare or calculate with: an expression as it is, an attribute as its column, a value as a constant. */
@@ -1281,3 +1282,72 @@ applyMixins(ComparisonOperation, [BooleanAggregates]);
 
 export interface LogicalOperation extends BooleanAggregates {}
 applyMixins(LogicalOperation, [BooleanAggregates]);
+
+/**
+ * A length of time, as Python's `timedelta` is: what the difference of two timestamps is. `Interval.days(731)`,
+ * `Interval.hours(36)`. It has no months or years, as they have no fixed length.
+ */
+export class Interval {
+  constructor(readonly milliseconds: number) {
+    if (!Number.isFinite(milliseconds)) throw new RangeError('An interval is a finite length of time');
+  }
+
+  static days(n: number): Interval { return new Interval(n * 86_400_000); }
+  static hours(n: number): Interval { return new Interval(n * 3_600_000); }
+  static minutes(n: number): Interval { return new Interval(n * 60_000); }
+  static seconds(n: number): Interval { return new Interval(n * 1000); }
+  static milliseconds(n: number): Interval { return new Interval(n); }
+
+  /** The length in seconds, as text with no trailing zeros: `63158400`, `1.5`. */
+  totalSeconds(): number { return this.milliseconds / 1000; }
+  equals(other: Interval): boolean { return this.milliseconds === other.milliseconds; }
+  toString(): string { return `${this.totalSeconds()} seconds`; }
+}
+
+/** An interval as a constant: `constant(Interval.days(2))`, or the value an interval is compared with. */
+export class IntervalConstantOperation extends ConstantOperation {
+  constructor(readonly value: Interval) { super(); }
+  comparisonOperand(): RelationalOperationElement { return this; }
+}
+
+export interface IntervalConstantOperation extends Equatable<Interval>, Orderable<Interval> {}
+applyMixins(IntervalConstantOperation, [Equatable, Orderable]);
+
+/** An aggregate that gives an interval: the smallest or largest of a group's. */
+export class IntervalAggregateOperation extends AggregateOperation {}
+
+/**
+ * The smallest and largest of a group, for an expression that can be ordered but not summed. They are of the expression's
+ * own type: the minimum of an interval is an interval.
+ */
+export abstract class Extremes<A extends AggregateOperation> {
+  /** @internal The aggregate that gives the expression's own type. */
+  abstract aggregateKind(): AggregateConstructor<A>;
+
+  /** Smallest value in the group. */
+  min(): A { return new (this.aggregateKind())(this as unknown as RelationalOperationElement, AggregateOperator.MIN, 'Min Expression'); }
+  /** Largest value in the group. */
+  max(): A { return new (this.aggregateKind())(this as unknown as RelationalOperationElement, AggregateOperator.MAX, 'Max Expression'); }
+}
+
+/**
+ * The time between two timestamps, `left - right`: an interval. It is compared with an `Interval` or another interval and
+ * ordered, and its smallest and largest are intervals. It is not a number, so it has no arithmetic, sum or average.
+ */
+export class IntervalOperation extends BinaryOperation implements Sortable {
+  constructor(left: RelationalOperationElement, right: RelationalOperationElement, readonly displayName?: string) {
+    super(left, right);
+  }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+
+  comparisonOperand(): RelationalOperationElement { return this; }
+  aggregateKind(): AggregateConstructor<IntervalAggregateOperation> { return IntervalAggregateOperation; }
+}
+
+export interface IntervalOperation extends Equatable<Interval>, Orderable<Interval>, Extremes<IntervalAggregateOperation> {}
+applyMixins(IntervalOperation, [Equatable, Orderable, Extremes]);
