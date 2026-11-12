@@ -87,6 +87,26 @@ function sortTarget(sort: SortOperation): string {
 
 let nextRelationNumber = 1;
 
+/**
+ * A row of a result as a function of it reads it: its columns are attributes, `r.price`, as Legend's `$r.price`. The
+ * columns are known when the query is built, so a name that is not one is refused then, with the columns there are.
+ * A column's type is what it holds when the query is built, so a row's attributes are loosely typed.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ResultRow = Record<string, any>;
+
+function rowOf(columns: Map<string, Attribute>): ResultRow {
+  return new Proxy({} as ResultRow, {
+    get(_target, name) {
+      if (typeof name !== 'string') return undefined;
+      const column = columns.get(name);
+      if (column === undefined) throw new Error(`No column '${name}' in this result: its columns are ${JSON.stringify([...columns.keys()])}`);
+      return column;
+    },
+    set() { throw new Error('A row is read, not changed: use extend() to add a column'); },
+  });
+}
+
 export class FinderResult {
   private _relationName?: string;
   private _orderBy: SortOperation[] = [];
@@ -168,6 +188,55 @@ export class FinderResult {
       && this._orderBy.length === 0 && this._groupBy.length === 0 && !this._distinct && this._having === undefined
       && this._limit === undefined && this._offset === undefined;
     return (bare ? (source as TableAlias).relation : asRelation.relation) as QueryExpression;
+  }
+
+  /** A result that reads from this one: a query over this result's query, as Legend's relation functions are. */
+  private _next(display: (Attribute | RelationalOperationElement)[], op?: Operation): FinderResult {
+    const { alias } = this.relation();
+    return new FinderResult(null, null, display, alias, op ?? new NoOperation());
+  }
+
+  /**
+   * The rows of this result for which every condition holds, as Legend's `filter(r | $r.price > 250)`: each condition is a
+   * function of a row that reads its columns as attributes, including one that a window function, an aggregate or `extend`
+   * made, which a `WHERE` over the rows themselves cannot do:
+   *
+   *     rows.filter(r => r.price.gt(250))
+   */
+  filter(...conditions: ((row: ResultRow) => Operation)[]): FinderResult {
+    const { attributes: columns } = this.relation();
+    const row = rowOf(columns);
+    let op: Operation | undefined;
+    for (const condition of conditions) {
+      if (typeof condition !== 'function') throw new TypeError('A filter condition is a function of a row: filter(r => r.price.gt(250))');
+      op = op === undefined ? condition(row) : op.and(condition(row)) as Operation;
+    }
+    return this._next([...columns.values()], op);
+  }
+
+  /**
+   * This result with more columns, each named by its key and worked out from a row, as Legend's `extend(~top : r | ...)`. A
+   * window adds an aggregate over the rows to each row:
+   *
+   *     rows.extend({ double: r => r.price.times(2), top: r => r.price.max().over([r.account]) })
+   */
+  extend(columns: Record<string, (row: ResultRow) => RelationalOperationElement | Attribute>): FinderResult {
+    const { attributes: existing } = this.relation();
+    const row = rowOf(existing);
+    const added = Object.entries(columns).map(([name, expression]) => {
+      if (typeof expression !== 'function') throw new TypeError(`The column '${name}' is a function of a row: extend({ ${name}: r => ... })`);
+      const value = expression(row);
+      return value instanceof Attribute ? value.alias(name) : new Alias(value, name);
+    });
+    return this._next([...existing.values(), ...added]);
+  }
+
+  /** Only some of this result's columns, by name, as Legend's `select(~[sym, price])`. To rename or work out a column use `extend` first. */
+  select(...names: string[]): FinderResult {
+    const { attributes: columns } = this.relation();
+    const missing = names.filter(n => !columns.has(n));
+    if (missing.length > 0) throw new Error(`No column ${JSON.stringify(missing)} in this result: its columns are ${JSON.stringify([...columns.keys()])}`);
+    return this._next(names.map(n => columns.get(n)!));
   }
 
   /**

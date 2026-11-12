@@ -6,6 +6,31 @@ export const _AT = '2030-01-01 00:00:00';
 export function _trades(f: any) {
   return f.findAll(null, _AT, [f.account().name().alias('account'), f.symbol().alias('sym'), f.price().alias('price')]);
 }
+export function _expensive_trades(f: any) {
+  const trades = _trades(f);
+  const expensive = trades.filter((r: any) => r.price.gt(250.0));
+  return expensive.orderBy(expensive.column('price').ascending());
+}
+export function _top_trade_per_account(f: any) {
+  const trades = _trades(f);
+  const with_top = trades.extend({ top: (r: any) => r.price.max().over([r.account]) });
+  const top = with_top.filter((r: any) => r.price.eq(r.top)).select('account', 'sym', 'price');
+  return top.orderBy(top.column('account').ascending());
+}
+export function _most_expensive_trade(f: any) {
+  const trades = _trades(f);
+  const with_top = trades.extend({ top: (r: any) => r.price.max().over() });
+  return with_top.filter((r: any) => r.price.eq(r.top)).select('account', 'sym', 'price');
+}
+export function _price_as_a_multiple(f: any) {
+  const trades = _trades(f);
+  const doubled = trades.extend({ double: (r: any) => r.price.times(2.0) }).select('sym', 'double');
+  return doubled.orderBy(doubled.column('double').descending()).limit(2);
+}
+export function _dearer_trades(f: any) {
+  const dear = _trades(f).filter((r: any) => r.price.gt(350.0));
+  return dear.extend({ dear_account: (r: any) => r.account, dear_sym: (r: any) => r.sym }).select('dear_account', 'dear_sym');
+}
 
 export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
@@ -46,68 +71,81 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'chain_filter_on_a_column',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _expensive_trades(f),
+    expected: { columns: ['account', 'sym', 'price'], rows: [
+        ['Beta Fund', 'MSFT', 300.0],
+        ['Beta Fund', 'TSLA', 400.0],
+        ['Gamma Fund', 'GS', 500.0],
+      ], sql: 'FROM (SELECT', skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_window_then_filter_on_it',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _top_trade_per_account(f),
+    expected: { columns: ['account', 'sym', 'price'], rows: [
+        ['Alpha Fund', 'GOOG', 200.0],
+        ['Beta Fund', 'TSLA', 400.0],
+        ['Gamma Fund', 'GS', 500.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_window_over_all_rows',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _most_expensive_trade(f),
+    expected: { columns: ['account', 'sym', 'price'], rows: [
+        ['Gamma Fund', 'GS', 500.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_extend_an_expression_and_select',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _price_as_a_multiple(f),
+    expected: { columns: ['sym', 'double'], rows: [
+        ['GS', 1000.0],
+        ['TSLA', 800.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_group_by_a_column_and_aggregate',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
   },
   {
     name: 'chain_filter_the_groups',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
   },
   {
     name: 'chain_aggregate_the_whole_relation',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
   },
   {
     name: 'join_inner_on_a_column_of_each',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
   },
   {
     name: 'join_left_keeps_the_rows_that_find_no_match',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
   },
   {
     name: 'exists_keeps_the_rows_that_have_a_match',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
   },
   {
     name: 'not_exists_keeps_the_rows_that_have_none',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
   },
   {
     name: 'join_right_keeps_every_row_of_the_right',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
   },
   {
     name: 'join_full_keeps_the_rows_of_both_that_find_no_match',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('group_by, aggregate, join and exists on a result are not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'group_by, aggregate, join and exists on a result are not ported yet' },
   },
 ];
 
