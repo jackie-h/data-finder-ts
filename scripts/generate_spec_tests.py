@@ -163,6 +163,8 @@ class Translator:
         self.helpers: set[str] = set()         # module-level helper functions the queries call
         self.signatures: dict[str, list[str]] = {}   # their parameter names, to give a call's keywords their place
         self.plain: set[str] = set()           # names that are plain values, not expressions (a helper's `quantity: float`)
+        self.local_functions: dict[str, tuple[list[str], str | None, list[str]]] = {}   # a helper's own functions: positional, *args, keyword-only
+        self.callables: set[str] = set()       # a helper's parameters that are functions it calls (a `history`)
         self.used: set[str] = set()            # free functions the translated queries call
         self.model_used: set[str] = set()      # model classes the translated queries use
         self.rows: set[str] = set()            # the parameters of lambdas that read a row of a result
@@ -239,6 +241,16 @@ class Translator:
 
     def visit_Tuple(self, node: ast.Tuple) -> str:
         return '[' + ', '.join(self.expr(e) for e in node.elts) + ']'
+
+    def visit_JoinedStr(self, node: ast.JoinedStr) -> str:
+        """An f-string, as a template literal."""
+        parts = []
+        for value in node.values:
+            if isinstance(value, ast.Constant):
+                parts.append(value.value.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${'))
+            else:
+                parts.append('${' + self.expr(value.value) + '}')
+        return '`' + ''.join(parts) + '`'
 
     def visit_Lambda(self, node: ast.Lambda) -> str:
         """A function of a row of a result (`lambda r: r.price > 250.0`): the row's columns are attributes."""
@@ -328,6 +340,19 @@ class Translator:
 
     def visit_Call(self, node: ast.Call) -> str:
         func = node.func
+        if isinstance(func, ast.Name) and func.id in self.local_functions:
+            positional, vararg, kwonly = self.local_functions[func.id]
+            given = [self.expr(a) for a in node.args]
+            args = given[:len(positional)]
+            if vararg is not None:   # the rest are the one array the function takes in their place
+                args += ['[' + ', '.join(given[len(positional):]) + ']']
+            keywords = {k.arg: self.expr(k.value) for k in node.keywords}
+            args += [keywords.get(name, 'undefined') for name in kwonly]
+            while args and args[-1] == 'undefined':
+                args.pop()
+            return f'{func.id}({", ".join(args)})'
+        if isinstance(func, ast.Name) and func.id in self.callables:   # a function the helper was given
+            return f'{func.id}({", ".join(self.expr(a) for a in node.args)})'
         if isinstance(func, ast.Name) and func.id in self.helpers:
             args = [self.expr(a) for a in node.args]
             if node.keywords:   # a keyword is the argument of its name: the helper takes them in order
@@ -388,8 +413,13 @@ class Translator:
             return f'{self.expr(owner)}.{name}({", ".join((args or ["\'\'"]) + [order])})'
         if func.attr in ('extend', 'aggregate') and node.keywords:
             # extend(top=lambda r: ...): the new columns are one object, by name
-            columns = ', '.join(f'{k.arg}: {self.expr(k.value)}' for k in node.keywords)
-            return f'{self.expr(owner)}.{func.attr}({{ {columns} }})'
+            parts = []
+            for k in node.keywords:
+                if k.arg is None and isinstance(k.value, ast.Dict):   # **{name: lambda r: ...}: names worked out at run time
+                    parts += [f'[{self.expr(key)}]: {self.expr(value)}' for key, value in zip(k.value.keys, k.value.values)]
+                else:
+                    parts.append(f'{k.arg}: {self.expr(k.value)}')
+            return f'{self.expr(owner)}.{func.attr}({{ {", ".join(parts)} }})'
         if func.attr == 'concatenate' and node.keywords:
             # concatenate(other, all=True): UNION ALL, as an option
             (kw,) = node.keywords

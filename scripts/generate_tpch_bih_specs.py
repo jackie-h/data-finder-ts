@@ -44,7 +44,8 @@ class TpchTranslator(Translator):
         (op,), (right,) = node.ops, node.comparators
         if isinstance(op, (ast.Is, ast.IsNot)):   # `x is None`: a plain value
             return f'({self.expr(node.left)} {"===" if isinstance(op, ast.Is) else "!=="} {self.expr(right)})'
-        if isinstance(node.left, ast.Name) and node.left.id in self.plain and isinstance(op, (ast.Eq, ast.NotEq)):
+        if isinstance(node.left, ast.Name) and isinstance(op, (ast.Eq, ast.NotEq)) \
+                and (node.left.id in self.plain or isinstance(right, ast.Constant)):   # a name against a literal is a plain value
             return f'({self.expr(node.left)} {"===" if isinstance(op, ast.Eq) else "!=="} {self.expr(right)})'
         return super().visit_Compare(node)
 
@@ -75,6 +76,8 @@ def function_source(translator: Translator, stmt: ast.FunctionDef) -> str:
     translator.plain = {a.arg for a, d in zip(stmt.args.args, defaults) if d is not None or a.annotation is not None}
     params = ', '.join(f'{a.arg}: any' + (f' = {translator.expr(d)}' if d is not None else '') for a, d in zip(stmt.args.args, defaults))
     declared = set(names)
+    translator.callables = set(names)
+    translator.local_functions = {}
 
     def block(body: list[ast.stmt], indent: str) -> list[str]:
         lines: list[str] = []
@@ -92,6 +95,22 @@ def function_source(translator: Translator, stmt: ast.FunctionDef) -> str:
                 targets = [t.id for t in inner.targets[0].elts]
                 declared.update(targets)
                 lines.append(f'{indent}const [{", ".join(targets)}] = [{", ".join(translator.expr(v) for v in inner.value.elts)}];')
+            elif isinstance(inner, ast.Assign) and isinstance(inner.targets[0], ast.Tuple):   # a, b, c = when: unpacked from a value
+                targets = [t.id for t in inner.targets[0].elts]
+                declared.update(targets)
+                lines.append(f'{indent}const [{", ".join(targets)}] = {translator.expr(inner.value)};')
+            elif isinstance(inner, ast.FunctionDef):   # a function of the helper's own, which a query step calls
+                positional = [a.arg for a in inner.args.args]
+                vararg = inner.args.vararg.arg if inner.args.vararg else None
+                kwonly = [a.arg for a in inner.args.kwonlyargs]
+                translator.local_functions[inner.name] = (positional, vararg, kwonly)
+                declared.add(inner.name)
+                parameters = [f'{n}: any' for n in positional] + ([f'{vararg}: any[]'] if vararg else []) \
+                    + [f'{a.arg}: any = {translator.expr(d) if d is not None else "undefined"}'
+                       for a, d in zip(inner.args.kwonlyargs, inner.args.kw_defaults)]
+                lines.append(f'{indent}const {inner.name} = ({", ".join(parameters)}) => {{')
+                lines += block(inner.body, indent + '  ')
+                lines.append(f'{indent}}};')
             elif isinstance(inner, ast.Return):
                 lines.append(f'{indent}return {translator.expr(inner.value)};')
             elif isinstance(inner, ast.If):
@@ -111,6 +130,8 @@ def function_source(translator: Translator, stmt: ast.FunctionDef) -> str:
         return lines
 
     body = '\n'.join(block(stmt.body, '  '))
+    translator.callables = set()
+    translator.local_functions = {}
     translator.plain = plain_before
     return f'export function {stmt.name}({params}) {{\n{body}\n}}'
 
@@ -187,7 +208,7 @@ def main() -> None:
             except NotImplementedError as error:
                 # a construct of the query that the translator has no TypeScript for yet: the case is listed, skipped
                 reason = UNPORTED_REASON
-                print(f'... {case_id} is skipped: {reason}')
+                print(f'... {case_id} is skipped: {str(error)[:300]}')
                 columns = [str(c) for c in case.select]
                 blocks.append(f"  {{\n    name: {js_str(case_id)},\n    query: _q => {{ throw new Error({js_str(reason)}); }},\n"
                               f"    expected: {{ columns: [{', '.join(js_str(c) for c in columns)}], rows: [], skip: {js_str(reason)} }},\n  }},\n")
@@ -200,6 +221,8 @@ def main() -> None:
                 fields.append('approximate: true')
         blocks.append(f"  {{\n    name: {js_str(case_id)},\n    query: {query},\n    expected: {{ {', '.join(fields)} }},\n  }},\n")
 
+    if any('new Interval(' in block for block in blocks):   # an expected interval
+        translator.model_used.add('Interval')
     header = [BANNER, "import { ts, type SpecCase } from '../../spec-harness';"]
     if translator.model_used:
         header.append(f"import {{ {', '.join(sorted(translator.model_used))} }} from '../../../src/model/relational';")
