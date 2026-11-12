@@ -6,12 +6,12 @@ import { seeds } from './spec-seeds';
 import { EmployeeFinder } from './generated_examples/orgchart/EmployeeFinder';
 import { toSql } from '../src/datafinder/sql-generator';
 import { StringAttribute } from '../src/datafinder/typed-attributes';
-import { Column, JoinOperation, JoinTreeNodeOperation, NoOperation, Table } from '../src/model/relational';
+import { Column, JoinOperation, JoinKind, JoinTreeNodeOperation, NoOperation, Table } from '../src/model/relational';
 
 function sql(keyOnTarget: boolean): string {
   const person = new Table('person', []);
   const firm = new Table('firm', []);
-  const join = new JoinOperation('Firm', firm, new Column('FIRMID', 'INT', new Table('person', [])), new Column('ID', 'INT', new Table('firm', []), keyOnTarget));
+  const join = JoinOperation.onKeys('Firm', firm, new Column('FIRMID', 'INT', new Table('person', [])), new Column('ID', 'INT', new Table('firm', []), keyOnTarget), JoinKind.LEFT);
   const name = new StringAttribute('Name', 'NAME', 'VARCHAR', new Table('firm', []), new JoinTreeNodeOperation(join));
   return toSql(null, null, [name], person, new NoOperation());
 }
@@ -27,7 +27,7 @@ describe('the SQL', () => {
 
   it('a key on the source stays first', () => {
     const person = new Table('person', []);
-    const join = new JoinOperation('Firm', new Table('firm', []), new Column('ID', 'INT', new Table('person', []), true), new Column('FIRMID', 'INT', new Table('firm', [])));
+    const join = JoinOperation.onKeys('Firm', new Table('firm', []), new Column('ID', 'INT', new Table('person', []), true), new Column('FIRMID', 'INT', new Table('firm', [])), JoinKind.LEFT);
     const name = new StringAttribute('Name', 'NAME', 'VARCHAR', new Table('firm', []), new JoinTreeNodeOperation(join));
     expect(toSql(null, null, [name], person, new NoOperation()).endsWith('ON (t0.ID = t1.FIRMID)')).toBe(true);
   });

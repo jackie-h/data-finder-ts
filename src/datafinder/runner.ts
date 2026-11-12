@@ -11,7 +11,7 @@ import {
   QueryExpression,
   RelationExistsOperation,
   QuerySpecification,
-  RelationJoin,
+  JoinOperation,
   JoinKind,
   Table,
   containsAggregate,
@@ -376,7 +376,7 @@ export class FinderResult {
     }
     const columns = [...left, ...right].map(([name, attribute]) => attribute.alias(name));
     const joined = new QuerySpecification(columns, new NoOperation(), [], leftAlias, new Map(), false, undefined, new Map(),
-      [new RelationJoin('', rightAlias, test, how as JoinKind)]);
+      [new JoinOperation('', rightAlias, test, how as JoinKind)]);
     const alias = new TableAlias(joined, `relation${nextRelationNumber++}`);
     return new FinderResult(null, null, [...attributes(alias)].map(([name, attribute]) => attribute.alias(name)), alias, new NoOperation());
   }

@@ -583,11 +583,56 @@ export class Table extends NamedRelation {
  * which alias they belong to by its name. A table is already named, so this is for a relation that is not: a query.
  */
 export class TableAlias extends NamedRelation {
-  constructor(readonly relation: Relation, name: string) { super(name); }
+  private _columns: readonly RelationalOperationElement[];
 
-  get columns(): readonly RelationalOperationElement[] { return this.relation.columns; }
+  /**
+   * An alias of a table has columns of its own, with the same names and types and the alias as their owner: that is what tells
+   * `employee.manager_id` from `manager.id` when one table is on both sides of a join. An alias of a query has the query's
+   * columns, which are expressions and have no owner to change.
+   */
+  constructor(readonly relation: Relation, name: string) {
+    super(name);
+    this._columns = relation instanceof Table
+      ? relation.columns.map(c => new Column(c.name, c.type, this, c.primaryKey, c.nullable))
+      : relation.columns;
+  }
+
+  get columns(): readonly RelationalOperationElement[] { return this._columns; }
+
+  /**
+   * The alias's own column of that name. A table in a finder lists only the columns the finder reads, so one that the alias has
+   * not got yet is made, owned by the alias.
+   */
+  column(name: string, type: string): Column {
+    for (const column of this._columns) if (column instanceof Column && column.name === name) return column;
+    const made = new Column(name, type, this);
+    this._columns = [...this._columns, made];
+    return made;
+  }
 }
 
+/** ANSI SQL's join types: `inner`, and the outer joins `left`, `right` and `full`, which keep the rows that find no match. */
+export enum JoinKind {
+  INNER = 'inner',
+  LEFT = 'left',
+  RIGHT = 'right',
+  FULL = 'full',
+}
+
+/** Whether two relations are the same one: the same object, or tables or aliases that go by the same name. */
+export function sameRelation(a: Relation | undefined, b: Relation | undefined): boolean {
+  if (a === b) return true;
+  return a instanceof NamedRelation && b instanceof NamedRelation && a.qualifiedName === b.qualifiedName;
+}
+
+/**
+ * A relation joined on a condition, as Legend's `Join` and ANSI SQL's `<join type> JOIN <table reference> ON <search condition>`:
+ * its `target`, the kind of join and the condition `operation`.
+ *
+ * Every column in the condition is owned by a relation, and that says which side of the join it is on: a column of the `target`
+ * belongs to the target and any other to what is joined from. When one table is both, the target is a `TableAlias` of it
+ * (`new TableAlias(employee, 'manager')`) and the condition uses that alias's columns.
+ */
 export class JoinOperation {
   filter?: RelationalOperationElement;
   /** Property-equality filters on the join target (property id -> value), set by a related finder given a filter. */
@@ -597,12 +642,62 @@ export class JoinOperation {
 
   constructor(
     readonly name: string,
-    readonly target: Table,
-    readonly left: Column,
-    readonly right: Column,
+    readonly target: Relation,
+    readonly operation: RelationalOperationElement,
+    readonly kind: JoinKind,
     filter?: RelationalOperationElement,
   ) {
     this.filter = filter;
+    for (const column of this.columns()) column.ownerRelation; // a column that belongs to no relation can't say which side it is on
+  }
+
+  /**
+   * `table` joined where its `target` column equals the `source` column of what is joined from. When that is the same table, the
+   * target is an alias of it named `name`, so the two sides can be told apart.
+   */
+  static onKeys(name: string, table: Table, source: Column, target: Column, kind: JoinKind): JoinOperation {
+    if (sameRelation(source.ownerRelation, table)) {
+      const alias = new TableAlias(table, name || table.name + '_joined');
+      return new JoinOperation(name, alias, new ComparisonOperation(source, ComparisonOperator.EQUAL, alias.column(target.name, target.type)), kind);
+    }
+    return new JoinOperation(name, table, new ComparisonOperation(source, ComparisonOperator.EQUAL, target), kind);
+  }
+
+  /** The table that is joined: the target, or what the target is an alias of. */
+  get table(): Table {
+    const target = this.target instanceof TableAlias ? this.target.relation : this.target;
+    if (!(target instanceof Table)) throw new Error(`Not a table: ${String(target)}`);
+    return target;
+  }
+
+  /** The columns the condition reads. */
+  columns(): Column[] {
+    const found: Column[] = [];
+    const walk = (op: unknown): void => {
+      if (op instanceof Column) found.push(op);
+      else if (op instanceof BinaryOperation) { walk(op.left); walk(op.right); }
+      else if (op instanceof UnaryOperation || op instanceof Alias) walk(op.element);
+    };
+    walk(this.operation);
+    return found;
+  }
+
+  /** Whether the column is on the joined side. */
+  isTarget(column: Column): boolean {
+    return sameRelation(column.ownerRelation, this.target);
+  }
+
+  /**
+   * The (source, target) columns of a join that is one column equal to another: what a step that only asks if a row exists reads.
+   * Any other condition has no such pair.
+   */
+  keys(): [Column, Column] {
+    const op = this.operation;
+    if (op instanceof ComparisonOperation && op.operator === ComparisonOperator.EQUAL
+      && op.left instanceof Column && op.right instanceof Column && this.isTarget(op.left) !== this.isTarget(op.right)) {
+      return this.isTarget(op.left) ? [op.right, op.left] : [op.left, op.right];
+    }
+    throw new Error(`Join '${this.name}' is not one column equal to another: it has no key to read`);
   }
 }
 
@@ -753,28 +848,6 @@ export class RelationExistsOperation extends Operation {
  */
 export abstract class QueryExpression extends Relation {}
 
-/** ANSI SQL's join types: `inner`, and the outer joins `left`, `right` and `full`, which keep the rows that find no match. */
-export enum JoinKind {
-  INNER = 'inner',
-  LEFT = 'left',
-  RIGHT = 'right',
-  FULL = 'full',
-}
-
-/**
- * A relation joined on a condition, as ANSI SQL's `<join type> JOIN <table reference> ON <search condition>` and Legend's
- * `Join`: its `target`, the kind of join and the condition `operation`. Every column in the condition is owned by a relation,
- * which says which side of the join it is on. A query holds these for the relations it reads besides its root.
- */
-export class RelationJoin {
-  constructor(
-    readonly name: string,
-    readonly target: Relation,
-    readonly operation: RelationalOperationElement,
-    readonly kind: JoinKind,
-  ) {}
-}
-
 /**
  * A single SELECT over a root table, as ANSI SQL's `<query specification>`: what to show, which rows qualify, how
  * they are grouped, which groups qualify (HAVING) and whether duplicates are removed (DISTINCT). It has no ORDER BY
@@ -802,7 +875,7 @@ export class QuerySpecification extends QueryExpression {
      */
     readonly subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map(),
     /** Relations joined to the root on a condition, in the order they are written. */
-    readonly joins: readonly RelationJoin[] = [],
+    readonly joins: readonly JoinOperation[] = [],
   ) { super(); }
 }
 
@@ -825,7 +898,7 @@ export class OrderedQuerySpecification extends QuerySpecification {
     readonly offset?: number,
     having?: Operation,
     subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map(),
-    joins: readonly RelationJoin[] = [],
+    joins: readonly JoinOperation[] = [],
   ) { super(columns, filter, groupBy, table, joinFilters, distinct, having, subSelects, joins); }
 }
 

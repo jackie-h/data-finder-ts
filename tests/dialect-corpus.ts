@@ -3,7 +3,7 @@ import { toSql } from '../src/datafinder/sql-generator';
 import type { DialectName } from '../src/datafinder/dialect';
 import { constant, when } from '../src/datafinder';
 import { DateAttribute, DateTimeAttribute, DoubleAttribute, IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
-import { Column, DateOnly, JoinOperation, JoinTreeNodeOperation, NoOperation, Table, concat } from '../src/model/relational';
+import { Column, DateOnly, JoinOperation, JoinKind, JoinTreeNodeOperation, NoOperation, Table, concat } from '../src/model/relational';
 
 const text = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
 const other = new StringAttribute('Other', 'other', 'VARCHAR', new Table('t', []));
@@ -13,7 +13,7 @@ const day = new DateAttribute('Day', 'day', 'DATE', new Table('t', []));
 const at = new DateTimeAttribute('At', 'at', 'TIMESTAMP', new Table('t', []));
 const table = new Table('t', ['name', 'other', 'id', 'price', 'day', 'at'].map(c => new Column(c, 'VARCHAR', new Table('t', []))));
 
-const join = new JoinOperation('Child', new Table('u', []), new Column('id', 'INT', new Table('t', [])), new Column('fk', 'INT', new Table('u', [])));
+const join = JoinOperation.onKeys('Child', new Table('u', []), new Column('id', 'INT', new Table('t', [])), new Column('fk', 'INT', new Table('u', [])), JoinKind.LEFT);
 const child = new StringAttribute('Child Name', 'name', 'VARCHAR', new Table('u', []), new JoinTreeNodeOperation(join));
 
 type Query = (dialect: DialectName) => string;
