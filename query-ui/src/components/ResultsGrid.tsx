@@ -3,8 +3,12 @@ import { AgGridReact } from 'ag-grid-react';
 import { themeQuartz, colorSchemeDark, colorSchemeLight, type ColDef } from 'ag-grid-community';
 import { displayValue } from '../lib/format';
 
-const lightTheme = themeQuartz.withPart(colorSchemeLight);
-const darkTheme = themeQuartz.withPart(colorSchemeDark);
+/** Tight rows and small type, so more of a result is on screen at once. */
+const compact = themeQuartz.withParams({
+  spacing: 4, fontSize: 12, rowHeight: 24, headerHeight: 28, headerFontSize: 12, cellHorizontalPadding: 8,
+});
+const lightTheme = compact.withPart(colorSchemeLight);
+const darkTheme = compact.withPart(colorSchemeDark);
 
 function useDark(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -33,7 +37,8 @@ export function ResultsGrid({ columns, rows }: Props) {
   return (
     <div className="grid-host">
       <AgGridReact theme={dark ? darkTheme : lightTheme} columnDefs={columnDefs} rowData={rowData}
-        defaultColDef={{ sortable: true, resizable: true, floatingFilter: true, minWidth: 110 }}
+        defaultColDef={{ sortable: true, resizable: true, floatingFilter: true, minWidth: 90 }}
+        floatingFiltersHeight={26}
         enableCellTextSelection suppressFieldDotNotation />
     </div>
   );
