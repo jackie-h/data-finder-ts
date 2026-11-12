@@ -1,6 +1,6 @@
 import {
   ExistsOperation, NotExistsOperation, JoinTreeNodeOperation, JoinOperation, Column, Table, TableAlias, LogicalOperation, LogicalOperator,
-  NamedRelation, Operation, Relation,
+  Operation, Relation, JoinKind,
 } from '../model/relational';
 import { titleCase } from './naming';
 
@@ -44,7 +44,9 @@ export interface NavigationDates {
 export class JoinSide {
   constructor(private readonly relation: Relation) {}
 
-  column(name: string, type: string): Column { return new Column(name, type, this.relation); }
+  column(name: string, type: string): Column {
+    return this.relation instanceof TableAlias ? this.relation.column(name, type) : new Column(name, type, this.relation);
+  }
 }
 
 /**
@@ -55,30 +57,33 @@ export class JoinSide {
  */
 export type JoinCondition = Operation | ((plain: JoinSide, target: JoinSide) => Operation);
 
-/** The name a join's `{target}` side is given when the table is joined to itself. */
-export const TARGET_SIDE = '{target}';
-
-function sameTable(a: Relation, b: Relation): boolean {
-  return a === b || (a instanceof NamedRelation && b instanceof NamedRelation && a.qualifiedName === b.qualifiedName);
-}
-
 /**
- * Give a join its condition, ANDed into its ON beside its key columns. `reverse` is that the join is followed from the other
- * end, which matters only to a join of a table to itself: the sides trade places.
+ * `table` joined where its `target` column equals the `source` column of what is joined from, and where `condition` holds besides,
+ * as Legend's join `firmTable.ID = personTable.FIRMID and firmTable.FLAG is null`. The condition reads the columns of the two
+ * tables, which say which side they are on.
+ *
+ * A join of a table to itself has the same table on both sides, so its condition is a function of the two sides, as Legend's
+ * `personTable.MANAGERID = {target}.ID`. `reverse` is that the join is followed from the other end, so the sides trade places.
  */
-export function applyJoinCondition(join: JoinOperation, condition: JoinCondition, reverse = false): void {
-  const selfJoin = sameTable(join.left.ownerRelation, join.target);
+export function keysJoin(
+  name: string, table: Table | TableAlias, source: Column, target: Column, kind: JoinKind, condition?: JoinCondition, reverse = false,
+): JoinOperation {
+  const join = JoinOperation.onKeys(name, table, source, target, kind);
+  if (condition === undefined) return join;
   let resolved: Operation;
   if (typeof condition === 'function') {
-    if (!selfJoin) throw new Error(`Join '${join.name}' joins ${join.target.name} to another table: its condition is not one of a self join`);
-    const parent = new JoinSide(join.left.ownerRelation);
-    const joined = new JoinSide(new TableAlias(join.target, TARGET_SIDE));
+    if (!(join.target instanceof TableAlias)) {
+      throw new Error(`Join '${name}' joins ${table.name} to another table: its condition is not one of a self join`);
+    }
+    const parent = new JoinSide(source.ownerRelation);
+    const joined = new JoinSide(join.target);
     resolved = reverse ? condition(joined, parent) : condition(parent, joined);
+  } else if (join.target !== table) {
+    throw new Error(`Join '${name}' joins ${table.name} to itself: its condition needs to say which side each column is on`);
   } else {
-    if (selfJoin) throw new Error(`Join '${join.name}' joins ${join.target.name} to itself: its condition needs to say which side each column is on`);
     resolved = condition;
   }
-  join.filter = join.filter === undefined ? resolved : new LogicalOperation(join.filter, LogicalOperator.AND, resolved);
+  return new JoinOperation(name, join.target, new LogicalOperation(join.operation, LogicalOperator.AND, resolved), kind);
 }
 
 export function viaJoins(
@@ -89,9 +94,7 @@ export function viaJoins(
 ): JoinTreeNodeOperation | undefined {
   let node = parent;
   for (const [source, table, target, condition] of hops) {
-    const join = new JoinOperation('', table, source, target);
-    if (condition !== undefined) applyJoinCondition(join, condition);
-    node = new JoinTreeNodeOperation(join, node, false, true, businessDate, processingDatetime);
+    node = new JoinTreeNodeOperation(keysJoin('', table, source, target, JoinKind.LEFT, condition), node, false, true, businessDate, processingDatetime);
   }
   return node;
 }

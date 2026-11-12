@@ -105,7 +105,7 @@ def condition_code(op, self_join: bool = False) -> str:
         if isinstance(node, Column):
             if not self_join:
                 return column_code(node, False)
-            side = "target" if isinstance(node.owner, TableAlias) else "plain"
+            side = "target" if isinstance(node.owner, TableAlias) and node.owner.name == "{target}" else "plain"
             return f"{side}.column('{node.name}', '{node.type}')"
         if isinstance(node, ComparisonOperation):
             return f"new ComparisonOperation({code(node.left)}, ComparisonOperator.{node.operator.name}, {code(node.right)})"
@@ -155,7 +155,7 @@ class _QueryCode:
         columns = ", ".join(self.value(c) for c in query.columns)
         group_by = ", ".join(self.value(g) for g in query.group_by)
         joins = ", ".join(
-            f"new RelationJoin('{j.name}', {self.relation(j.target)}, {self.value(j.operation)}, JoinKind.{j.kind.name})"
+            f"new JoinOperation('{j.name}', {self.relation(j.target)}, {self.value(j.operation)}, JoinKind.{j.kind.name})"
             for j in query.joins)
         having = self.value(query.having) if query.having is not None else "undefined"
         return (f"new QuerySpecification([{columns}], {self.value(query.filter)}, [{group_by}], {self.relation(query.table)}, "
@@ -256,13 +256,17 @@ def js_string(value: str) -> str:
     return "'" + value.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
 
-def condition_call(join: Join, reverse: bool = False) -> str:
-    """The call that gives a finder the condition of the join it follows, or nothing. ``reverse`` is that the finder is
-    the one the join is followed to from its other end, which matters only to a join of a table to itself."""
+def condition_args(join: Join, *rest) -> str:
+    """The trailing arguments that give a related finder the condition of the join it follows: ``given`` arguments are already
+    passed before ``condition``, which is the tenth. ``reverse`` is that the finder is the one the join is followed to from its
+    other end, which matters only to a join of a table to itself. Nothing when the join has no condition."""
     if join.condition is None:
         return ""
+    *flags, given = rest
+    reverse = bool(flags and flags[0])
     self_join = _is_self_join(join.lhs, join.rhs)
-    return f".withCondition({condition_code(join.condition, self_join)}" + (", true" if reverse and self_join else "") + ")"
+    return (", undefined" * (9 - given) + f", {condition_code(join.condition, self_join)}"
+            + (", true" if reverse and self_join else ""))
 
 
 def _scheme_columns_code(table, owned_by: str | None = None) -> str:
@@ -631,7 +635,7 @@ def generate(mapping: Mapping, output_directory: str):
         has_business_date_range=has_business_date_range,
         has_processing_snapshot=has_processing_snapshot,
         parent_expr=parent_expr,
-        condition_call=condition_call,
+        condition_args=condition_args,
         column_code=column_code,
         display_name=display_name,
         to_ts_name=to_ts_name,
@@ -689,7 +693,7 @@ def generate(mapping: Mapping, output_directory: str):
                 "  CaseOperation, Column, ComparisonOperation, ComparisonOperator, ConcatOperation, CountAllOperation,\n"
                 "  DecimalConstantOperation, FloatConstantOperation, InOperation, IntegerConstantOperation, IsNotNullOperation,\n"
                 "  IsNullOperation, JoinKind, LogicalOperation, LogicalOperator, NoOperation, NotInOperation, NotOperation,\n"
-                "  QuerySpecification, RelationJoin, ScalarFunction, ScalarFunctionOperation, StringConstantOperation, Table, TableAlias,\n"
+                "  JoinOperation, QuerySpecification, ScalarFunction, ScalarFunctionOperation, StringConstantOperation, Table, TableAlias,\n"
                 "  UnionOperation,\n} from '@model/relational';\n"
                 "import {\n  BiTemporalColumns, BusinessDateAndProcessingTemporalColumns, BusinessDateRangeColumns, ProcessingTemporalColumns,\n"
                 "  SingleBusinessDateColumn, SingleProcessingDatetimeColumn,\n} from '@model/milestoning';\n\n"

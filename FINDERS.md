@@ -288,6 +288,8 @@ If the mapping declares flat columns on the table that duplicate a related prope
 
 A mapping's association can have a condition besides its key columns, as Legend's `Join Firm_Person(firms.id = persons.firm_id and firms.flag is null ...)`: an Association table with a `Condition` column (see the `join_conditions_mapping.md` example), written as `table.column` over the two tables the row joins. The generated finders AND it into the `ON` of the left outer join, so a row it rejects leaves the joined columns NULL and drops no row, and it reads the same from the other end of the join, so the reverse navigation uses it too. For a hop of a property mapped through other tables each hop has its own. A table joined to itself is written with `{target}` for the side it reaches, as Legend's `personTable.MANAGERID = {target}.ID`; the generated finders then pass the condition as a function of the two sides, and followed from the other end the sides trade places. The GraphQL runner reads no join conditions.
 
+Underneath, a join is `JoinOperation(name, target, operation, kind)`, as Legend's `Join` and Python's: `kind` is one of ANSI SQL's `JoinKind` (`INNER`, `LEFT`, `RIGHT`, `FULL`), `operation` is its one condition, and the owner of each column in it says which side of the join it is on. A table joined to itself is read through a `TableAlias` of it, which has columns of its own, so `employee.manager_id` and `manager.id` are different columns. `JoinOperation.onKeys(...)` is the equality of two key columns; `keysJoin(...)` (what the generated finders call) adds a condition to it.
+
 ### Filtering a join by property
 
 A related-finder accessor accepts property values to restrict the joined rows (an equality filter on the join, so unmatched rows stay as NULLs rather than being dropped):
@@ -311,6 +313,10 @@ ef.findAll([ef.firstName()], ef.manager().notExists())   // employees with no ma
 ```
 
 They compile to a LEFT JOIN checked for NULL. For a to-many join that is only asked whether a row exists, the join is to a sub-select of the distinct join column, so the row is not repeated once per match; if the query also reads a value through that join, it stays a plain join and the row repeats for each child.
+
+## A class mapped to a query written as SQL
+
+A mapping can map a class to a query written as SQL, as it maps one to a table (see `sql_queries_mapping.md`): a `Query` section whose heading names the query and the class, with the SQL in a `sql` block (PostgreSQL: `SELECT [DISTINCT]`, joins, `WHERE`, `GROUP BY` with aggregates, `HAVING`, `UNION`, named expressions), then the columns it gives and what they map to. Nothing is created in the database: the SQL is read when the mapping is loaded, checked against the tables and columns there are, and the generator writes it into a `<Mapping>Queries.ts` module as the query model (`TableAlias` of a `QuerySpecification`, with typed columns of its own). A query over the class then writes it as a derived table, `FROM (SELECT ...) AS t0`; a query can read an earlier one, and a class mapped to a query has associations like any other. A query is milestoned as a table is, by the columns its SQL gives (name the scheme in the heading), so a query over the class, or a join to it, is given the dates over the query's columns. `count()` on such a class is not supported yet.
 
 ## Count
 

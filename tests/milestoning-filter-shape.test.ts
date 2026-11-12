@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { toSql, needsParentheses } from '../src/datafinder/sql-generator';
 import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
-import { Column, JoinOperation, JoinTreeNodeOperation, LogicalOperation, LogicalOperator, NoOperation, Table } from '../src/model/relational';
+import { Column, JoinOperation, JoinKind, JoinTreeNodeOperation, LogicalOperation, LogicalOperator, NoOperation, Table } from '../src/model/relational';
 import { BiTemporalColumns, MilestonedTable, ProcessingTemporalColumns } from '../src/model/milestoning';
 
 const P = new Date('2017-06-11T00:00:00Z');
@@ -27,7 +27,7 @@ function processingOnly(name = 'trades'): MilestonedTable {
 
 function joined(target: Table): [Table, StringAttribute] {
   const root = new Table('parent', [new Column('id', 'INT', new Table('parent', []))]);
-  const join = new JoinOperation('Child', target, new Column('id', 'INT', new Table('parent', [])), new Column('fk', 'INT', target));
+  const join = JoinOperation.onKeys('Child', target, new Column('id', 'INT', new Table('parent', [])), new Column('fk', 'INT', target), JoinKind.LEFT);
   return [root, new StringAttribute('Child Id', 'id', 'VARCHAR', target, new JoinTreeNodeOperation(join))];
 }
 
