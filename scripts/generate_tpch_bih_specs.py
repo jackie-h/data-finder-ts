@@ -160,6 +160,14 @@ def main() -> None:
             functions.append(function_source(translator, helper))
         except NotImplementedError as error:
             failed[helper.name] = str(error)
+    # a helper that calls one that could not be translated cannot be either
+    for _ in range(len(functions)):
+        broken = [(f, name) for f in functions for name in failed if re.search(rf'\b{re.escape(name)}\(', f)]
+        if not broken:
+            break
+        for source, name in broken:
+            functions.remove(source)
+            failed[re.match(r'export function (\w+)', source).group(1)] = failed[name]
 
     blocks = []
     for case_id, case in CASES.items():

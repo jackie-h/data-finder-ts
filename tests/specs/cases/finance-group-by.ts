@@ -6,6 +6,66 @@ export const _AT = '2030-01-01 00:00:00';
 export function _trades(f: any) {
   return f.findAll(null, _AT, [f.account().name().alias('account'), f.symbol().alias('sym'), f.price().alias('price')]);
 }
+export function _expensive_trades(f: any) {
+  const trades = _trades(f);
+  const expensive = trades.filter((r: any) => r.price.gt(250.0));
+  return expensive.orderBy(expensive.column('price').ascending());
+}
+export function _top_trade_per_account(f: any) {
+  const trades = _trades(f);
+  const with_top = trades.extend({ top: (r: any) => r.price.max().over([r.account]) });
+  const top = with_top.filter((r: any) => r.price.eq(r.top)).select('account', 'sym', 'price');
+  return top.orderBy(top.column('account').ascending());
+}
+export function _most_expensive_trade(f: any) {
+  const trades = _trades(f);
+  const with_top = trades.extend({ top: (r: any) => r.price.max().over() });
+  return with_top.filter((r: any) => r.price.eq(r.top)).select('account', 'sym', 'price');
+}
+export function _price_as_a_multiple(f: any) {
+  const trades = _trades(f);
+  const doubled = trades.extend({ double: (r: any) => r.price.times(2.0) }).select('sym', 'double');
+  return doubled.orderBy(doubled.column('double').descending()).limit(2);
+}
+export function _totals_per_account(f: any) {
+  const totals = _trades(f).groupBy((r: any) => r.account).aggregate({ total: (r: any) => r.price.sum(), trades: (r: any) => r.price.count() });
+  return totals.orderBy(totals.column('account').ascending());
+}
+export function _accounts_with_a_large_total(f: any) {
+  const totals = _trades(f).groupBy((r: any) => r.account).aggregate({ total: (r: any) => r.price.sum() });
+  const large = totals.filter((r: any) => r.total.gt(400.0));
+  return large.orderBy(large.column('total').descending());
+}
+export function _account_totals(f: any) {
+  return _trades(f).groupBy((r: any) => r.account).aggregate({ total: (r: any) => r.price.sum() }).extend({ total_account: (r: any) => r.account }).select('total_account', 'total');
+}
+export function _dearer_trades(f: any) {
+  const dear = _trades(f).filter((r: any) => r.price.gt(350.0));
+  return dear.extend({ dear_account: (r: any) => r.account, dear_sym: (r: any) => r.sym }).select('dear_account', 'dear_sym');
+}
+export function _each_trade_with_its_account_total(f: any) {
+  const trades = _trades(f);
+  const joined = trades.join(_account_totals(f), (t: any, a: any) => t.account.eq(a.total_account), 'inner');
+  const result = joined.select('sym', 'price', 'total');
+  return result.orderBy(result.column('price').ascending());
+}
+export function _accounts_with_the_trades_over_350(f: any, how: any) {
+  const accounts = _account_totals(f).select('total_account');
+  const joined = accounts.join(_dearer_trades(f), (a: any, t: any) => a.total_account.eq(t.dear_account), how);
+  const result = joined.select('total_account', 'dear_sym');
+  return result.orderBy(result.column('total_account').ascending());
+}
+export function _right_join_of_the_trades_over_350_to_the_accounts(f: any) {
+  const joined = _dearer_trades(f).join(_account_totals(f).select('total_account'), (t: any, a: any) => t.dear_account.eq(a.total_account), 'right');
+  const result = joined.select('total_account', 'dear_sym');
+  return result.orderBy(result.column('total_account').ascending());
+}
+export function _full_join_of_two_accounts_to_the_trades_over_350(f: any) {
+  const accounts = _account_totals(f).filter((r: any) => r.total_account.ne('Gamma Fund')).select('total_account');
+  const joined = accounts.join(_dearer_trades(f), (a: any, t: any) => a.total_account.eq(t.dear_account), 'full');
+  const result = joined.select('total_account', 'dear_sym');
+  return result.orderBy(result.column('total_account').ascending(), result.column('dear_sym').ascending());
+}
 
 export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
@@ -46,68 +106,108 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'chain_filter_on_a_column',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _expensive_trades(f),
+    expected: { columns: ['account', 'sym', 'price'], rows: [
+        ['Beta Fund', 'MSFT', 300.0],
+        ['Beta Fund', 'TSLA', 400.0],
+        ['Gamma Fund', 'GS', 500.0],
+      ], sql: 'FROM (SELECT', skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_window_then_filter_on_it',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _top_trade_per_account(f),
+    expected: { columns: ['account', 'sym', 'price'], rows: [
+        ['Alpha Fund', 'GOOG', 200.0],
+        ['Beta Fund', 'TSLA', 400.0],
+        ['Gamma Fund', 'GS', 500.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_window_over_all_rows',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _most_expensive_trade(f),
+    expected: { columns: ['account', 'sym', 'price'], rows: [
+        ['Gamma Fund', 'GS', 500.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_extend_an_expression_and_select',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _price_as_a_multiple(f),
+    expected: { columns: ['sym', 'double'], rows: [
+        ['GS', 1000.0],
+        ['TSLA', 800.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_group_by_a_column_and_aggregate',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _totals_per_account(f),
+    expected: { columns: ['account', 'total', 'trades'], rows: [
+        ['Alpha Fund', 300.0, 2],
+        ['Beta Fund', 700.0, 2],
+        ['Gamma Fund', 500.0, 1],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_filter_the_groups',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _accounts_with_a_large_total(f),
+    expected: { columns: ['account', 'total'], rows: [
+        ['Beta Fund', 700.0],
+        ['Gamma Fund', 500.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_aggregate_the_whole_relation',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _trades(f).aggregate({ total: (r: any) => r.price.sum(), highest: (r: any) => r.price.max(), average_of_five: (r: any) => r.price.sum().dividedBy(5.0) }),
+    expected: { columns: ['total', 'highest', 'average_of_five'], rows: [
+        [1500.0, 500.0, 300.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'join_inner_on_a_column_of_each',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _each_trade_with_its_account_total(f),
+    expected: { columns: ['sym', 'price', 'total'], rows: [
+        ['AAPL', 100.0, 300.0],
+        ['GOOG', 200.0, 300.0],
+        ['MSFT', 300.0, 700.0],
+        ['TSLA', 400.0, 700.0],
+        ['GS', 500.0, 500.0],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'join_left_keeps_the_rows_that_find_no_match',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _accounts_with_the_trades_over_350(f, 'left'),
+    expected: { columns: ['total_account', 'dear_sym'], rows: [
+        ['Alpha Fund', null],
+        ['Beta Fund', 'TSLA'],
+        ['Gamma Fund', 'GS'],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'exists_keeps_the_rows_that_have_a_match',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('exists on a result is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'exists on a result is not ported yet' },
   },
   {
     name: 'not_exists_keeps_the_rows_that_have_none',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: () => { throw new Error('exists on a result is not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'exists on a result is not ported yet' },
   },
   {
     name: 'join_right_keeps_every_row_of_the_right',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _right_join_of_the_trades_over_350_to_the_accounts(f),
+    expected: { columns: ['total_account', 'dear_sym'], rows: [
+        ['Alpha Fund', null],
+        ['Beta Fund', 'TSLA'],
+        ['Gamma Fund', 'GS'],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'join_full_keeps_the_rows_of_both_that_find_no_match',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => _full_join_of_two_accounts_to_the_trades_over_350(f),
+    expected: { columns: ['total_account', 'dear_sym'], rows: [
+        ['Alpha Fund', null],
+        ['Beta Fund', 'TSLA'],
+        [null, 'GS'],
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
 ];
 

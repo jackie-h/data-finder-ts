@@ -30,12 +30,88 @@ export function _parts_supplier_relationship(ps: any, p: any) {
   return ps.findAll(p.APP_TIME, p.SYS_TIME, [part.brand().alias('p_brand'), part.type().alias('p_type'), part.size().alias('p_size'), supplier.supplierKey().countDistinct().alias('supplier_cnt')], part.brand().ne('Brand#45').and(part.type().startsWith('MEDIUM POLISHED').not()).and(part.size().isIn([49, 14, 23, 45, 19, 3, 36, 9])).and(supplier.comment().matches('Customer.*Complaints').not())).groupBy(part.brand(), part.type(), part.size()).orderBy(supplier.supplierKey().countDistinct().descending(), part.brand().ascending(), part.type().ascending(), part.size().ascending());
 }
 
+export function _important_stock(ps: any, p: any) {
+  let value = ps.supplyCost().times(ps.availQty()).sum();
+  let parts = ps.findAll(p.APP_TIME, p.SYS_TIME, [ps.part().partKey().alias('ps_partkey'), value.alias('value')], ps.supplier().nation().name().eq(p.NATION)).groupBy(ps.part().partKey());
+  let with_total = parts.extend({ total: (r: any) => r.value.sum().over() });
+  let important = with_total.filter((r: any) => r.value.gt(r.total.times(p.FRACTION))).select('ps_partkey', 'value');
+  return important.orderBy(important.column('value').descending());
+}
+
+export function _minimum_cost_supplier(ps: any, p: any) {
+  let supplier = ps.supplier();
+  let rows = ps.findAll(p.APP_TIME, p.SYS_TIME, [supplier.acctBal().alias('s_acctbal'), supplier.name().alias('s_name'), supplier.nation().name().alias('n_name'), ps.part().partKey().alias('p_partkey'), ps.part().mfgr().alias('p_mfgr'), supplier.address().alias('s_address'), supplier.phone().alias('s_phone'), supplier.comment().alias('s_comment'), ps.supplyCost().alias('cost')], ps.part().size().eq(p.SIZE).and(ps.part().type().endsWith(((s: string) => s.startsWith('%') ? s.slice('%'.length) : s)(p.TYPE))).and(supplier.nation().region().name().eq(p.REGION)));
+  let with_cheapest = rows.extend({ cheapest: (r: any) => r.cost.min().over([r.p_partkey]) });
+  let cheapest = with_cheapest.filter((r: any) => r.cost.eq(r.cheapest)).select('s_acctbal', 's_name', 'n_name', 'p_partkey', 'p_mfgr', 's_address', 's_phone', 's_comment');
+  return cheapest.orderBy(cheapest.column('s_acctbal').descending(), cheapest.column('n_name').ascending(), cheapest.column('s_name').ascending(), cheapest.column('p_partkey').ascending()).limit(100);
+}
+
+export function _product_type_profit(lines: any, supplies: any, p: any) {
+  let sold = lines.findAll(p.APP_TIME, p.SYS_TIME, [lines.part().partKey().alias('l_partkey'), lines.supplier().supplierKey().alias('l_suppkey'), lines.supplier().nation().name().alias('nation'), lines.order().orderDate().year().alias('o_year'), _revenue(lines).alias('revenue'), lines.quantity().alias('quantity')], lines.part().name().contains('green'));
+  let supplied = supplies.findAll(p.APP_TIME, p.SYS_TIME, [supplies.part().partKey().alias('ps_partkey'), supplies.supplier().supplierKey().alias('ps_suppkey'), supplies.supplyCost().alias('supplycost')]);
+  let profit = sold.join(supplied, (l: any, ps: any) => l.l_partkey.eq(ps.ps_partkey).and(l.l_suppkey.eq(ps.ps_suppkey)), 'inner').extend({ amount: (r: any) => r.revenue.minus(r.supplycost.times(r.quantity)) });
+  let by_nation = profit.groupBy((r: any) => [r.nation, r.o_year]).aggregate({ sum_profit: (r: any) => r.amount.sum() });
+  return by_nation.orderBy(by_nation.column('nation').ascending(), by_nation.column('o_year').descending());
+}
+
+export function _customer_distribution(q: any, p: any) {
+  let customers = q.customer.findAll(p.APP_TIME, p.SYS_TIME, [q.customer.customerKey().alias('c_custkey')]);
+  let orders = q.order.findAll(p.APP_TIME, p.SYS_TIME, [q.order.customer().customerKey().alias('o_custkey'), q.order.orderKey().alias('o_orderkey')], q.order.comment().matches('special.*requests').not());
+  let per_customer = customers.join(orders, (c: any, o: any) => c.c_custkey.eq(o.o_custkey), 'left').groupBy((r: any) => r.c_custkey).aggregate({ c_count: (r: any) => r.o_orderkey.count() });
+  let distribution = per_customer.groupBy((r: any) => r.c_count).aggregate({ custdist: (r: any) => r.c_custkey.count() });
+  return distribution.orderBy(distribution.column('custdist').descending(), distribution.column('c_count').descending());
+}
+
+export function _top_supplier(q: any, p: any) {
+  let lines = q.lineitem;
+  let revenue = lines.findAll(p.APP_TIME, p.SYS_TIME, [lines.supplier().supplierKey().alias('supplier_no'), _revenue(lines).sum().alias('total_revenue')], lines.shipDate().gte(new DateOnly('1996-01-01T00:00:00Z')).and(lines.shipDate().lt(new DateOnly('1996-04-01T00:00:00Z')))).groupBy(lines.supplier().supplierKey());
+  let highest = revenue.aggregate({ highest: (r: any) => r.total_revenue.max() });
+  let top = revenue.join(highest, (r: any, h: any) => r.total_revenue.eq(h.highest), 'inner');
+  let suppliers = q.supplier.findAll(null, p.SYS_TIME, [q.supplier.supplierKey().alias('s_suppkey'), q.supplier.name().alias('s_name'), q.supplier.address().alias('s_address'), q.supplier.phone().alias('s_phone')]);
+  let result = suppliers.join(top, (s: any, t: any) => s.s_suppkey.eq(t.supplier_no), 'inner').select('s_suppkey', 's_name', 's_address', 's_phone', 'total_revenue');
+  return result.orderBy(result.column('s_suppkey').ascending());
+}
+
+export function _large_volume_customer(lines: any, p: any) {
+  let order = lines.order();
+  let large = lines.findAll(p.APP_TIME, p.SYS_TIME, [order.orderKey().alias('l_orderkey'), lines.quantity().sum().alias('quantity')]).groupBy(order.orderKey()).filter((r: any) => r.quantity.gt(p.QUANTITY));
+  let rows = lines.findAll(p.APP_TIME, p.SYS_TIME, [order.customer().name().alias('c_name'), order.customer().customerKey().alias('c_custkey'), order.orderKey().alias('o_orderkey'), order.orderDate().alias('o_orderdate'), order.totalPrice().alias('o_totalprice'), lines.quantity().sum().alias('sum_quantity')]).groupBy(order.customer().name(), order.customer().customerKey(), order.orderKey(), order.orderDate(), order.totalPrice());
+  let result = rows.join(large, (r: any, l: any) => r.o_orderkey.eq(l.l_orderkey), 'inner').select('c_name', 'c_custkey', 'o_orderkey', 'o_orderdate', 'o_totalprice', 'sum_quantity');
+  return result.orderBy(result.column('o_totalprice').descending(), result.column('o_orderdate').ascending()).limit(100);
+}
+
+export function _small_quantity_order_revenue(lines: any, p: any) {
+  let rows = lines.findAll(p.APP_TIME, p.SYS_TIME, [lines.part().partKey().alias('partkey'), lines.quantity().alias('quantity'), lines.extendedPrice().alias('price')], lines.part().brand().eq(p.BRAND).and(lines.part().container().eq(p.CONTAINER)));
+  let with_average = rows.extend({ average: (r: any) => r.quantity.average().over([r.partkey]) });
+  let small = with_average.filter((r: any) => r.quantity.lt(r.average.times(0.2)));
+  return small.aggregate({ avg_yearly: (r: any) => r.price.sum().dividedBy(7.0) });
+}
+
 export function _order(o: any) {
   return [o.orderKey(), o.orderStatus(), o.totalPrice(), o.orderDate(), o.orderPriority(), o.shipPriority()];
 }
 
 export function _customer(c: any) {
   return [c.customerKey(), c.name(), c.address(), c.phone(), c.acctBal()];
+}
+
+export function _latest_before(rows: any, columns: any) {
+  let with_latest = rows.extend({ latest: (r: any) => r.end.max().over() });
+  return with_latest.filter((r: any) => r.end.eq(r.latest)).select(...columns);
+}
+
+export function _time_slider(orders: any, p: any, status: any) {
+  let in_range = orders.sysTimeBegin().lt(p.SYS_TIME_END).and(orders.sysTimeEnd().gt(p.SYS_TIME_BEGIN));
+  let current = orders.findAll(null, null, [orders.sysTimeBegin().alias('o_begin'), orders.sysTimeEnd().alias('o_end'), orders.totalPrice().alias('price')], ((status === null) ? in_range : in_range.and(orders.orderStatus().eq(status))));
+  let begins = orders.findAll(null, null, [orders.sysTimeBegin().alias('event_time')], in_range);
+  let ends = orders.findAll(null, null, [orders.sysTimeEnd().alias('event_time')], in_range);
+  return _busiest_time(current, begins.concatenate(ends), ((status === null) ? (r: any) => r.o_begin.count() : (r: any) => r.price.sum()));
+}
+
+export function _busiest_time(current: any, times: any, total: any) {
+  let at = current.join(times, (o: any, t: any) => o.o_begin.lte(t.event_time).and(t.event_time.lt(o.o_end)), 'inner');
+  let totals = at.groupBy((r: any) => r.event_time).aggregate({ total: total });
+  return totals.aggregate({ max_total: (r: any) => r.total.max() });
 }
 
 export function _other_parts(f: any, p: any, app: any, sys: any, application: any = false, system: any = null, anchor_app: any = null) {
@@ -476,13 +552,23 @@ export const TPCH_BIH_SPECS: SpecCase<TpchBihFinders>[] = [
   },
   {
     name: 'K5_sys',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['c_custkey', 'c_acctbal', 'sys_time_begin'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { CUSTOMER_KEY: 136, APP_TIME: new DateOnly('2003-01-01T00:00:00Z'), SYS_TIME: new Date(Date.UTC(2006, 0, 1, 0, 0, 0)) };
+      return _latest_before(q.customer.findAll(p.APP_TIME, null, [q.customer.customerKey().alias('c_custkey'), q.customer.acctBal().alias('c_acctbal'), q.customer.sysTimeBegin().alias('sys_time_begin'), q.customer.sysTimeEnd().alias('end')], q.customer.customerKey().eq(p.CUSTOMER_KEY).and(q.customer.sysTimeEnd().lte(p.SYS_TIME))), ['c_custkey', 'c_acctbal', 'sys_time_begin']);
+    },
+    expected: { columns: ['c_custkey', 'c_acctbal', 'sys_time_begin'], rows: [
+        [136, 49978.67, ts('2004-05-25T21:07:12')],
+      ], approximate: true },
   },
   {
     name: 'K5_app',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['c_custkey', 'c_acctbal', 'visible_time_begin'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { CUSTOMER_KEY: 136, APP_TIME: new DateOnly('2002-07-07T00:00:00Z') };
+      return _latest_before(q.customer.findAll(null, _NOW, [q.customer.customerKey().alias('c_custkey'), q.customer.acctBal().alias('c_acctbal'), q.customer.visibleTimeBegin().alias('visible_time_begin'), q.customer.visibleTimeEnd().alias('end')], q.customer.customerKey().eq(p.CUSTOMER_KEY).and(q.customer.visibleTimeEnd().lte(p.APP_TIME))), ['c_custkey', 'c_acctbal', 'visible_time_begin']);
+    },
+    expected: { columns: ['c_custkey', 'c_acctbal', 'visible_time_begin'], rows: [
+        [136, 93707.43, ts('2000-04-16')],
+      ], approximate: true },
   },
   {
     name: 'K6_sys',
@@ -935,13 +1021,23 @@ export const TPCH_BIH_SPECS: SpecCase<TpchBihFinders>[] = [
   },
   {
     name: 'R3a',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['0'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME_BEGIN: new Date(Date.UTC(2003, 0, 1, 0, 0, 0)), SYS_TIME_END: new Date(Date.UTC(2006, 0, 1, 0, 0, 0)) };
+      return _time_slider(q.order, p, null);
+    },
+    expected: { columns: ['max_total'], rows: [
+        [1691],
+      ] },
   },
   {
     name: 'R3b',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['0'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME_BEGIN: new Date(Date.UTC(2003, 0, 1, 0, 0, 0)), SYS_TIME_END: new Date(Date.UTC(2006, 0, 1, 0, 0, 0)) };
+      return _time_slider(q.order, p, 'O');
+    },
+    expected: { columns: ['max_total'], rows: [
+        [87848240.22],
+      ], approximate: true },
   },
   {
     name: 'R4',
@@ -1938,8 +2034,17 @@ export const TPCH_BIH_SPECS: SpecCase<TpchBihFinders>[] = [
   },
   {
     name: 'Q2',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['s_acctbal', 's_name', 'n_name', 'p_partkey', 'p_mfgr', 's_address', 's_phone', 's_comment'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME: new Date(Date.UTC(2010, 0, 1, 0, 0, 0)), APP_TIME: new DateOnly('2005-01-01T00:00:00Z'), SIZE: 31, TYPE: '%TIN', REGION: 'AFRICA' };
+      return _minimum_cost_supplier(q.partsupp, p);
+    },
+    expected: { columns: ['s_acctbal', 's_name', 'n_name', 'p_partkey', 'p_mfgr', 's_address', 's_phone', 's_comment'], rows: [
+        [4680.24, 'Supplier#000000004', 'MOROCCO', 123, 'Manufacturer#1', 'qGTQJXogS83a7MBnEweGHKevK', '25-843-787-7479', 'al braids affix through the regular'],
+        [3880.74, 'Supplier#000000002', 'ETHIOPIA', 49, 'Manufacturer#2', 'TRMhVHz3XiFuhapxucPo1', '15-679-861-2259', ' the pending packages. furiously expres'],
+        [3880.74, 'Supplier#000000002', 'ETHIOPIA', 67, 'Manufacturer#2', 'TRMhVHz3XiFuhapxucPo1', '15-679-861-2259', ' the pending packages. furiously expres'],
+        [3880.74, 'Supplier#000000002', 'ETHIOPIA', 118, 'Manufacturer#2', 'TRMhVHz3XiFuhapxucPo1', '15-679-861-2259', ' the pending packages. furiously expres'],
+        [1304.82, 'Supplier#000000006', 'KENYA', 21, 'Manufacturer#3', 'zaux5FTzToEg', '24-696-997-4969', ' sleep fluffily against the blithely special dugouts. furiously express th'],
+      ] },
   },
   {
     name: 'Q3',
@@ -2014,8 +2119,43 @@ export const TPCH_BIH_SPECS: SpecCase<TpchBihFinders>[] = [
   },
   {
     name: 'Q9',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['nation', 'o_year', 'sum_profit'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME: new Date(Date.UTC(2010, 0, 1, 0, 0, 0)), APP_TIME: new DateOnly('2009-07-01T00:00:00Z') };
+      return _product_type_profit(q.lineitem, q.partsupp, p);
+    },
+    expected: { columns: ['nation', 'o_year', 'sum_profit'], rows: [
+        ['ARGENTINA', 2008, 4763.1944],
+        ['ARGENTINA', 2006, 6543.9507],
+        ['ARGENTINA', 2002, 1577.2386],
+        ['ARGENTINA', 2001, 1094.0333],
+        ['ETHIOPIA', 2008, 31715.2],
+        ['IRAN', 2005, 5434.7736],
+        ['IRAN', 2004, 24391.36],
+        ['IRAN', 2003, 4945.6008],
+        ['IRAN', 2001, 34707.15],
+        ['IRAQ', 2008, 25324.22],
+        ['IRAQ', 2007, 3814.55],
+        ['IRAQ', 2004, 5286.7782],
+        ['IRAQ', 2002, 23834.56],
+        ['KENYA', 2008, 14411.0505],
+        ['KENYA', 2007, 21078.1136],
+        ['KENYA', 2003, 12678.9584],
+        ['MOROCCO', 2008, 3537.3192],
+        ['MOROCCO', 2007, 7698.8712],
+        ['MOROCCO', 2006, 5087.232],
+        ['MOROCCO', 2004, 2857.3632],
+        ['MOROCCO', 2003, 8393.5044],
+        ['MOROCCO', 2000, 8531.1816],
+        ['PERU', 2009, 1268.28],
+        ['PERU', 2008, 2715.7179],
+        ['PERU', 2007, 7785.18],
+        ['PERU', 2006, 4447.02],
+        ['PERU', 2004, 3491.6373],
+        ['PERU', 2000, 10380.24],
+        ['UNITED KINGDOM', 2009, 26715.528],
+        ['UNITED KINGDOM', 2008, 1721.8704],
+        ['UNITED STATES', 2004, 2523.528],
+      ], approximate: true },
   },
   {
     name: 'Q10',
@@ -2048,8 +2188,16 @@ export const TPCH_BIH_SPECS: SpecCase<TpchBihFinders>[] = [
   },
   {
     name: 'Q11',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['ps_partkey', 'value'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME: new Date(Date.UTC(2010, 0, 1, 0, 0, 0)), APP_TIME: new DateOnly('1992-04-01T00:00:00Z'), NATION: 'IRAN', FRACTION: 0.1 };
+      return _important_stock(q.partsupp, p);
+    },
+    expected: { columns: ['ps_partkey', 'value'], rows: [
+        [26, 7960004.65],
+        [78, 7217646.72],
+        [95, 7185227.46],
+        [154, 7023789.85],
+      ], approximate: true },
   },
   {
     name: 'Q12',
@@ -2064,8 +2212,18 @@ export const TPCH_BIH_SPECS: SpecCase<TpchBihFinders>[] = [
   },
   {
     name: 'Q13',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['c_count', 'custdist'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME: new Date(Date.UTC(2010, 0, 1, 0, 0, 0)), APP_TIME: new DateOnly('1995-07-01T00:00:00Z') };
+      return _customer_distribution(q, p);
+    },
+    expected: { columns: ['c_count', 'custdist'], rows: [
+        [0, 55],
+        [1, 33],
+        [2, 9],
+        [5, 1],
+        [4, 1],
+        [3, 1],
+      ] },
   },
   {
     name: 'Q14',
@@ -2079,8 +2237,13 @@ export const TPCH_BIH_SPECS: SpecCase<TpchBihFinders>[] = [
   },
   {
     name: 'Q15',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['s_suppkey', 's_name', 's_address', 's_phone', 'total_revenue'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME: new Date(Date.UTC(2010, 0, 1, 0, 0, 0)), APP_TIME: new DateOnly('1996-01-01T00:00:00Z') };
+      return _top_supplier(q, p);
+    },
+    expected: { columns: ['s_suppkey', 's_name', 's_address', 's_phone', 'total_revenue'], rows: [
+        [1, 'Supplier#000000001', 'sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1', '27-918-335-1736', 247709.2343],
+      ], approximate: true },
   },
   {
     name: 'Q16',
@@ -2127,13 +2290,24 @@ export const TPCH_BIH_SPECS: SpecCase<TpchBihFinders>[] = [
   },
   {
     name: 'Q17',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['avg_yearly'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME: new Date(Date.UTC(2010, 0, 1, 0, 0, 0)), APP_TIME: new DateOnly('2009-01-01T00:00:00Z'), BRAND: 'Brand#32', CONTAINER: 'MED PACK' };
+      return _small_quantity_order_revenue(q.lineitem, p);
+    },
+    expected: { columns: ['avg_yearly'], rows: [
+        [130.858571428571],
+      ] },
   },
   {
     name: 'Q18',
-    query: _q => { throw new Error('the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet'); },
-    expected: { columns: ['c_name', 'c_custkey', 'o_orderkey', 'o_orderdate', 'o_totalprice', 'sum(l_quantity)'], rows: [], skip: 'the query reads results as relations (filter, extend, select, group_by, join, exists), which is not ported yet' },
+    query: q => {
+      const p = { SYS_TIME: new Date(Date.UTC(2010, 0, 1, 0, 0, 0)), APP_TIME: new DateOnly('2009-01-01T00:00:00Z'), QUANTITY: 250 };
+      return _large_volume_customer(q.lineitem, p);
+    },
+    expected: { columns: ['c_name', 'c_custkey', 'o_orderkey', 'o_orderdate', 'o_totalprice', 'sum_quantity'], rows: [
+        ['Customer#000000242', 242, 6160, ts('2005-04-19'), 273519.29, 268.0],
+        ['Customer#000000034', 34, 6273, ts('2008-10-15'), 247339.12, 258.0],
+      ], approximate: true },
   },
   {
     name: 'Q19',

@@ -101,10 +101,7 @@ SKIPPED_MODULES = {
 # Expectations of the Python specs for features that are not ported yet, by the pattern their names match. Each is generated
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 UNPORTED = [
-    (r'^concatenate', 'concatenate (UNION) is not ported yet'),
-    (r'^(chain_|join_|exists_keeps|not_exists_keeps)', 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'),
-    (r'^(not_equal|ne_matches)', '!= matching a missing value is not ported yet'),
-    (r'^interval_', 'the interval between two datetimes is not ported yet'),
+    (r'^(exists_keeps|not_exists_keeps)', 'exists on a result is not ported yet'),
 ]
 
 
@@ -167,6 +164,7 @@ class Translator:
         self.plain: set[str] = set()           # names that are plain values, not expressions (a helper's `quantity: float`)
         self.used: set[str] = set()            # free functions the translated queries call
         self.model_used: set[str] = set()      # model classes the translated queries use
+        self.rows: set[str] = set()            # the parameters of lambdas that read a row of a result
 
     def type_of(self, node: ast.AST) -> str | None:
         """'text', 'number' or None: what an expression holds, as far as `+ - * /` needs to know."""
@@ -177,10 +175,14 @@ class Translator:
                 return 'number'
         if isinstance(node, ast.Name) and node.id in self.plain:
             return 'number'
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id in self.rows:
+            return 'number'   # a column of a row: the specs do arithmetic only on numbers
         if isinstance(node, ast.UnaryOp):
             return self.type_of(node.operand)
         if isinstance(node, ast.BinOp):
             left, right = self.type_of(node.left), self.type_of(node.right)
+            if isinstance(node.op, ast.Sub) and 'datetime' in (left, right) and 'timedelta' not in (left, right):
+                return 'interval'   # the time between two datetimes
             if isinstance(node.op, ast.Add) and 'text' in (left, right):
                 return 'text'
             if isinstance(node.op, ast.Mult) and left == 'text':
@@ -190,12 +192,14 @@ class Translator:
             func = node.func
             if isinstance(func, ast.Name):
                 return self.type_of(node.args[0]) if func.id == 'constant' else None
+            if isinstance(func.value, ast.Name) and func.value.id == 'datetime':
+                return {'datetime': 'datetime', 'timedelta': 'timedelta'}.get(func.attr)
             if func.attr in TEXT_METHODS:
                 return 'text'
             if func.attr in NUMBER_METHODS:
                 return 'number'
             kind = self.properties.get(func.attr)
-            return {'String': 'text', 'Integer': 'number', 'Float': 'number', 'Decimal': 'number'}.get(kind)
+            return {'String': 'text', 'Integer': 'number', 'Float': 'number', 'Decimal': 'number', 'DateTime': 'datetime'}.get(kind)
         return None
 
     def expr(self, node: ast.AST) -> str:
@@ -232,6 +236,20 @@ class Translator:
         assert isinstance(gen.target, ast.Name) and not gen.ifs, ast.dump(node)
         return f'{self.expr(gen.iter)}.map({gen.target.id} => {self.expr(node.elt)})'
 
+    def visit_Tuple(self, node: ast.Tuple) -> str:
+        return '[' + ', '.join(self.expr(e) for e in node.elts) + ']'
+
+    def visit_Lambda(self, node: ast.Lambda) -> str:
+        """A function of a row of a result (`lambda r: r.price > 250.0`): the row's columns are attributes."""
+        names = [a.arg for a in node.args.args]
+        self.rows.update(names)
+        return f'({", ".join(n + ": any" for n in names)}) => {self.expr(node.body)}'
+
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> str:
+        (gen,) = node.generators
+        assert isinstance(gen.target, ast.Name) and not gen.ifs, ast.dump(node)
+        return f'{self.expr(gen.iter)}.map({gen.target.id} => {self.expr(node.elt)})'
+
     def visit_IfExp(self, node: ast.IfExp) -> str:
         return f'({self.expr(node.test)} ? {self.expr(node.body)} : {self.expr(node.orelse)})'
 
@@ -258,6 +276,10 @@ class Translator:
         except (ValueError, TypeError):
             pass
         kinds = self.type_of(node.left), self.type_of(node.right)
+        if isinstance(node.op, ast.Sub) and 'datetime' in kinds:   # the time between two datetimes, an interval
+            if kinds[0] != 'datetime':
+                raise NotImplementedError(ast.dump(node))
+            return f'{left}.minus({self.expr(right)})'
         plain = lambda n: isinstance(n, ast.Constant) or (isinstance(n, ast.Name) and n.id in self.plain)  # noqa: E731
         if plain(node.left) and plain(node.right) and any(isinstance(n, ast.Name) for n in (node.left, node.right)):
             # a plain value (a helper's `quantity: float`) with a number: a number, not an expression
@@ -270,6 +292,8 @@ class Translator:
             return f'{left}.concat({self.expr(right)})'
         if isinstance(node.op, ast.Mult) and kinds[0] == 'text':
             return f'{left}.repeat({self.expr(right)})'
+        if isinstance(node.op, (ast.BitAnd, ast.BitOr)):   # (a == b) & (c != d): and / or of two comparisons
+            return f'{left}.{"and" if isinstance(node.op, ast.BitAnd) else "or"}({self.expr(right)})'
         if type(node.op) in ARITHMETIC_METHODS:
             if kinds[0] is None and not isinstance(node.left, ast.Call):
                 raise NotImplementedError('arithmetic on an unknown type: ' + ast.dump(node))
@@ -287,7 +311,8 @@ class Translator:
         """Mirror StringAttribute.__getitem__."""
         base = self.expr(node.value)
         sl = node.slice
-        assert isinstance(sl, ast.Slice)
+        if not isinstance(sl, ast.Slice):   # result["name"]: a column of a result
+            return f'{base}.column({self.expr(sl)})'
         const = lambda n: None if n is None else ast.literal_eval(n)  # noqa: E731
         start, stop, step = const(sl.lower), const(sl.upper), const(sl.step)
         if step == -1 and start is None and stop is None:
@@ -318,6 +343,11 @@ class Translator:
             return f'{FREE_FUNCTIONS[func.id]}({", ".join(self.expr(a) for a in node.args)})'
         assert isinstance(func, ast.Attribute), ast.dump(node)
         owner = func.value
+        # datetime.timedelta(days=2): a length of time
+        if isinstance(owner, ast.Name) and owner.id == 'datetime' and func.attr == 'timedelta':
+            self.model_used.add('Interval')
+            (kw,) = node.keywords
+            return f'Interval.{kw.arg}({self.expr(kw.value)})'
         # datetime.datetime(...) / datetime.date(...)
         if isinstance(owner, ast.Name) and owner.id == 'datetime':
             parts = [ast.literal_eval(a) for a in node.args]
@@ -329,11 +359,17 @@ class Translator:
             return 'new Date(Date.UTC(' + ', '.join(str(x) for x in [y, m - 1, d, *rest]) + '))'
         args = [self.expr(a) for a in node.args]
         name = method_name(func.attr)
+        if func.attr == 'removeprefix':   # str.removeprefix on a parameter of the query
+            (prefix,) = args
+            return f'((s: string) => s.startsWith({prefix}) ? s.slice({prefix}.length) : s)({self.expr(owner)})'
         if func.attr in ('std', 'var') and node.keywords:
             # std(ddof=0): the degrees of freedom are the one argument
             (kw,) = node.keywords
             assert kw.arg == 'ddof', ast.dump(node)
             return f'{self.expr(owner)}.{name}({", ".join(args + [self.expr(kw.value)])})'
+        if func.attr == 'join' and any(k.arg == 'how' for k in node.keywords):
+            (how,) = node.keywords
+            return f'{self.expr(owner)}.join({", ".join(args + [self.expr(how.value)])})'
         if func.attr == 'join' and node.keywords:
             # join(",", order_by=[...]): the order the values are joined in is the second argument
             (kw,) = node.keywords
@@ -342,6 +378,15 @@ class Translator:
             if not isinstance(kw.value, ast.List):
                 order = f'[{order}]'
             return f'{self.expr(owner)}.{name}({", ".join((args or ["\'\'"]) + [order])})'
+        if func.attr in ('extend', 'aggregate') and node.keywords:
+            # extend(top=lambda r: ...): the new columns are one object, by name
+            columns = ', '.join(f'{k.arg}: {self.expr(k.value)}' for k in node.keywords)
+            return f'{self.expr(owner)}.{func.attr}({{ {columns} }})'
+        if func.attr == 'concatenate' and node.keywords:
+            # concatenate(other, all=True): UNION ALL, as an option
+            (kw,) = node.keywords
+            assert kw.arg == 'all', ast.dump(node)
+            return f'{self.expr(owner)}.{name}({", ".join(args + ["{ all: " + self.expr(kw.value) + " }"])})'
         if func.attr == 'over' and node.keywords:
             # over(partition_by=[...], order_by=[...]): positional in TypeScript
             given = {k.arg: self.expr(k.value) for k in node.keywords}
@@ -376,6 +421,8 @@ def ts_value(value) -> str:
         return repr(float(f'{float(value):.15g}'))
     if isinstance(value, str):
         return js_str(value)
+    if isinstance(value, datetime.timedelta):
+        return f'new Interval({value / datetime.timedelta(milliseconds=1)})'
     if isinstance(value, (datetime.datetime, datetime.date)):
         return f"ts({js_str(value.isoformat())})"
     raise NotImplementedError(repr(value))
@@ -410,7 +457,7 @@ def mapping_dir(mapping_file: str) -> str:
 
 def translate_helper(translator: 'Translator', stmt: ast.FunctionDef) -> str:
     """A module-level helper function of a spec module as a TypeScript function."""
-    args = ', '.join(f'{a.arg}: any' for a in stmt.args.args)
+    args = ', '.join([f'{a.arg}: any' for a in stmt.args.args] + ([f'...{stmt.args.vararg.arg}: any[]'] if stmt.args.vararg else []))
     lines = []
     for inner in stmt.body:
         if isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Constant):
@@ -566,6 +613,8 @@ describe('trade specs do not depend on order', () => {{
         banner,
         "import { ts, type SpecCase } from '../../spec-harness';",
     ]
+    if any('new Interval(' in block for block in case_blocks):
+        translator.model_used.add('Interval')
     if translator.model_used:
         cases_header.append(f"import {{ {', '.join(sorted(translator.model_used))} }} from '../../../src/model/relational';")
     if translator.used:

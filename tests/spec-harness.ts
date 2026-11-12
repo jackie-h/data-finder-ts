@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { expect } from 'vitest';
 import { DuckDBConnection } from '@duckdb/node-api';
 import type { FinderResult } from '../src/datafinder/runner';
+import { Interval } from '../src/model/relational';
 import type { DialectName, SqlDialect } from '../src/datafinder/dialect';
 
 let _examplesDir: string | undefined;
@@ -67,11 +68,17 @@ function instant(text: string): number {
 function normalize(value: unknown): unknown {
   if (value === null || value === undefined) return null;
   if (value instanceof Temporal) return instant(value.iso);
+  if (value instanceof Interval) return value.milliseconds;
   if (typeof value === 'bigint') return Number(value);
   if (typeof value === 'object') {
     const name = (value as object).constructor?.name ?? '';
     if (name === 'DuckDBDateValue' || name === 'DuckDBTimestampValue') return instant(String(value));
     if (name === 'DuckDBDecimalValue') return Number(String(value));
+    if (name === 'DuckDBIntervalValue') { // months have no fixed length, so an interval of months is not a length of time
+      const { months, days, micros } = value as { months: number; days: number; micros: bigint };
+      if (months !== 0) throw new Error(`An interval of months (${months}) is not a length of time`);
+      return days * 86_400_000 + Number(micros) / 1000;
+    }
   }
   return value;
 }

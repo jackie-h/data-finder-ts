@@ -137,6 +137,8 @@ Custom `QueryRunner`s receive the timeout as the last argument to `select`.
 | `DateAttribute` `DateTimeAttribute` | `.eq(v)` `.gt(v)` `.lt(v)` `.gte(v)` `.lte(v)` |
 | `BooleanAttribute` | `.eq(v)` |
 
+`.ne(v)` (not equal) is on every type, and it matches a row with no value, as Legend writes it: `category.ne('Finance')` is `category <> 'Finance' OR category IS NULL`, whatever the column. `.eq` never matches a missing value. Ordering comparisons on an optional property are written with an `IS NOT NULL` guard, which changes no row.
+
 Combine with `.and()` and `.or()`. A chain reads left to right, each call taking everything before it as its left side, so the first line below is `(name is Acme or name is Beta) and id > 100` and the second is `(name is Acme and id > 100) or name is Beta`:
 
 ```ts
@@ -171,6 +173,58 @@ A numeric column, aggregate, number function or another calculation has `.plus()
 ### First day of a period
 
 `.firstDayOfWeek()` (a Monday), `.firstDayOfMonth()`, `.firstDayOfQuarter()` and `.firstDayOfYear()` on a date or timestamp attribute give the date the period starts, as a date: `pf.tradeDate().firstDayOfMonth()`. The result is named after the function and the column (`First Day Of Month Trade Date`), and can be compared (`.eq(new DateOnly('2024-07-01'))`), sorted and aliased.
+
+### The time between two timestamps
+
+`a.minus(b)` on a timestamp (a column, an expression or a constant) is `a - b`, an interval, as Python's `datetime - datetime` is a `timedelta`: `tf.validTo().minus(tf.validFrom())`. `b` is another timestamp column or expression, or a `Date`. An interval is compared with an `Interval` (`Interval.days(731)`, `Interval.hours(36)`, `Interval.seconds(1.5)`) or another interval, sorted and aliased, and its `min()` and `max()` are intervals. It is not a number, so it has no arithmetic, `sum` or `average` (use `diffDays` or `diffSeconds` for a number). `constant(Interval.days(1))` and `when(...).then(Interval.days(1))` take one too, and `IntervalAttribute` is a column that holds one. The SQL is the difference of the two timestamps, compared with `INTERVAL '<seconds>' SECOND`. The DuckDB runner gives an interval as the value its driver gives (days and microseconds); an interval of months has no fixed length. The GraphQL runner does not compute it on the client.
+
+## Concatenating results
+
+`a.concatenate(b)` is the rows of two results that have the same columns, `UNION` (each distinct row once), and `a.concatenate(b, { all: true })` is `UNION ALL`, as Legend's `concatenate`. It is a result like any other: order it, limit it, offset it, or concatenate it again (`a.concatenate(b).concatenate(c)` is one flat chain of unions). A column of a result is named as `alias()` names it, or by its display name in snake_case (`Category` is `category`); `result.columnNames()` lists them and `result.column('category')` is the column as a typed attribute, to order a concatenated result by:
+
+```ts
+const rows = low.concatenate(high);
+rows.orderBy(rows.column('category').ascending()).offset(1).limit(3);
+```
+
+The two results need the same column names, in the same order, each named once (name a repeated column with `alias()`). A side keeps its own `orderBy` and `limit` (in brackets in the SQL). The GraphQL runner has no union.
+
+## Steps over a result: filter, extend, select
+
+A result can be read as a relation, and each step is a query over the one before it, as Legend's relation functions are. A step takes functions of a row, whose columns are attributes (`r.price`, as Legend's `$r.price`): a column that is not there is refused when the query is built, with the columns there are.
+
+```ts
+const trades = tf.findAll(null, at, [tf.account().name().alias('account'), tf.symbol().alias('sym'), tf.price().alias('price')]);
+
+trades.filter(r => r.price.gt(250));                                   // the rows for which every condition holds
+trades.extend({ double: r => r.price.times(2) });                      // more columns, each from a row
+trades.extend({ top: r => r.price.max().over([r.account]) })          // a window, then filter on it:
+  .filter(r => r.price.eq(r.top)).select('account', 'sym', 'price');  //   what a WHERE over the rows cannot do
+trades.select('sym', 'price');                                         // some columns, by name
+```
+
+`groupBy` and `aggregate` are steps too, as Legend's `groupBy` and `aggregate`:
+
+```ts
+trades.groupBy(r => r.account).aggregate({ total: r => r.price.sum(), n: r => r.price.count() });   // the keys, and an aggregate of each group
+trades.groupBy(r => [r.account, r.sym]).aggregate({ total: r => r.price.sum() });                    // several keys
+trades.groupBy(r => r.date.year().alias('year')).aggregate({ n: r => r.price.count() });             // an expression is named with alias()
+trades.aggregate({ total: r => r.price.sum(), average: r => r.price.sum().dividedBy(5) });            // one row for the whole result
+```
+
+Each aggregate column must be an aggregate of the rows of its group (`sum`, `count`, `average`, `min`, `max`, ... also inside arithmetic). `groupBy` with finder attributes (`f.findAll([...]).groupBy(f.category())`) is as before; the two forms are told apart by their arguments and cannot be mixed. A step after it, such as `filter`, reads the groups' columns (a `HAVING`, written as a `WHERE` over the grouped query).
+
+`join` puts two results together, as Legend's `join`. The condition is a function of a row of each (`and` / `or` combine comparisons), and `how` is one of ANSI SQL's join types, `'inner'`, or `'left'`, `'right'` and `'full'`, the outer joins that keep the rows that find no match, with NULL for the other side's columns:
+
+```ts
+orders.join(customers, (o, c) => o.customerId.eq(c.id), 'inner');      // only the orders that have a customer
+orders.join(customers, (o, c) => o.customerId.eq(c.id), 'left');       // every order, with a customer or NULL
+lines.join(others, (a, b) => a.order.eq(b.order).and(a.supplier.ne(b.supplier)), 'inner');
+```
+
+The result has the columns of both sides, which must be named differently (as Legend requires): name them with `alias()`, or `extend` then `select`. It is a result like any other, so it can be joined again, filtered, grouped and ordered. The SQL is `FROM (left) AS t1 INNER JOIN (right) AS t2 ON (...)` inside the query that reads it.
+
+The result of a step is a result: order it with `.column(name)` (`rows.orderBy(rows.column('price').ascending())`), limit it, concatenate it. A row's attributes are loosely typed (`ResultRow`): a column's type is known when the query is built, not by the compiler.
 
 ## Sorting
 

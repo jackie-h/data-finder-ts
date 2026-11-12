@@ -9,6 +9,7 @@ import {
   ComparisonOperation,
   ExistsOperation,
   InOperation,
+  Interval,
   IsNotNullOperation,
   IsNullOperation,
   LogicalOperation,
@@ -24,7 +25,7 @@ const CONDITIONS = [
 ];
 
 /** What a branch can be: a column or expression as it is, a plain value as a constant. */
-export type Branch = Attribute | RelationalOperationElement | boolean | number | string | Date;
+export type Branch = Attribute | RelationalOperationElement | boolean | number | string | Date | Interval;
 
 /**
  * Something that is true or false for a row, which a `when` can test: a comparison, a null check, a membership

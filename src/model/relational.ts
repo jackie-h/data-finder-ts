@@ -743,6 +743,28 @@ export class NotExistsOperation extends RelationalOperationElement implements Al
  */
 export abstract class QueryExpression extends Relation {}
 
+/** ANSI SQL's join types: `inner`, and the outer joins `left`, `right` and `full`, which keep the rows that find no match. */
+export enum JoinKind {
+  INNER = 'inner',
+  LEFT = 'left',
+  RIGHT = 'right',
+  FULL = 'full',
+}
+
+/**
+ * A relation joined on a condition, as ANSI SQL's `<join type> JOIN <table reference> ON <search condition>` and Legend's
+ * `Join`: its `target`, the kind of join and the condition `operation`. Every column in the condition is owned by a relation,
+ * which says which side of the join it is on. A query holds these for the relations it reads besides its root.
+ */
+export class RelationJoin {
+  constructor(
+    readonly name: string,
+    readonly target: Relation,
+    readonly operation: RelationalOperationElement,
+    readonly kind: JoinKind,
+  ) {}
+}
+
 /**
  * A single SELECT over a root table, as ANSI SQL's `<query specification>`: what to show, which rows qualify, how
  * they are grouped, which groups qualify (HAVING) and whether duplicates are removed (DISTINCT). It has no ORDER BY
@@ -754,7 +776,7 @@ export class QuerySpecification extends QueryExpression {
     readonly columns: readonly RelationalOperationElement[],
     readonly filter: RelationalOperationElement,
     readonly groupBy: RelationalOperationElement[] = [],
-    readonly table?: Table,
+    readonly table?: Relation,
     /**
      * Extra ON conditions for this query's joins (milestoning and property filters), keyed by join node.
      * Held here rather than on the shared JoinOperation, so queries that use the same node can't affect each other.
@@ -769,6 +791,8 @@ export class QuerySpecification extends QueryExpression {
      * that instead of to the table, so a parent is not repeated for each row that matches.
      */
     readonly subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map(),
+    /** Relations joined to the root on a condition, in the order they are written. */
+    readonly joins: readonly RelationJoin[] = [],
   ) { super(); }
 }
 
@@ -784,14 +808,34 @@ export class OrderedQuerySpecification extends QuerySpecification {
     groupBy: RelationalOperationElement[] = [],
     /** How many rows are returned at most. */
     readonly limit?: number,
-    table?: Table,
+    table?: Relation,
     joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map(),
     distinct: boolean = false,
     /** How many rows to skip before the first one returned. */
     readonly offset?: number,
     having?: Operation,
     subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map(),
-  ) { super(columns, filter, groupBy, table, joinFilters, distinct, having, subSelects); }
+    joins: readonly RelationJoin[] = [],
+  ) { super(columns, filter, groupBy, table, joinFilters, distinct, having, subSelects, joins); }
+}
+
+/**
+ * Two query expressions whose rows are put together: `left UNION right` (the distinct rows), or `UNION ALL` with `all`.
+ * ANSI SQL's `<query expression body>` with a set operator, and Legend's `concatenate`. The two have the same number of
+ * columns, and the result's columns are the left one's. Either side can be a union itself.
+ *
+ * As a query expression it has no ORDER BY or row limit; a query that reads from it, through a table alias, has.
+ */
+export class UnionOperation extends QueryExpression {
+  constructor(readonly left: QueryExpression, readonly right: QueryExpression, readonly all: boolean = false) {
+    super();
+    if (left.columns.length !== right.columns.length) {
+      throw new Error(`A union is of queries with the same columns: ${left.columns.length} and ${right.columns.length} columns`);
+    }
+  }
+
+  /** The columns of the left side name the result's columns. */
+  get columns(): readonly RelationalOperationElement[] { return this.left.columns; }
 }
 
 /** Whether `op` holds an aggregate, a window function or a count. */
@@ -820,7 +864,8 @@ export function valueOperand(value: unknown): ConstantOperation {
   if (typeof value === 'string') return new StringConstantOperation(value);
   if (value instanceof DateOnly) return new DateConstantOperation(value); // before Date: DateOnly is a Date
   if (value instanceof Date) return new DateTimeConstantOperation(value);
-  throw new TypeError(`A value to compare with is a boolean, a finite number, a string or a date, not ${value === null ? 'null' : typeof value}`);
+  if (value instanceof Interval) return new IntervalConstantOperation(value);
+  throw new TypeError(`A value to compare with is a boolean, a finite number, a string, a date or an interval, not ${value === null ? 'null' : typeof value}`);
 }
 
 /** The thing to compare or calculate with: an expression as it is, an attribute as its column, a value as a constant. */
@@ -1281,3 +1326,72 @@ applyMixins(ComparisonOperation, [BooleanAggregates]);
 
 export interface LogicalOperation extends BooleanAggregates {}
 applyMixins(LogicalOperation, [BooleanAggregates]);
+
+/**
+ * A length of time, as Python's `timedelta` is: what the difference of two timestamps is. `Interval.days(731)`,
+ * `Interval.hours(36)`. It has no months or years, as they have no fixed length.
+ */
+export class Interval {
+  constructor(readonly milliseconds: number) {
+    if (!Number.isFinite(milliseconds)) throw new RangeError('An interval is a finite length of time');
+  }
+
+  static days(n: number): Interval { return new Interval(n * 86_400_000); }
+  static hours(n: number): Interval { return new Interval(n * 3_600_000); }
+  static minutes(n: number): Interval { return new Interval(n * 60_000); }
+  static seconds(n: number): Interval { return new Interval(n * 1000); }
+  static milliseconds(n: number): Interval { return new Interval(n); }
+
+  /** The length in seconds, as text with no trailing zeros: `63158400`, `1.5`. */
+  totalSeconds(): number { return this.milliseconds / 1000; }
+  equals(other: Interval): boolean { return this.milliseconds === other.milliseconds; }
+  toString(): string { return `${this.totalSeconds()} seconds`; }
+}
+
+/** An interval as a constant: `constant(Interval.days(2))`, or the value an interval is compared with. */
+export class IntervalConstantOperation extends ConstantOperation {
+  constructor(readonly value: Interval) { super(); }
+  comparisonOperand(): RelationalOperationElement { return this; }
+}
+
+export interface IntervalConstantOperation extends Equatable<Interval>, Orderable<Interval> {}
+applyMixins(IntervalConstantOperation, [Equatable, Orderable]);
+
+/** An aggregate that gives an interval: the smallest or largest of a group's. */
+export class IntervalAggregateOperation extends AggregateOperation {}
+
+/**
+ * The smallest and largest of a group, for an expression that can be ordered but not summed. They are of the expression's
+ * own type: the minimum of an interval is an interval.
+ */
+export abstract class Extremes<A extends AggregateOperation> {
+  /** @internal The aggregate that gives the expression's own type. */
+  abstract aggregateKind(): AggregateConstructor<A>;
+
+  /** Smallest value in the group. */
+  min(): A { return new (this.aggregateKind())(this as unknown as RelationalOperationElement, AggregateOperator.MIN, 'Min Expression'); }
+  /** Largest value in the group. */
+  max(): A { return new (this.aggregateKind())(this as unknown as RelationalOperationElement, AggregateOperator.MAX, 'Max Expression'); }
+}
+
+/**
+ * The time between two timestamps, `left - right`: an interval. It is compared with an `Interval` or another interval and
+ * ordered, and its smallest and largest are intervals. It is not a number, so it has no arithmetic, sum or average.
+ */
+export class IntervalOperation extends BinaryOperation implements Sortable {
+  constructor(left: RelationalOperationElement, right: RelationalOperationElement, readonly displayName?: string) {
+    super(left, right);
+  }
+
+  /** Sort by this expression, smallest first. */
+  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+
+  /** Sort by this expression, largest first. */
+  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+
+  comparisonOperand(): RelationalOperationElement { return this; }
+  aggregateKind(): AggregateConstructor<IntervalAggregateOperation> { return IntervalAggregateOperation; }
+}
+
+export interface IntervalOperation extends Equatable<Interval>, Orderable<Interval>, Extremes<IntervalAggregateOperation> {}
+applyMixins(IntervalOperation, [Equatable, Orderable, Extremes]);

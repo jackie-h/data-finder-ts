@@ -3,6 +3,13 @@ import { ts, type SpecCase } from '../../spec-harness';
 import { concat, constant, countAll, when } from '../../../src/datafinder';
 import type { CompanyFinder } from '../../generated_examples/companies/CompanyFinder';
 
+export function _ascending(result: any, ...columns: any[]) {
+  return result.orderBy(...columns.map(column => result.column(column).ascending()));
+}
+export function _descending(result: any, ...columns: any[]) {
+  return result.orderBy(...columns.map(column => result.column(column).descending()));
+}
+
 export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   {
     name: 'count_distinct_of_the_whole_result',
@@ -36,23 +43,35 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'join_per_group_in_an_order',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => f.findAll([f.category(), f.name().join(', ', [f.name().ascending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
+    expected: { columns: ['Category', 'Join Name'], rows: [
+        ['Finance', 'Delta Ltd, Gamma LLC'],
+        ['Manufacturing', 'Acme Industries'],
+        ['Technology', 'Acme Corp, Beta Corp'],
+      ], sql: 'STRING_AGG(t0.name, \', \' ORDER BY t0.name ASC)', skipGraphql: 'The GraphQL engine cannot order the values it joins' },
   },
   {
     name: 'join_descending',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => f.findAll([f.category(), f.name().join('|', [f.name().descending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
+    expected: { columns: ['Category', 'Join Name'], rows: [
+        ['Finance', 'Gamma LLC|Delta Ltd'],
+        ['Manufacturing', 'Acme Industries'],
+        ['Technology', 'Beta Corp|Acme Corp'],
+      ], skipGraphql: 'The GraphQL engine cannot order the values it joins' },
   },
   {
     name: 'join_of_the_whole_result',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => f.findAll([f.category().join('/', [f.id().ascending()])]),
+    expected: { columns: ['Join Category'], rows: [
+        ['Technology/Manufacturing/Technology/Finance/Finance'],
+      ], skipGraphql: 'The GraphQL engine cannot order the values it joins' },
   },
   {
     name: 'join_without_an_order_joins_every_value',
-    query: () => { throw new Error('a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet' },
+    query: f => f.findAll([f.category(), f.name().join(',')], f.category().eq('Manufacturing')).groupBy(f.category()),
+    expected: { columns: ['Category', 'Join Name'], rows: [
+        ['Manufacturing', 'Acme Industries'],
+      ], sql: 'STRING_AGG(t0.name, \',\')' },
   },
   {
     name: 'count_all_counts_rows_per_group',
@@ -270,8 +289,11 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'not_equal_on_an_expression',
-    query: () => { throw new Error('!= matching a missing value is not ported yet'); },
-    expected: { columns: [], rows: [], skip: '!= matching a missing value is not ported yet' },
+    query: f => f.findAll([f.id()], f.name().toLowerCase().ne('acme corp')).orderBy(f.id().ascending()).limit(2),
+    expected: { columns: ['Id'], rows: [
+        [2],
+        [3],
+      ], skipGraphql: 'A filter on an expression cannot be pushed to the server' },
   },
   {
     name: 'sort_by_an_aggregate_descending_then_a_column',
@@ -821,33 +843,59 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'concatenate_removes_the_duplicate_rows',
-    query: () => { throw new Error('concatenate (UNION) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'concatenate (UNION) is not ported yet' },
+    query: f => _ascending(f.findAll([f.category()], f.id().lt(3)).concatenate(f.findAll([f.category()], f.id().gt(2))), 'category'),
+    expected: { columns: ['category'], rows: [
+        ['Finance'],
+        ['Manufacturing'],
+        ['Technology'],
+      ], sql: ' UNION SELECT', skipGraphql: 'The GraphQL finder has no union' },
   },
   {
     name: 'concatenate_all_keeps_the_duplicate_rows',
-    query: () => { throw new Error('concatenate (UNION) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'concatenate (UNION) is not ported yet' },
+    query: f => _ascending(f.findAll([f.category()], f.id().lt(3)).concatenate(f.findAll([f.category()], f.id().gt(2)), { all: true }), 'category'),
+    expected: { columns: ['category'], rows: [
+        ['Finance'],
+        ['Finance'],
+        ['Manufacturing'],
+        ['Technology'],
+        ['Technology'],
+      ], sql: ' UNION ALL SELECT', skipGraphql: 'The GraphQL finder has no union' },
   },
   {
     name: 'concatenate_more_than_two_results',
-    query: () => { throw new Error('concatenate (UNION) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'concatenate (UNION) is not ported yet' },
+    query: f => _descending(f.findAll([f.id()], f.id().eq(1)).concatenate(f.findAll([f.id()], f.id().eq(2)), { all: true }).concatenate(f.findAll([f.id()], f.id().eq(3)), { all: true }), 'id'),
+    expected: { columns: ['id'], rows: [
+        [3],
+        [2],
+        [1],
+      ], skipGraphql: 'The GraphQL finder has no union' },
   },
   {
     name: 'concatenate_more_than_two_results_with_named_columns',
-    query: () => { throw new Error('concatenate (UNION) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'concatenate (UNION) is not ported yet' },
+    query: f => _descending(f.findAll([f.id().alias('theKey')], f.id().eq(1)).concatenate(f.findAll([f.id().alias('theKey')], f.id().eq(2)), { all: true }).concatenate(f.findAll([f.id().alias('theKey')], f.id().eq(3)), { all: true }), 'theKey'),
+    expected: { columns: ['theKey'], rows: [
+        [3],
+        [2],
+        [1],
+      ], sql: ' UNION ALL SELECT', skipGraphql: 'The GraphQL finder has no union' },
   },
   {
     name: 'concatenate_then_offset_and_limit',
-    query: () => { throw new Error('concatenate (UNION) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'concatenate (UNION) is not ported yet' },
+    query: f => _ascending(f.findAll([f.id()], f.id().lt(3)).concatenate(f.findAll([f.id()], f.id().gte(3))), 'id').offset(1).limit(3),
+    expected: { columns: ['id'], rows: [
+        [2],
+        [3],
+        [4],
+      ], sql: 'LIMIT 3 OFFSET 1', skipGraphql: 'The GraphQL finder has no union' },
   },
   {
     name: 'concatenate_a_result_with_its_own_order_and_limit',
-    query: () => { throw new Error('concatenate (UNION) is not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'concatenate (UNION) is not ported yet' },
+    query: f => _ascending(f.findAll([f.id()]).orderBy(f.id().descending()).limit(2).concatenate(f.findAll([f.id()], f.id().eq(1)), { all: true }), 'id'),
+    expected: { columns: ['id'], rows: [
+        [1],
+        [4],
+        [5],
+      ], sql: '(SELECT', skipGraphql: 'The GraphQL finder has no union' },
   },
   {
     name: 'aggregate_over_a_window_keeps_every_row',

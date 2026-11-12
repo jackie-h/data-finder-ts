@@ -13,6 +13,7 @@ import {
   DatePart,
   DateTimeConstantOperation,
   DateTruncOperation,
+  IntervalOperation,
   RelationalOperationElement,
   applyMixins,
 } from '../model/relational';
@@ -129,6 +130,15 @@ export abstract class DateTimeFunctions {
   subtractMinutes(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.functionInput(), n, DatePart.MINUTE, false, 'Subtract Minutes ' + this.functionLabel()); }
   /** Subtract `n` seconds from this timestamp. */
   subtractSeconds(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.functionInput(), n, DatePart.SECOND, false, 'Subtract Seconds ' + this.functionLabel()); }
+
+  /**
+   * The time between `other` and this timestamp, `this - other`, as an interval: `f.validTo().minus(f.validFrom())`. It is compared with
+   * an `Interval` (`.gt(Interval.days(30))`), and its `min()` and `max()` are intervals. It is not a number: for a number of days or
+   * seconds use `diffDays` or `diffSeconds`.
+   */
+  minus(other: Date | Comparand): IntervalOperation {
+    return new IntervalOperation(this.functionInput(), other instanceof Date ? new DateTimeConstantOperation(other) : comparandOperand(other), 'Interval ' + this.functionLabel());
+  }
 
   /** Number of whole days between this timestamp and `other`. */
   diffDays(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.functionInput(), diffOther(other), DatePart.DAY, 'Diff Days ' + this.functionLabel()); }

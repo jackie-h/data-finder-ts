@@ -46,11 +46,17 @@ import {
   NotExistsOperation,
   QuerySpecification,
   OrderedQuerySpecification,
+  QueryExpression,
+  RelationJoin,
+  JoinKind,
+  UnionOperation,
   BinaryOperation,
   CaseOperation,
   ConcatOperation,
   DateTruncOperation,
   ArithmeticOperation,
+  IntervalOperation,
+  IntervalConstantOperation,
   ArithmeticOperator,
   containsAggregate,
   containsAggregateOrWindow,
@@ -124,7 +130,8 @@ const AGGREGATE_SQL_NAMES: Partial<Record<AggregateOperator, string>> = {
 
 /**
  * Comparisons that are never true for a missing value. Legend guards these on an optional property with IS NOT NULL;
- * it does not guard `=` (which a missing value never matches either) or `<>`.
+ * it does not guard `=` (which a missing value never matches either). A `<>` of a column and a value is not guarded but
+ * widened: `<> x OR IS NULL`.
  */
 const GUARDED_COMPARISONS = new Set<ComparisonOperator>([
   ComparisonOperator.LESS_THAN, ComparisonOperator.GREATER_THAN, ComparisonOperator.LESS_THAN_OR_EQUAL_TO,
@@ -184,6 +191,7 @@ function constantValueString(op: ConstantOperation, d: SqlDialect): string {
   if (op instanceof FloatConstantOperation) return Number.isInteger(op.value) && Math.abs(op.value) < 1e21 ? op.value.toFixed(1) : String(op.value); // 200.0, so it stays a float
   if (op instanceof BooleanConstantOperation) return op.value ? 'TRUE' : 'FALSE';
   if (op instanceof DecimalConstantOperation) return String(op.value);
+  if (op instanceof IntervalConstantOperation) return "INTERVAL '" + op.value.totalSeconds() + "' SECOND";
   throw new Error('Unknown constant operation');
 }
 
@@ -316,6 +324,9 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
   if (operation instanceof ConstantOperation) return selectedConstantString(operation, d);
   if (operation instanceof RenderedSql) return operation.sql;
   if (operation instanceof ConcatOperation) return operation.parts.map(part => operandString(part, d)).join(' || ');
+  if (operation instanceof IntervalOperation) { // the timestamps are typed, as a select list's constants are
+    return sqlOperationToString(operation.left, d) + ' - ' + sqlOperationToString(operation.right, d);
+  }
   if (operation instanceof ArithmeticOperation) {
     let left = operandString(operation.left, d);
     let right = operandString(operation.right, d);
@@ -514,7 +525,7 @@ function walkRefs(
     walkRefs(op.element, visit, visitExists);
   } else if (op instanceof ConcatOperation) {
     for (const part of op.parts) walkRefs(part, visit, visitExists);
-  } else if (op instanceof ArithmeticOperation) {
+  } else if (op instanceof ArithmeticOperation || op instanceof IntervalOperation) {
     walkRefs(op.left, visit, visitExists);
     walkRefs(op.right, visit, visitExists);
   } else if (op instanceof CaseOperation) {
@@ -636,7 +647,7 @@ function buildQuerySpecification(
   businessDate: Date | null,
   processingDatetime: Date | null,
   columns: (Attribute | RelationalOperationElement)[],
-  table: Table,
+  table: Relation,
   op: RelationalOperationElement,
   orderBy: SortOperation[] = [],
   groupBy: Comparand[] = [],
@@ -734,6 +745,36 @@ function reachesToMany(op: RelationalOperationElement): boolean {
 }
 
 /** A column with any alias around it taken off. */
+/** The name a column of a result gets in a SELECT when it has not been given one with `alias()`. */
+export function displayAlias(col: RelationalOperationElement | Attribute): string {
+  if (col instanceof Alias) return col.name;
+  if (col instanceof CountAllOperation) return 'Count';
+  if (col instanceof ConstantOperation) return 'Constant';
+  if (col instanceof Attribute) return col.displayName();
+  if (col instanceof Column) return col.name;
+  const element = (col as { element?: unknown }).element;
+  const ofColumn = () => findColumn(col as RelationalOperationElement).column.name;
+  if (col instanceof WindowFunctionOperation) {
+    if (col.displayName) return col.displayName;
+    if ([WindowFunction.ROW_NUMBER, WindowFunction.RANK, WindowFunction.DENSE_RANK].includes(col.func)) {
+      return col.func.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+    return col.element ? col.func + ' ' + ofColumn() : col.func;
+  }
+  if (col instanceof AggregateOperation) {
+    return col.displayName ?? (element instanceof ColumnWithJoin ? col.operator + ' ' + ofColumn() : 'Expression');
+  }
+  if (col instanceof ScalarFunctionOperation) return col.displayName ?? col.func + ' ' + ofColumn();
+  if (col instanceof DateDiffOperation || col instanceof DateTruncOperation) return col.displayName ?? ofColumn();
+  if (col instanceof DateExtractOperation || col instanceof DateArithmeticOperation) {
+    return col.displayName ?? (element instanceof ColumnWithJoin ? ofColumn() : 'Expression');
+  }
+  if (col instanceof CaseOperation || col instanceof ConcatOperation || col instanceof ArithmeticOperation || col instanceof IntervalOperation) {
+    return col.displayName ?? 'Expression';
+  }
+  return 'Expression';
+}
+
 function unaliased(op: unknown): unknown {
   return op instanceof Alias ? unaliased(op.element) : op;
 }
@@ -756,10 +797,11 @@ class SQLQueryGenerator {
   private _tableAliasIncr: number;
   private _tableAliasesByTable = new Map<unknown, TableAlias>();
   private _addedJoinIds = new Set<JoinTreeNodeOperation>();
-  private _rootTable?: Table;
+  private _rootTable?: Relation;
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
   private _subSelects: ReadonlyMap<JoinTreeNodeOperation, QuerySpecification> = new Map();
+  private _relationJoins: readonly RelationJoin[] = [];
 
   generate(query: QuerySpecification): void {
     // a query that is only stored has no order, limit or offset
@@ -768,9 +810,12 @@ class SQLQueryGenerator {
     this._elidableNodes = this._computeElidableNodes(query);
     this._joinFilters = query.joinFilters;
     this._subSelects = query.subSelects;
+    this._relationJoins = query.joins;
     if (this._rootTable !== undefined) {
       this._from.add(this._tableAliasForTable(this._rootTable));
     }
+    // the relations joined to it are named next, so they read t1, t2, ... in the order they are joined
+    for (const join of query.joins) this._tableAliasForTable(join.target);
     this.processSelect([...query.columns]);
     this._where = this.buildFilter(this._guarded(query.filter));
     const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
@@ -815,8 +860,8 @@ class SQLQueryGenerator {
     }
     const aggregates = query.columns.filter(containsAggregate);
     if (aggregates.length === 0) return [];
-    const perRoot = query.table !== undefined && aggregates.some(reachesToMany);
-    const keys = perRoot ? query.table!.columns.filter(c => c.primaryKey).map(c => this._columnToString(c)) : [];
+    const perRoot = query.table instanceof Table && aggregates.some(reachesToMany);
+    const keys = perRoot ? (query.table as Table).columns.filter(c => c.primaryKey).map(c => this._columnToString(c)) : [];
     const grouped = query.columns
       .map((column, i) => ({ column, shown: this._select[i] }))
       .filter(({ column }) => !containsAggregateOrWindow(column) && !(unaliased(column) instanceof ConstantOperation))
@@ -885,7 +930,8 @@ class SQLQueryGenerator {
 
   /**
    * The condition with an explicit `IS NOT NULL` before each ordering or pattern comparison on a value that can be
-   * missing, as Legend writes it for what a query asks of a class. The guard changes no row. It is not added to a
+   * missing, as Legend writes it for what a query asks of a class. The guard changes no row. A `<>` of a column and a value
+   * also matches a missing value, as Legend writes it for any column: `<> x OR IS NULL`. It is not added to a
    * join's own filter (its milestoning dates and property values) or to HAVING, which are not that, so they are
    * never passed through here.
    */
@@ -896,6 +942,11 @@ class SQLQueryGenerator {
     if (op instanceof ComparisonOperation && GUARDED_COMPARISONS.has(op.operator) && op.left instanceof ColumnWithJoin
       && this._resolveOptional(op.left)) {
       return new LogicalOperation(new IsNotNullOperation(op.left), LogicalOperator.AND, op);
+    }
+    if (op instanceof ComparisonOperation && op.operator === ComparisonOperator.NOT_EQUAL && op.left instanceof ColumnWithJoin
+      && op.right instanceof ConstantOperation) {
+      // a missing value is different from any value, as Legend writes it: <> x OR is null
+      return new LogicalOperation(op, LogicalOperator.OR, new IsNullOperation(op.left));
     }
     return op;
   }
@@ -933,6 +984,9 @@ class SQLQueryGenerator {
     if (op instanceof CaseOperation) return new RenderedSql(this._caseSql(op));
     if (isCondition(op)) return new RenderedSql(this.buildFilter(op as Operation)); // a condition inside an expression, such as the argument of an aggregate
     if (op instanceof ConcatOperation) return new ConcatOperation(op.parts.map(part => this._rewriteOperation(part)), op.displayName);
+    if (op instanceof IntervalOperation) {
+      return new IntervalOperation(this._rewriteOperation(op.left), this._rewriteOperation(op.right), op.displayName);
+    }
     if (op instanceof ArithmeticOperation) {
       return new ArithmeticOperation(this._rewriteOperation(op.left), op.operator, this._rewriteOperation(op.right), op.displayName);
     }
@@ -1069,7 +1123,7 @@ class SQLQueryGenerator {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (col instanceof ConcatOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
-    } else if (col instanceof ArithmeticOperation) {
+    } else if (col instanceof ArithmeticOperation || col instanceof IntervalOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? 'Expression'));
     } else if (col instanceof DateTruncOperation) {
       this._select.push(new Alias(this._rewriteOperation(col), col.displayName ?? findColumn(col).column.name));
@@ -1150,8 +1204,8 @@ class SQLQueryGenerator {
       return sql;
     }
     if (op instanceof ConstantOperation) return constantValueString(op, this._dialect);
-    if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation || op instanceof ConcatOperation
-        || op instanceof DateTruncOperation || op instanceof DateExtractOperation || op instanceof DateArithmeticOperation
+    if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation || op instanceof IntervalOperation
+        || op instanceof ConcatOperation || op instanceof DateTruncOperation || op instanceof DateExtractOperation || op instanceof DateArithmeticOperation
         || op instanceof DateDiffOperation || op instanceof AggregateOperation || op instanceof CountAllOperation) {
       // an expression compared in a filter needs its columns' joins, then is written as in a select list
       const required = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
@@ -1185,7 +1239,8 @@ class SQLQueryGenerator {
       return this._tableAliasesByTable.get(cacheKey)!;
     }
     const subSelect = key instanceof JoinTreeNodeOperation ? this._subSelects.get(key) : undefined;
-    const ta = new TableAlias(subSelect ?? table, 't' + this._tableAliasIncr++);
+    // a relation read under a name (a result used as a table): the relation itself is what is written
+    const ta = new TableAlias(subSelect ?? (table instanceof TableAlias ? table.relation : table), 't' + this._tableAliasIncr++);
     this._tableAliasesByTable.set(cacheKey, ta);
     return ta;
   }
@@ -1194,11 +1249,31 @@ class SQLQueryGenerator {
   private _relationSql(alias: TableAlias): string {
     const relation = alias.relation;
     if (relation instanceof Table) return relation.qualifiedName;
+    if (!(relation instanceof QueryExpression)) throw new TypeError('Cannot read ' + relation.constructor.name + ' in a query');
+    return '(' + this._querySql(relation) + ')';
+  }
+
+  /** A query written by a generator of its own that numbers its aliases after this one's; a union is its two queries. */
+  private _querySql(relation: QueryExpression): string {
+    if (relation instanceof UnionOperation) {
+      return this._unionSideSql(relation.left) + (relation.all ? ' UNION ALL ' : ' UNION ') + this._unionSideSql(relation.right);
+    }
     if (!(relation instanceof QuerySpecification)) throw new TypeError('Cannot read ' + relation.constructor.name + ' in a query');
     const nested = new SQLQueryGenerator(this._dialect, this._tableAliasIncr);
     nested.generate(relation);
+    const sql = nested.buildQueryString(); // it names its own relations as it is written, so read its count after
     this._tableAliasIncr = nested._tableAliasIncr;
-    return '(' + nested.buildQueryString() + ')';
+    return sql;
+  }
+
+  /**
+   * One side of a union: in brackets if it has an ORDER BY, a row limit or an offset, as SQL needs for them to belong to
+   * that side and not to the whole union.
+   */
+  private _unionSideSql(side: QueryExpression): string {
+    const sql = this._querySql(side);
+    return side instanceof OrderedQuerySpecification && (side.orderBy.length > 0 || side.limit !== undefined || side.offset)
+      ? '(' + sql + ')' : sql;
   }
 
   buildQueryString(): string {
@@ -1208,8 +1283,17 @@ class SQLQueryGenerator {
       (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
     );
 
+    // a relation joined on a condition is written in its JOIN, not listed in FROM because a column of it was read
+    const joinedAliases = new Set(this._relationJoins.map(j => this._tableAliasForTable(j.target)));
+    const joined = this._relationJoins.map(j => {
+      const alias = this._tableAliasForTable(j.target);
+      const word = { [JoinKind.INNER]: 'INNER', [JoinKind.LEFT]: 'LEFT OUTER', [JoinKind.RIGHT]: 'RIGHT OUTER', [JoinKind.FULL]: 'FULL OUTER' }[j.kind];
+      return ' ' + word + ' JOIN ' + this._relationSql(alias) + ' AS ' + alias.name + ' ON (' + this.buildFilter(j.operation) + ')';
+    });
+
     return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca, this._dialect)).join(',') +
-      ' FROM ' + Array.from(this._from).map(ta => this._relationSql(ta) + ' AS ' + ta.name).join(',') +
+      ' FROM ' + Array.from(this._from).filter(ta => !joinedAliases.has(ta)).map(ta => this._relationSql(ta) + ' AS ' + ta.name).join(',') +
+      joined.join('') +
       joins.join('') +
       this._buildWhere() +
       this._buildGroupBy() +
@@ -1250,7 +1334,7 @@ export function toSql(
   businessDate: Date | null,
   processingDatetime: Date | null,
   columns: (Attribute | RelationalOperationElement)[],
-  table: Table,
+  table: Relation,
   op: RelationalOperationElement,
   orderBy: SortOperation[] = [],
   groupBy: Comparand[] = [],
