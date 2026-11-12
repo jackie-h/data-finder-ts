@@ -101,7 +101,7 @@ SKIPPED_MODULES = {
 # Expectations of the Python specs for features that are not ported yet, by the pattern their names match. Each is generated
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 UNPORTED = [
-    (r'^(chain_|join_|exists_keeps|not_exists_keeps)', 'a result as a relation (filter, extend, select, group_by, join, exists) is not ported yet'),
+    (r'^(chain_group_by|chain_filter_the_groups|chain_aggregate|join_|exists_keeps|not_exists_keeps)', 'group_by, aggregate, join and exists on a result are not ported yet'),
     (r'^(not_equal|ne_matches)', '!= matching a missing value is not ported yet'),
 ]
 
@@ -165,6 +165,7 @@ class Translator:
         self.plain: set[str] = set()           # names that are plain values, not expressions (a helper's `quantity: float`)
         self.used: set[str] = set()            # free functions the translated queries call
         self.model_used: set[str] = set()      # model classes the translated queries use
+        self.rows: set[str] = set()            # the parameters of lambdas that read a row of a result
 
     def type_of(self, node: ast.AST) -> str | None:
         """'text', 'number' or None: what an expression holds, as far as `+ - * /` needs to know."""
@@ -175,6 +176,8 @@ class Translator:
                 return 'number'
         if isinstance(node, ast.Name) and node.id in self.plain:
             return 'number'
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id in self.rows:
+            return 'number'   # a column of a row: the specs do arithmetic only on numbers
         if isinstance(node, ast.UnaryOp):
             return self.type_of(node.operand)
         if isinstance(node, ast.BinOp):
@@ -233,6 +236,12 @@ class Translator:
         (gen,) = node.generators
         assert isinstance(gen.target, ast.Name) and not gen.ifs, ast.dump(node)
         return f'{self.expr(gen.iter)}.map({gen.target.id} => {self.expr(node.elt)})'
+
+    def visit_Lambda(self, node: ast.Lambda) -> str:
+        """A function of a row of a result (`lambda r: r.price > 250.0`): the row's columns are attributes."""
+        names = [a.arg for a in node.args.args]
+        self.rows.update(names)
+        return f'({", ".join(names)}) => {self.expr(node.body)}'
 
     def visit_GeneratorExp(self, node: ast.GeneratorExp) -> str:
         (gen,) = node.generators
@@ -359,6 +368,10 @@ class Translator:
             if not isinstance(kw.value, ast.List):
                 order = f'[{order}]'
             return f'{self.expr(owner)}.{name}({", ".join((args or ["\'\'"]) + [order])})'
+        if func.attr == 'extend' and node.keywords:
+            # extend(top=lambda r: ...): the new columns are one object, by name
+            columns = ', '.join(f'{k.arg}: {self.expr(k.value)}' for k in node.keywords)
+            return f'{self.expr(owner)}.extend({{ {columns} }})'
         if func.attr == 'concatenate' and node.keywords:
             # concatenate(other, all=True): UNION ALL, as an option
             (kw,) = node.keywords

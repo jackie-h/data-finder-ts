@@ -23,6 +23,7 @@ export {
   type QueryRunner,
   type QueryTarget,
   type Row,
+  type ResultRow,
   registerRunner,
   clearRunner,
   getRunner,
