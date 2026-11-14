@@ -1,6 +1,6 @@
 {
   "name": "data-finder-query-ui",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A query page for data-finder mappings: pick properties, filters and group by, build the SQL, run it on Databricks and analyse the rows in DuckDB. A CLI that builds and serves it, and React components to embed it.",
   "keywords": [
     "data-finder",
@@ -62,7 +62,7 @@
     "@duckdb/duckdb-wasm": "^1.32.0",
     "ag-grid-community": "^36.3.0",
     "ag-grid-react": "^36.3.0",
-    "data-finder-ts": ">=0.1.5",
+    "data-finder-ts": ">=0.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

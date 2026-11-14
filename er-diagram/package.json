@@ -1,6 +1,6 @@
 {
   "name": "data-finder-er-diagram",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Mermaid ER diagram viewer; draws the JSON that mapping_markdown.export_json writes from model and mapping markdown",
   "type": "module",
   "bin": {
