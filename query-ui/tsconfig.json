@@ -10,6 +10,9 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
     "paths": {
+      "data-finder-ts": ["../src/index"],
+      "data-finder-ts/datafinder/*": ["../src/datafinder/*"],
+      "data-finder-ts/model/*": ["../src/model/*"],
       "@datafinder": ["../src/datafinder/index"],
       "@datafinder/*": ["../src/datafinder/*"],
       "@model/*": ["../src/model/*"]

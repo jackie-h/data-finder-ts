@@ -1,5 +1,5 @@
 /** The tree of what a query can show: the properties of a class and, through its relations, those of the classes it reaches. */
-import type { ClassMetadata, MappingMetadata, PropertyType } from '@datafinder';
+import type { ClassMetadata, MappingMetadata, PropertyType } from 'data-finder-ts';
 
 export interface PropertyNode {
   kind: 'property';

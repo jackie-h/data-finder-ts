@@ -13,7 +13,47 @@ A browser tool for asking questions of a mapping without writing code.
 
 The panel on the left collapses so the results can use the whole width. **Show SQL** displays what will be sent.
 
-## Running it
+## Install it from npm
+
+`data-finder-query-ui` is a package of its own, in two forms: a command that builds and serves the page for your mappings, and
+React components to put the page in your own app. Both need your generated finders (`ts_generator.generator.generate`, one folder for each mapping).
+
+```bash
+npm install data-finder-ts data-finder-query-ui     # react, react-dom, ag-grid-* and @duckdb/duckdb-wasm come with it as peers
+```
+
+### The command
+
+```bash
+npx data-finder-query-ui build --mappings generated --out query-ui-dist --config query-ui.config.json
+DATABRICKS_HOST=https://adb-123.azuredatabricks.net DATABRICKS_TOKEN=... npx data-finder-query-ui serve --dir query-ui-dist
+```
+
+`generated` is a folder with one folder for each mapping, each holding the `<Mapping>Metadata.ts` and `<Mapping>Context.ts` (and the finders)
+the generator wrote. `build` copies the page into `.data-finder-query-ui/` in your project, builds it against your `node_modules`
+(one copy of React, AG Grid, DuckDB-wasm and data-finder-ts) and removes the folder again. `--config` is the `query-ui.config.json` with the targets
+(below); the package's example when not given. `serve` is the page and the read-only proxy in one process: the token stays on the server.
+
+### The components
+
+```tsx
+import { QueryUi, mappingEntry } from 'data-finder-query-ui';
+import 'data-finder-query-ui/styles.css';
+import { FinanceMappingMetadata } from './generated/finance/FinanceMappingMetadata';
+import { FinanceMappingContext } from './generated/finance/FinanceMappingContext';
+
+<QueryUi
+  mappings={[mappingEntry('finance', FinanceMappingMetadata, FinanceMappingContext)]}
+  targets={[{ name: 'Databricks', host: '', warehouseId: 'abc123' }]} />
+```
+
+`QueryUi` is the whole page; `PropertyTree`, `ColumnList`, `FilterList`, `ResultsGrid`, `AnalysePane` and `SettingsDialog` are its parts, and `buildQuery`
+for a spec of your own is in data-finder-ts. The generated finders import the library through the aliases `@datafinder/*` and
+`@model/*`; point them at data-finder-ts in your bundler (`@datafinder/x` is `data-finder-ts/datafinder/x`, `@model/x` is `data-finder-ts/model/x`).
+`targets` is read from `query-ui.config.json` next to the page when not given. The page needs a bundler that handles `?url` imports (Vite does)
+for the DuckDB-wasm files. `data-finder-query-ui/server` exports `startProxy` for running the proxy yourself.
+
+## Running it from a checkout of the repository
 
 ```bash
 uv sync && npm ci && npm ci --prefix query-ui

@@ -58,6 +58,31 @@
       "types": "./dist/datafinder/sql-generator.d.ts",
       "import": "./dist/datafinder/sql-generator.js",
       "require": "./dist/datafinder/sql-generator.cjs"
+    },
+    "./datafinder/finder": {
+      "types": "./dist/datafinder/finder.d.ts",
+      "import": "./dist/datafinder/finder.js",
+      "require": "./dist/datafinder/finder.cjs"
+    },
+    "./datafinder/embedded": {
+      "types": "./dist/datafinder/embedded.d.ts",
+      "import": "./dist/datafinder/embedded.js",
+      "require": "./dist/datafinder/embedded.cjs"
+    },
+    "./datafinder/naming": {
+      "types": "./dist/datafinder/naming.d.ts",
+      "import": "./dist/datafinder/naming.js",
+      "require": "./dist/datafinder/naming.cjs"
+    },
+    "./datafinder/metadata": {
+      "types": "./dist/datafinder/metadata.d.ts",
+      "import": "./dist/datafinder/metadata.js",
+      "require": "./dist/datafinder/metadata.cjs"
+    },
+    "./model/graphql_mapping": {
+      "types": "./dist/model/graphql_mapping.d.ts",
+      "import": "./dist/model/graphql_mapping.js",
+      "require": "./dist/model/graphql_mapping.cjs"
     }
   },
   "main": "./dist/index.cjs",

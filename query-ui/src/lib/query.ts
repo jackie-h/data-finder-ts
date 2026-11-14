@@ -1,6 +1,6 @@
 /** The state of the query panel, and what it turns into. */
-import type { FilterOperator, FilterSpec, MappingMetadata, QuerySpec, SelectSpec, AggregateName } from '@datafinder';
-import { operatorsFor, resolvePath } from '@datafinder';
+import type { FilterOperator, FilterSpec, MappingMetadata, QuerySpec, SelectSpec, AggregateName } from 'data-finder-ts';
+import { operatorsFor, resolvePath } from 'data-finder-ts';
 import type { Settings } from './settings';
 
 export interface FilterRow { id: number; path: string; op: FilterOperator; value: string; value2: string }

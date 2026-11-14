@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist/types",
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "data-finder-ts": ["../dist/index.d.ts"],
+      "data-finder-ts/datafinder/*": ["../dist/datafinder/*.d.ts"],
+      "data-finder-ts/model/*": ["../dist/model/*.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/mappings", "src/main.tsx", "src/lib/app-mappings.ts"]
+}

@@ -5,21 +5,28 @@ import { FilterList } from './components/FilterList';
 import { ResultsGrid } from './components/ResultsGrid';
 import { AnalysePane } from './components/AnalysePane';
 import { SettingsDialog } from './components/SettingsDialog';
-import { loadMappings } from './lib/mappings';
+import type { MappingEntry } from './lib/mappings';
 import { loadSettings, saveSettings, type Settings } from './lib/settings';
 import { loadTargets, FALLBACK_TARGETS, type Target } from './lib/config';
 import { emptyQuery, groupedBy, toSpec, type QueryState } from './lib/query';
 import { datesNeeded, labelOf } from './lib/tree';
 import { runQuery, sqlFor, type QueryResult } from './lib/run';
 
-export function App() {
-  const mappings = useMemo(loadMappings, []);
+export interface QueryUiProps {
+  /** The mappings to offer; see `mappingEntry`. */
+  mappings: MappingEntry[];
+  /** Where queries can be sent. Read from `query-ui.config.json` next to the page when not given. */
+  targets?: Target[];
+}
+
+/** The whole query page: the mapping picker, the property tree, filters and group by with RUN, and the results. */
+export function QueryUi({ mappings, targets: given }: QueryUiProps) {
   const [mappingKey, setMappingKey] = useState(mappings[0]?.key ?? '');
   const mapping = mappings.find(m => m.key === mappingKey);
   const [state, setState] = useState<QueryState>(() => emptyQuery(mapping?.metadata.classes[0]?.name ?? ''));
   const [settings, setSettings] = useState<Settings>(loadSettings);
-  const [targets, setTargets] = useState<Target[]>(FALLBACK_TARGETS);
-  const [targetName, setTargetName] = useState(FALLBACK_TARGETS[0].name);
+  const [targets, setTargets] = useState<Target[]>(given ?? FALLBACK_TARGETS);
+  const [targetName, setTargetName] = useState((given ?? FALLBACK_TARGETS)[0].name);
   const [result, setResult] = useState<QueryResult | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [running, setRunning] = useState(false);
@@ -29,11 +36,12 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
+    if (given !== undefined) return;
     void loadTargets().then(list => { setTargets(list); setTargetName(list[0].name); });
-  }, []);
+  }, [given]);
 
   if (mapping === undefined) {
-    return <p className="empty">No mappings found. Run <code>npm run generate</code> in query-ui, then reload.</p>;
+    return <p className="empty">No mappings found. Give <code>QueryUi</code> some, or build the app with <code>--mappings</code>.</p>;
   }
   const { metadata } = mapping;
   const target = targets.find(t => t.name === targetName) ?? targets[0];
