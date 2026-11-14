@@ -89,10 +89,8 @@ COLUMN_LABELS = {
     'fill_null_leaves_a_value_that_is_there': {'Fill Null Name': 'Or Else Name'},
 }
 
-# Specs that exercise Python features the TypeScript port doesn't have (SQL views: View / to_view).
-SKIPPED_SPECS = {
-    'TRADE_VIEW_FINDER_SPECS': 'SQL views are not ported',
-}
+# Specs that exercise Python features the TypeScript port doesn't have.
+SKIPPED_SPECS: dict[str, str] = {}
 
 # Whole spec modules that are not ported.
 SKIPPED_MODULES = {

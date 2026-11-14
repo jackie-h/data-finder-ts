@@ -20,6 +20,8 @@ export {
 } from './query-builder';
 export {
   FinderResult,
+  ViewDefinition,
+  ViewResult,
   type QueryRunner,
   type QueryTarget,
   type Row,
@@ -36,3 +38,4 @@ export {
   QueryTimeoutError,
 } from './runner';
 export { DatabricksConnect, type DatabricksConfig, DatabricksQueryError } from './databricks-runner';
+export { View, ViewDefinitionError } from '../model/view';

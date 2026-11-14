@@ -2,6 +2,8 @@ import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { DEFAULT_TIMEOUT_MS, QueryRunner, QueryTarget, QueryTimeoutError, registerRunner, clearRunner } from '../src/datafinder/runner';
 import { toSql } from '../src/datafinder/sql-generator';
 import type { Attribute } from '../src/datafinder/attribute';
+import { viewSqlToString } from '../src/datafinder/sql-generator';
+import type { View } from '../src/model/view';
 import type { Table, SortOperation, RelationalOperationElement, Operation } from '../src/model/relational';
 
 export class DuckDbRunner implements QueryRunner {
@@ -30,6 +32,22 @@ export class DuckDbRunner implements QueryRunner {
   ): Promise<unknown[][]> {
     const sql = toSql(businessDate, processingDatetime, columns as Attribute[], table as Table, op, orderBy, groupBy, limit, businessDateTo, distinct, offset, having, this.dialect, processingDatetimeTo);
     console.log('[SQL]', sql);
+    return this.run(sql, timeoutMs);
+  }
+
+  async createView(view: View): Promise<void> {
+    await this.conn.run(`CREATE SCHEMA IF NOT EXISTS ${view.schema}`);
+    await this.conn.run(viewSqlToString(view, this.dialect));
+  }
+
+  async selectView(view: View, orderBy: string[] = [], timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<unknown[][]> {
+    let sql = `SELECT * FROM ${view.qualifiedName}`;
+    if (orderBy.length > 0) sql += ' ORDER BY ' + orderBy.map(column => `"${column}"`).join(', ');
+    console.log('[SQL]', sql);
+    return this.run(sql, timeoutMs);
+  }
+
+  private async run(sql: string, timeoutMs: number): Promise<unknown[][]> {
     const timer = setTimeout(() => this.conn.interrupt(), timeoutMs);
     let result;
     try {

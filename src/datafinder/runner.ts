@@ -1,5 +1,6 @@
 import { Attribute, Comparand } from './attribute';
-import { buildQuerySpecification, toSql } from './sql-generator';
+import { buildQuerySpecification, checkViewJoins, toSql, viewSqlToString } from './sql-generator';
+import { View, ViewDefinitionError } from '../model/view';
 import { attributes, columnName } from './relation';
 import { MilestonedTable, hasProcessingRange, milestoningColumnsOf } from '../model/milestoning';
 import { DialectName, SqlDialect } from './dialect';
@@ -61,6 +62,12 @@ export interface QueryRunner {
     having?: Operation,
     processingDatetimeTo?: Date | null,
   ): Promise<Row[]>;
+
+  /** Create the view on the backend, replacing any existing view of that name. A runner that cannot, leaves this out. */
+  createView?(view: View): Promise<void>;
+
+  /** Return all rows of a view that already exists, ordered by the named view columns. A runner that cannot, leaves this out. */
+  selectView?(view: View, orderBy?: string[], timeoutMs?: number): Promise<Row[]>;
 }
 
 let _runner: QueryRunner | null = null;
@@ -451,6 +458,33 @@ export class FinderResult {
     return this;
   }
 
+  /**
+   * Define a SQL view from this query: `schema.name`.
+   *
+   * A view has no dates, so `findAll` must have been called with `null` for the business date and processing time. The view
+   * exposes the root table's milestoning columns instead, and every joined milestoned table is pinned to the version that
+   * applied when the root row was recorded. A view also has no ORDER BY or row limit; to order the rows you read back use
+   * `ViewDefinition.result().orderBy()`. Each column is named after its display name in snake_case, e.g. "Account Name"
+   * becomes `account_name`.
+   */
+  toView(name: string, schema: string): ViewDefinition {
+    if (this._businessDate !== null || this._businessDateTo !== null || this._processingDatetime !== null || this._processingDatetimeTo !== null) {
+      throw new ViewDefinitionError(
+        'A view has no dates: pass null for the business date and processing time, and the view will expose the milestoning columns instead');
+    }
+    if (this._distinct) throw new ViewDefinitionError('A view cannot be distinct');
+    if (this._offset !== undefined) throw new ViewDefinitionError('A view has no row offset');
+    if (this._having !== undefined) throw new ViewDefinitionError('A view has no HAVING; filter the rows you read back from it');
+    if (this._orderBy.length > 0 || this._limit !== undefined) {
+      throw new ViewDefinitionError('A view has no ORDER BY or row limit; order the rows when you read them with result().orderBy()');
+    }
+    if (!(this._table instanceof Table)) throw new ViewDefinitionError('A view is defined over a table, not over a union');
+    const projection = this._columns.map(column => (column instanceof Alias ? column : column instanceof Attribute ? column.alias(columnName(column)) : new Alias(column, columnName(column))));
+    const view = new ViewDefinition(name, schema, this._table, projection, this._op, this._groupBy);
+    checkViewJoins(view);
+    return view;
+  }
+
   /** The query as SQL, in Postgres unless a dialect is given: `toSql('databricks')`. Nothing is run. */
   toSql(dialect: DialectName | SqlDialect = 'postgres'): string {
     return toSql(
@@ -488,6 +522,62 @@ export class FinderResult {
       this._having,
       this._processingDatetimeTo,
     );
+  }
+}
+
+/** A relational View that can render itself as DDL and be read back through a ViewResult. */
+export class ViewDefinition extends View {
+  /** `CREATE OR REPLACE VIEW` DDL, in Postgres or transpiled to `dialect` (e.g. 'databricks'). */
+  toSql(dialect: DialectName | SqlDialect = 'postgres'): string {
+    return viewSqlToString(this, dialect);
+  }
+
+  /** The view's rows, read by creating it on the registered runner's backend. */
+  result(): ViewResult {
+    return new ViewResult(this);
+  }
+}
+
+/**
+ * The rows of a view.
+ *
+ * `toSql()` is the view's CREATE VIEW DDL. `toRows()` has the registered runner create the view, then select all of its rows.
+ * Like FinderResult, nothing runs until rows are asked for.
+ *
+ * A view has no ORDER BY, so its rows come back in no particular order; `orderBy` orders the read-back (not the view) by output
+ * column name.
+ */
+export class ViewResult {
+  private _orderBy: string[] = [];
+  private _timeoutMs: number = DEFAULT_TIMEOUT_MS;
+
+  constructor(private readonly _view: View) {}
+
+  orderBy(...columns: string[]): this {
+    const unknown = columns.filter(c => !this._view.columnNames().includes(c));
+    if (unknown.length > 0) {
+      throw new Error(`Unknown view columns ${JSON.stringify(unknown)} — valid columns are: ${JSON.stringify(this._view.columnNames())}`);
+    }
+    this._orderBy = columns;
+    return this;
+  }
+
+  timeout(milliseconds: number): this {
+    this._timeoutMs = milliseconds;
+    return this;
+  }
+
+  toSql(dialect: DialectName | SqlDialect = 'postgres'): string {
+    return viewSqlToString(this._view, dialect);
+  }
+
+  async toRows(): Promise<Row[]> {
+    const runner = getRunner();
+    if (runner.createView === undefined || runner.selectView === undefined) {
+      throw new Error('The registered runner does not support views: it has no createView and selectView');
+    }
+    await runner.createView(this._view);
+    return runner.selectView(this._view, this._orderBy, this._timeoutMs);
   }
 }
 
