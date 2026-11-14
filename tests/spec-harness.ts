@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { expect } from 'vitest';
 import { DuckDBConnection } from '@duckdb/node-api';
-import type { FinderResult } from '../src/datafinder/runner';
+import type { FinderResult, ViewResult } from '../src/datafinder/runner';
 import { Interval } from '../src/model/relational';
 import type { DialectName, SqlDialect } from '../src/datafinder/dialect';
 
@@ -85,7 +85,7 @@ function normalize(value: unknown): unknown {
 
 /** Equivalent of TestExpectation.run: SQL fragments, then column names, then values. */
 export async function runExpectation(
-  result: FinderResult,
+  result: FinderResult | ViewResult,
   runner: ColumnReporter,
   expected: Expectation,
   backend: Backend = 'duckdb',
@@ -117,7 +117,7 @@ export async function runExpectation(
 /** One generated expectation: the query is built from a finder so that cases can share one. */
 export interface SpecCase<F> {
   name: string;
-  query: (finder: F) => FinderResult;
+  query: (finder: F) => FinderResult | ViewResult;
   expected: Expectation;
 }
 

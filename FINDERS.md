@@ -314,6 +314,29 @@ ef.findAll([ef.firstName()], ef.manager().notExists())   // employees with no ma
 
 They compile to a LEFT JOIN checked for NULL. For a to-many join that is only asked whether a row exists, the join is to a sub-select of the distinct join column, so the row is not repeated once per match; if the query also reads a value through that join, it stays a plain join and the row repeats for each child.
 
+## SQL views
+
+A query with no dates becomes a view: `toView(name, schema)` on the result of `findAll`, with `null` for the business date and the processing time. It uses the same `findAll` syntax, so the filter, joins, `groupBy`, aggregates and window functions come across.
+
+```ts
+const view = tf.findAll(null, null, [tf.symbol(), tf.account().name()])
+  .toView('trade_account', 'reporting');
+
+view.columnNames();                 // ['symbol', 'account_name', 'in_z', 'out_z']
+view.toSql();                       // CREATE OR REPLACE VIEW reporting.trade_account AS SELECT ...
+view.toSql('databricks');           // the same DDL in another dialect
+
+const rows = await view.result().orderBy('symbol').toRows();   // creates the view on the registered runner, then reads it
+```
+
+- Each column is named after its display name in snake_case (`Account Name` is `account_name`). Display names chain along the join path, so `account().branch().city()` is `account_branch_city`.
+- The view exposes the root table's milestoning columns (`in_z`, `out_z`, ...), so whoever reads it picks the point in time. A grouped view groups by those columns too.
+- Every joined milestoned table is pinned to the version that applied when the root row was recorded, so a later change to reference data never alters rows already in the view. A join that cannot be anchored (a business-dated table joined from one with no business date) is rejected with `ViewDefinitionError`, as are dates given to a join, a query with dates, `orderBy`, `limit`, `offset`, `distinct`, `having`, a view over a union, duplicate column names and names that are not plain identifiers.
+- A view has no ORDER BY, so `result().orderBy('column')` orders the read-back, not the view.
+- `toRows()` of a view needs a runner with `createView(view)` and `selectView(view, orderBy, timeoutMs)`; one without them throws. `DuckDbRunner` in `tests/` has both. `DatabricksConnect` does not: its DDL is for you to run, from `toSql('databricks')`.
+- A view is not a mapping: GraphQL has no views.
+- Python also writes views as a Liquibase changelog (`datafinder_liquibase`); that package is not ported.
+
 ## A class mapped to a query written as SQL
 
 A mapping can map a class to a query written as SQL, as it maps one to a table (see `sql_queries_mapping.md`): a `Query` section whose heading names the query and the class, with the SQL in a `sql` block (PostgreSQL: `SELECT [DISTINCT]`, joins, `WHERE`, `GROUP BY` with aggregates, `HAVING`, `UNION`, named expressions), then the columns it gives and what they map to. Nothing is created in the database: the SQL is read when the mapping is loaded, checked against the tables and columns there are, and the generator writes it into a `<Mapping>Queries.ts` module as the query model (`TableAlias` of a `QuerySpecification`, with typed columns of its own). A query over the class then writes it as a derived table, `FROM (SELECT ...) AS t0`; a query can read an earlier one, and a class mapped to a query has associations like any other. A query is milestoned as a table is, by the columns its SQL gives (name the scheme in the heading), so a query over the class, or a join to it, is given the dates over the query's columns. `count()` on such a class counts the rows the query gives.

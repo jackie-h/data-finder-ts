@@ -964,6 +964,60 @@ export const TRADE_TO_MANY_EXISTS_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
 ];
 
+export const TRADE_VIEW_FINDER_SPECS: SpecCase<TradeFinder>[] = [
+  {
+    name: 'view_of_root_columns_adds_the_validity_columns',
+    query: f => f.findAll(null, null, [f.symbol(), f.price()]).toView('trade_prices', 'reporting').result().orderBy('symbol'),
+    expected: { columns: ['symbol', 'price', 'in_z', 'out_z'], rows: [
+        ['AAPL', 84.11, ts('2020-01-01T00:00:00'), ts('9999-12-31T23:59:59')],
+        ['GOOG', 200.0, ts('2020-01-01T00:00:00'), ts('2022-01-01T00:00:00')],
+        ['MSFT', 300.0, ts('2024-01-01T00:00:00'), ts('9999-12-31T23:59:59')],
+      ], skipGraphql: 'Views are not supported by the GraphQL backend' },
+  },
+  {
+    name: 'each_trade_sees_the_account_applicable_when_it_was_recorded',
+    query: f => f.findAll(null, null, [f.symbol(), f.account().name()]).toView('trade_account', 'reporting').result().orderBy('symbol'),
+    expected: { columns: ['symbol', 'account_name', 'in_z', 'out_z'], rows: [
+        ['AAPL', 'Acme Ltd', ts('2020-01-01T00:00:00'), ts('9999-12-31T23:59:59')],
+        ['GOOG', 'Acme Ltd', ts('2020-01-01T00:00:00'), ts('2022-01-01T00:00:00')],
+        ['MSFT', null, ts('2024-01-01T00:00:00'), ts('9999-12-31T23:59:59')],
+      ], sql: 't1.in_z <= t0.in_z', unexpectedSql: 'GREATEST', skipGraphql: 'Views are not supported by the GraphQL backend' },
+  },
+  {
+    name: 'an_ancestor_nothing_projects_is_pinned_too',
+    query: f => f.findAll(null, null, [f.symbol(), f.account().branch().city()]).toView('trade_branch', 'reporting').result().orderBy('symbol'),
+    expected: { columns: ['symbol', 'account_branch_city', 'in_z', 'out_z'], rows: [
+        ['AAPL', 'London', ts('2020-01-01T00:00:00'), ts('9999-12-31T23:59:59')],
+        ['GOOG', 'London', ts('2020-01-01T00:00:00'), ts('2022-01-01T00:00:00')],
+        ['MSFT', null, ts('2024-01-01T00:00:00'), ts('9999-12-31T23:59:59')],
+      ], skipGraphql: 'Views are not supported by the GraphQL backend' },
+  },
+  {
+    name: 'filter_on_a_root_column',
+    query: f => f.findAll(null, null, [f.account().name()], f.symbol().eq('GOOG')).toView('goog_account', 'reporting').result(),
+    expected: { columns: ['account_name', 'in_z', 'out_z'], rows: [
+        ['Acme Ltd', ts('2020-01-01T00:00:00'), ts('2022-01-01T00:00:00')],
+      ], skipGraphql: 'Views are not supported by the GraphQL backend' },
+  },
+  {
+    name: 'filter_on_a_joined_column',
+    query: f => f.findAll(null, null, [f.symbol()], f.account().name().isNotNull()).toView('trades_with_account', 'reporting').result().orderBy('symbol'),
+    expected: { columns: ['symbol', 'in_z', 'out_z'], rows: [
+        ['AAPL', ts('2020-01-01T00:00:00'), ts('9999-12-31T23:59:59')],
+        ['GOOG', ts('2020-01-01T00:00:00'), ts('2022-01-01T00:00:00')],
+      ], skipGraphql: 'Views are not supported by the GraphQL backend' },
+  },
+  {
+    name: 'grouped_view_groups_by_the_validity_columns_too',
+    query: f => f.findAll(null, null, [f.account().name(), f.price().sum()]).groupBy(f.account().name()).toView('account_totals', 'reporting').result().orderBy('sum_price'),
+    expected: { columns: ['account_name', 'sum_price', 'in_z', 'out_z'], rows: [
+        ['Acme Ltd', 84.11, ts('2020-01-01T00:00:00'), ts('9999-12-31T23:59:59')],
+        ['Acme Ltd', 200.0, ts('2020-01-01T00:00:00'), ts('2022-01-01T00:00:00')],
+        [null, 300.0, ts('2024-01-01T00:00:00'), ts('9999-12-31T23:59:59')],
+      ], sql: 'GROUP BY t1.ACCT_NAME, t0.in_z, t0.out_z', skipGraphql: 'Views are not supported by the GraphQL backend' },
+  },
+];
+
 export const CONTRACTUAL_POSITION_FINDER_SPECS: SpecCase<ContractualPositionFinder>[] = [
   {
     name: 'position_jan15_current',
@@ -1024,5 +1078,6 @@ export const SPEC_GROUPS = {
   'ACCOUNT_POSITION_EXISTS_FINDER_SPECS': { finder: 'AccountFinder', cases: ACCOUNT_POSITION_EXISTS_FINDER_SPECS },
   'POSITION_DESK_EXISTS_FINDER_SPECS': { finder: 'ContractualPositionFinder', cases: POSITION_DESK_EXISTS_FINDER_SPECS },
   'TRADE_TO_MANY_EXISTS_FINDER_SPECS': { finder: 'TradeFinder', cases: TRADE_TO_MANY_EXISTS_FINDER_SPECS },
+  'TRADE_VIEW_FINDER_SPECS': { finder: 'TradeFinder', cases: TRADE_VIEW_FINDER_SPECS },
   'CONTRACTUAL_POSITION_FINDER_SPECS': { finder: 'ContractualPositionFinder', cases: CONTRACTUAL_POSITION_FINDER_SPECS },
 };

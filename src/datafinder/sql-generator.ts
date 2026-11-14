@@ -76,6 +76,7 @@ import {
   hasProcessingRange,
   milestoningColumnsOf,
 } from '../model/milestoning';
+import { View, ViewDefinitionError } from '../model/view';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
 import { DialectName, SqlDialect, dialectOf } from './dialect';
 
@@ -651,6 +652,42 @@ function datesForNode(
   return { businessDate, businessDateTo, processingDatetime, processingDatetimeTo };
 }
 
+/** The joins the expressions read through, each node once. */
+function requiredJoinNodes(expressions: (RelationalOperationElement | undefined)[]): Set<JoinTreeNodeOperation> {
+  const requiredJoins = new Set<JoinTreeNodeOperation>();
+  const collect: RefVisitor = ref => {
+    const parent = ref instanceof Attribute ? ref.parent() : ref.parent;
+    if (parent !== undefined) requiredJoins.add(parent);
+  };
+  const collectNode: NodeVisitor = node => requiredJoins.add(node);
+  for (const expression of expressions) walkRefs(expression, collect, collectNode);
+  return requiredJoins;
+}
+
+/**
+ * Each joined node's ON-clause condition: the property values the join was given, ANDed with `milestoning(node)`, the condition
+ * that picks the version of a milestoned table. The conditions are kept by the query and the join is not modified, as joins are
+ * shared between queries.
+ */
+function joinFiltersOf(
+  nodes: Iterable<JoinTreeNodeOperation>,
+  milestoning: (node: JoinTreeNodeOperation) => Operation | null,
+): Map<JoinTreeNodeOperation, Operation> {
+  const joinFilters = new Map<JoinTreeNodeOperation, Operation>();
+  for (const node of withAncestors(nodes)) {
+    let combined: Operation | undefined;
+    if (Object.keys(node.join.filterKwargs).length > 0) {
+      combined = buildJoinFilterFromProperties(node, node.join.filterKwargs, node.join.filterColumnMap);
+    }
+    const milestonedOp = milestoning(node);
+    if (milestonedOp !== null) {
+      combined = combined === undefined ? milestonedOp : new LogicalOperation(combined, LogicalOperator.AND, milestonedOp);
+    }
+    if (combined !== undefined) joinFilters.set(node, combined);
+  }
+  return joinFilters;
+}
+
 function buildQuerySpecification(
   businessDate: Date | null,
   processingDatetime: Date | null,
@@ -685,31 +722,8 @@ function buildQuerySpecification(
     }
   }
 
-  const requiredJoins = new Set<JoinTreeNodeOperation>();
-  const collect: RefVisitor = ref => {
-    const parent = ref instanceof Attribute ? ref.parent() : ref.parent;
-    if (parent !== undefined) requiredJoins.add(parent);
-  };
-  const collectNode: NodeVisitor = node => requiredJoins.add(node);
-  for (const col of columns) walkRefs(col, collect, collectNode);
-  for (const expr of groupBy) walkRefs(expr, collect, collectNode);
-  for (const sort of orderBy) walkRefs(sort, collect, collectNode);
-  walkRefs(op, collect, collectNode);
-
-  const joinFilters = new Map<JoinTreeNodeOperation, Operation>();
-  for (const node of withAncestors(requiredJoins)) {
-    let combined: Operation | undefined;
-    if (Object.keys(node.join.filterKwargs).length > 0) {
-      combined = buildJoinFilterFromProperties(node, node.join.filterKwargs, node.join.filterColumnMap);
-    }
-    if (milestoningColumnsOf(node.join.table) !== undefined) {
-      const milestonedOp = milestoningFor(node.join.table, node);
-      if (milestonedOp !== null) {
-        combined = combined === undefined ? milestonedOp : new LogicalOperation(combined, LogicalOperator.AND, milestonedOp);
-      }
-    }
-    if (combined !== undefined) joinFilters.set(node, combined);
-  }
+  const joinFilters = joinFiltersOf(requiredJoinNodes([...columns, ...groupBy, ...orderBy, op]),
+    node => milestoningColumnsOf(node.join.table) === undefined ? null : milestoningFor(node.join.table, node));
 
   // for each step only asked the existence of: `SELECT DISTINCT <join column> FROM <its table>`, with the table's
   // milestoning at the dates the step uses. Distinct on the join column makes it at most one row for a parent, however
@@ -1382,3 +1396,107 @@ export function toSql(
 }
 
 export { buildQuerySpecification };
+
+// --- views ---------------------------------------------------------------------------------------------------------------
+
+/** The joined table's column, read through the join. */
+function asOfColumn(column: Column, node: JoinTreeNodeOperation): ColumnWithJoin {
+  return new ColumnWithJoin(new Column(column.name, column.type, column.ownerRelation), node);
+}
+
+/** The root table's column: it is read directly, with no join. */
+function asOfRootColumn(column: Column): Column {
+  return new Column(column.name, column.type, column.ownerRelation);
+}
+
+function asOfAnd(ops: Operation[]): Operation {
+  return ops.reduce((result, op) => new LogicalOperation(result, LogicalOperator.AND, op));
+}
+
+/** `start <= point AND end > point` (or `end IS NULL` when open ends are NULL). */
+function asOfIntervalContains(start: Column, end: Column, point: Column, infiniteDatetime: string | undefined, node: JoinTreeNodeOperation): Operation {
+  const afterStart = new ComparisonOperation(asOfColumn(start, node), ComparisonOperator.LESS_THAN_OR_EQUAL_TO, point);
+  let beforeEnd: Operation = new ComparisonOperation(asOfColumn(end, node), ComparisonOperator.GREATER_THAN, point);
+  if (infiniteDatetime === undefined) beforeEnd = new LogicalOperation(beforeEnd, LogicalOperator.OR, new IsNullOperation(asOfColumn(end, node)));
+  return new LogicalOperation(afterStart, LogicalOperator.AND, beforeEnd);
+}
+
+/** The root row's point on the business-date axis: its date, or the start of its interval. */
+function asOfBusinessPoint(root: MilestoningColumns | undefined): Column | undefined {
+  if (root instanceof SingleBusinessDateColumn || root instanceof BusinessDateAndProcessingTemporalColumns) return root.businessDateColumn;
+  if (root instanceof BusinessDateRangeColumns) return root.businessDateFromColumn;
+  return undefined;
+}
+
+/** The root row's point on the processing axis: its snapshot time, or the start of its interval. */
+function asOfProcessingPoint(root: MilestoningColumns | undefined): Column | undefined {
+  if (root instanceof SingleProcessingDatetimeColumn) return root.processingDatetimeColumn;
+  if (root !== undefined && hasProcessingRange(root)) return root.startAtColumn;
+  return undefined;
+}
+
+/**
+ * Join condition pinning a joined milestoned table to the root row's own point in time.
+ *
+ * The child version chosen is the one that applied when the root row was recorded (processing axis) and for the root row's
+ * business date (business axis), so later changes to the child never alter rows already in the view. Throws
+ * ViewDefinitionError when the root has no corresponding axis.
+ */
+export function buildAsOfJoinCondition(rootTable: Table, node: JoinTreeNodeOperation): Operation | null {
+  const childTable = node.join.table;
+  const child = milestoningColumnsOf(childTable);
+  if (child === undefined) return null;
+  const root = milestoningColumnsOf(rootTable);
+  const where = `'${node.join.name}' (${childTable.name}) joined from ${rootTable.name}`;
+  const conditions: Operation[] = [];
+
+  if (child instanceof SingleProcessingDatetimeColumn || hasProcessingRange(child)) {
+    const point = asOfProcessingPoint(root);
+    if (point === undefined) throw new ViewDefinitionError(`${where} is processing-temporal, but ${rootTable.name} has no processing time to anchor it to`);
+    if (child instanceof SingleProcessingDatetimeColumn) {
+      conditions.push(new ComparisonOperation(asOfColumn(child.processingDatetimeColumn, node), ComparisonOperator.EQUAL, asOfRootColumn(point)));
+    } else {
+      conditions.push(asOfIntervalContains(child.startAtColumn, child.endAtColumn, asOfRootColumn(point), child.processingInfiniteDatetime, node));
+    }
+  }
+
+  if (child instanceof SingleBusinessDateColumn || child instanceof BusinessDateAndProcessingTemporalColumns || child instanceof BusinessDateRangeColumns) {
+    const point = asOfBusinessPoint(root);
+    if (point === undefined) throw new ViewDefinitionError(`${where} has a business date, but ${rootTable.name} has no business date to anchor it to`);
+    if (child instanceof BusinessDateRangeColumns) {
+      conditions.push(asOfIntervalContains(child.businessDateFromColumn, child.businessDateToColumn, asOfRootColumn(point), child.businessInfiniteDatetime, node));
+    } else {
+      conditions.push(new ComparisonOperation(asOfColumn(child.businessDateColumn, node), ComparisonOperator.EQUAL, asOfRootColumn(point)));
+    }
+  }
+  return conditions.length > 0 ? asOfAnd(conditions) : null;
+}
+
+/** The joins a view needs, ancestors first. */
+function viewJoinNodes(view: View): JoinTreeNodeOperation[] {
+  return withAncestors(requiredJoinNodes([...view.columns, ...view.groupBy, view.filter]));
+}
+
+/** Throws ViewDefinitionError unless every joined milestoned table can be pinned to the root row's point in time. */
+export function checkViewJoins(view: View): void {
+  for (const node of viewJoinNodes(view)) {
+    for (let step: JoinTreeNodeOperation | undefined = node; step !== undefined; step = step.parent) {
+      if (step.businessDate !== null || step.processingDatetime !== null) {
+        throw new ViewDefinitionError(
+          `'${step.join.name}' was given a date, but a view has no dates: each joined table is pinned to the point in time of the row it is joined from`);
+      }
+    }
+    buildAsOfJoinCondition(view.table, node);
+  }
+}
+
+/**
+ * `CREATE OR REPLACE VIEW` DDL for the view, in Postgres or the dialect given (e.g. 'databricks'). The view's join filters are
+ * worked out here, immediately before rendering, and not when the view is built.
+ */
+export function viewSqlToString(view: View, dialect: DialectName | SqlDialect = 'postgres'): string {
+  checkViewJoins(view);
+  const joinFilters = joinFiltersOf(requiredJoinNodes([...view.columns, ...view.groupBy, view.filter]), node => buildAsOfJoinCondition(view.table, node));
+  const query = new OrderedQuerySpecification(view.columns, view.filter, [], view.groupBy, undefined, view.table, joinFilters);
+  return `CREATE OR REPLACE VIEW ${view.qualifiedName} AS ` + querySqlToString(query, dialect);
+}
