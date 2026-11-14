@@ -16,7 +16,8 @@
     "processing_snapshot_model.md",
     "joins_through_tables_model.md",
     "bitemporal_dates_model.md",
-    "bitemporal_infinity_model.md"
+    "bitemporal_infinity_model.md",
+    "sql_queries_model.md"
   ],
   "mappings": [
     "companies_mapping.md",
@@ -33,6 +34,7 @@
     "joins_through_tables_mapping.md",
     "bitemporal_dates_mapping.md",
     "bitemporal_infinity_mapping.md",
-    "business_range_infinity_mapping.md"
+    "business_range_infinity_mapping.md",
+    "sql_queries_mapping.md"
   ]
 }
