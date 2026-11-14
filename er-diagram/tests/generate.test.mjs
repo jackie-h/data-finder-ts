@@ -114,9 +114,7 @@ const key = m => m.replace(/\.md$/, "");
 
 test("config covers every e2e model and database mapping file", () => {
   const listed = new Set([...config.models, ...config.mappings]);
-  const files = readdirSync(dir).filter(f => f.endsWith(".md") && !f.endsWith("_graphql_mapping.md")   // GraphQL mappings have no tables to draw
-    && !f.startsWith("tpch_bih_")                                                                      // the TPC-BiH benchmark is not drawn
-    && !f.startsWith("join_conditions_"));                                                                                                 // join conditions are not drawn yet
+  const files = readdirSync(dir).filter(f => f.endsWith(".md") && !f.endsWith("_graphql_mapping.md"));   // GraphQL mappings have no tables to draw
   assert.deepEqual(files.filter(f => !listed.has(f)), [], "markdown files in the e2e folder missing from the config");
   assert.deepEqual([...listed].filter(f => !existsSync(join(dir, f))), [], "config lists files that do not exist");
 });
@@ -258,7 +256,7 @@ test("e2e: column hover shows the logical property description", () => {
 });
 
 test("e2e: every foreign key is drawn and every association resolved", () => {
-  assert.match(gen.stdout, /16 mappings, 17 foreign keys \(0 associations unresolved\)/);
+  assert.match(gen.stdout, /18 mappings, 34 foreign keys \(0 associations unresolved\)/);
 });
 
 test("e2e: a class mapped to a SQL query is drawn as a query, with what it reads", () => {
