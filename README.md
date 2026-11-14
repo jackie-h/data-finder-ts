@@ -4,6 +4,11 @@ TypeScript port of [data-finder](https://github.com/jackie-h/data-finder), a mod
 
 For runtime usage and query API see **[FINDERS.md](FINDERS.md)**.
 
+Two companion packages are published with it, at the same version:
+
+- [`data-finder-er-diagram`](er-diagram/README.md): Mermaid ER diagrams of your models and mappings.
+- [`data-finder-query-ui`](query-ui/README.md): a page for asking questions of a mapping (properties, filters, group by), run on Databricks with the rows kept in DuckDB. A `data-finder-query-ui` command builds and serves it for your mappings, and React components put it in your own app.
+
 ## Requirements
 
 - Node ≥ 24

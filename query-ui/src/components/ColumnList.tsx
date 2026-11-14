@@ -1,4 +1,4 @@
-import { aggregatesFor, AGGREGATE_LABELS, resolvePath, type AggregateName, type MappingMetadata } from '@datafinder';
+import { aggregatesFor, AGGREGATE_LABELS, resolvePath, type AggregateName, type MappingMetadata } from 'data-finder-ts';
 import { labelOf } from '../lib/tree';
 import type { QueryState } from '../lib/query';
 

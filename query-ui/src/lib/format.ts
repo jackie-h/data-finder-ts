@@ -1,4 +1,4 @@
-import { DateOnly } from '@model/relational';
+import { DateOnly } from 'data-finder-ts/model/relational';
 
 /** A result value as the text to show. */
 export function displayValue(value: unknown): string {

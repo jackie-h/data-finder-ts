@@ -1,4 +1,4 @@
-import { operatorsFor, type FilterOperator, type MappingMetadata } from '@datafinder';
+import { operatorsFor, type FilterOperator, type MappingMetadata } from 'data-finder-ts';
 import { allProperties } from '../lib/tree';
 import type { FilterRow, QueryState } from '../lib/query';
 

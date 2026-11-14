@@ -117,3 +117,11 @@ jobs:
 
       - name: Type-check and build the UI
         run: npm run build --prefix query-ui
+
+      - name: Build the libraries
+        run: |
+          npm run build:lib
+          npm run build:lib --prefix query-ui
+
+      - name: Install the packages as a user would, build a page with the CLI and serve it
+        run: bash query-ui/scripts/smoke.sh

@@ -54,6 +54,36 @@ jobs:
         run: npm publish
         working-directory: er-diagram
 
+  publish-npm-query-ui:
+    name: Publish query UI to npm
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # required for OIDC
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false  # never use caching in release builds
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix query-ui
+
+      - name: Build the libraries
+        run: |
+          npm run build:lib
+          npm run build:lib --prefix query-ui
+
+      - name: Publish
+        run: npm publish
+        working-directory: query-ui
+
   publish-pypi:
     name: Publish to PyPI
     needs: ci

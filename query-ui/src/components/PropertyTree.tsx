@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { MappingMetadata } from '@datafinder';
+import type { MappingMetadata } from 'data-finder-ts';
 import { childrenOf } from '../lib/tree';
 
 interface Props {

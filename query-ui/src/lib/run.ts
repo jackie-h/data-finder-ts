@@ -1,7 +1,7 @@
 /** Sends a query to a target: the SQL the query builder writes, through DatabricksConnect, and the rows that come back. */
-import { buildQuery, type MappingMetadata, type QuerySpec } from '@datafinder';
-import { DatabricksConnect } from '@datafinder/databricks-runner';
-import { clearRunner, registerRunner } from '@datafinder/runner';
+import { buildQuery, type MappingMetadata, type QuerySpec } from 'data-finder-ts';
+import { DatabricksConnect } from 'data-finder-ts';
+import { clearRunner, registerRunner } from 'data-finder-ts/datafinder/runner';
 import type { Target } from './config';
 
 export interface QueryResult {

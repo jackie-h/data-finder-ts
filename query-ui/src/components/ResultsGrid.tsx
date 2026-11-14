@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { themeQuartz, type ColDef, type GridApi } from 'ag-grid-community';
+import { AllCommunityModule, ModuleRegistry, themeQuartz, type ColDef, type GridApi } from 'ag-grid-community';
 import { displayValue } from '../lib/format';
+
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 /**
  * Tight rows and small type, so more of a result is on screen at once, in the page's own colours: they are CSS variables,
