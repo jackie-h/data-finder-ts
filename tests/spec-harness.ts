@@ -99,19 +99,61 @@ export async function runExpectation(
 
   const rows = await result.toRows();
   expect(runner.lastColumns).toEqual(expected.columns);
+  expectRows(rows, expected.rows, expected.approximate === true);
+}
+
+/** Rows are the expected ones: values compared as numbers and instants, and two floats equal when they agree to a relative tolerance. */
+export function expectRows(rows: unknown[][], expectedRows: unknown[][], approximate: boolean): void {
   // a GraphQL server returns dates and timestamps as text, so an expected instant is compared with the text read as one
   // the last digits of a sin, tan or log depend on the platform's math library, and those of an aggregate on the order its
   // rows were added in, so two floats are equal when they agree to a relative 1e-12 (1e-9 where the spec says approximate)
-  const tolerance = expected.approximate === true ? 1e-9 : 1e-12;
-  const wanted = expected.rows.map(r => r.map(normalize));
+  const tolerance = approximate ? 1e-9 : 1e-12;
+  const wanted = expectedRows.map(r => r.map(normalize));
   const actual = rows.map((r, i) => r.map((v, j) => {
-    const value = normalize(expected.rows[i]?.[j] instanceof Temporal && typeof v === 'string' ? ts(v) : v);
+    const value = normalize(expectedRows[i]?.[j] instanceof Temporal && typeof v === 'string' ? ts(v) : v);
     const want = wanted[i]?.[j];
     const close = typeof value === 'number' && typeof want === 'number' && Number.isFinite(value) && Number.isFinite(want)
       && Math.abs(value - want) <= tolerance * Math.max(Math.abs(want), 1e-300);
     return close ? want : value;
   }));
   expect(actual).toEqual(wanted);
+}
+
+/**
+ * A TPC-BiH case run as the report's SQL (Python's BenchmarkCase.run_sql): the statements, the result columns that are compared
+ * (by name, or by position for a column the SQL does not name), and the rows expected.
+ */
+export interface TpchBihSqlCase {
+  id: string;
+  statements: string[];
+  select: (string | number)[];
+  /** The SQL has an ORDER BY, so the rows are compared in order; otherwise they are sorted. */
+  ordered: boolean;
+  /** The compared columns are DISTINCT: the SQL repeats a row for versions the finder collapses. */
+  distinct: boolean;
+  approximate: boolean;
+  rows: unknown[][];
+}
+
+function compareValues(a: unknown, b: unknown): number {
+  if (a === null || b === null) return a === null ? (b === null ? 0 : 1) : -1;   // missing last
+  const x = a as number | string, y = b as number | string;
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+/** The compared columns of a result, de-duplicated if `distinct` and sorted unless `ordered` (BenchmarkCase.project). */
+export function projectRows(sqlCase: TpchBihSqlCase, names: string[], rows: unknown[][]): unknown[][] {
+  const lowered = names.map(n => n.toLowerCase());
+  const positions = sqlCase.select.map(c => (typeof c === 'number' ? c : lowered.indexOf(c.toLowerCase())));
+  let out = rows.map(row => positions.map(i => normalize(row[i])));
+  if (sqlCase.distinct) {
+    const seen = new Set<string>();
+    out = out.filter(row => { const key = JSON.stringify(row); if (seen.has(key)) return false; seen.add(key); return true; });
+  }
+  if (!sqlCase.ordered) {
+    out.sort((a, b) => { for (let i = 0; i < a.length; i++) { const c = compareValues(a[i], b[i]); if (c !== 0) return c; } return 0; });
+  }
+  return out;
 }
 
 /** One generated expectation: the query is built from a finder so that cases can share one. */
