@@ -16,6 +16,13 @@ import {
   JoinKind,
   Table,
   containsAggregate,
+  containsAggregateOrWindow,
+  Column,
+  ConstantOperation,
+  ArithmeticOperation,
+  ScalarFunctionOperation,
+  ComparisonOperation,
+  LogicalOperation,
   Operation,
   SortOperation,
   NoOperation,
@@ -108,7 +115,7 @@ let nextRelationNumber = 1;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ResultRow = Record<string, any>;
 
-function rowOf(columns: Map<string, Attribute>): ResultRow {
+function rowOf(columns: ReadonlyMap<string, unknown>): ResultRow {
   return new Proxy({} as ResultRow, {
     get(_target, name) {
       if (typeof name !== 'string') return undefined;
@@ -301,14 +308,20 @@ export class FinderResult {
    *     rows.filter(r => r.price.gt(250))
    */
   filter(...conditions: ((row: ResultRow) => Operation)[]): FinderResult {
-    const { attributes: columns } = this.relation();
-    const row = rowOf(columns);
-    let op: Operation | undefined;
     for (const condition of conditions) {
       if (typeof condition !== 'function') throw new TypeError('A filter condition is a function of a row: filter(r => r.price.gt(250))');
-      op = op === undefined ? condition(row) : op.and(condition(row)) as Operation;
     }
-    return this._next(keepNames(columns), op);
+    const together = (row: ResultRow): Operation | undefined => {
+      let op: Operation | undefined;
+      for (const condition of conditions) op = op === undefined ? condition(row) : op.and(condition(row)) as Operation;
+      return op;
+    };
+    const shown = this._shown();
+    if (shown !== undefined) {
+      const op = this._tryFolded(() => together(rowOf(shown)));
+      if (op !== undefined) return this._folded(this._columns, this._op instanceof NoOperation ? op : this._op instanceof Operation ? this._op.and(op) : op);
+    }
+    return this._next(keepNames(this.relation().attributes), together(this.row()));
   }
 
   /**
@@ -318,14 +331,21 @@ export class FinderResult {
    *     rows.extend({ double: r => r.price.times(2), top: r => r.price.max().over([r.account]) })
    */
   extend(columns: Record<string, (row: ResultRow) => RelationalOperationElement | Attribute>): FinderResult {
-    const { attributes: existing } = this.relation();
-    const row = rowOf(existing);
-    const added = Object.entries(columns).map(([name, expression]) => {
+    for (const [name, expression] of Object.entries(columns)) {
       if (typeof expression !== 'function') throw new TypeError(`The column '${name}' is a function of a row: extend({ ${name}: r => ... })`);
+    }
+    const madeOf = (row: ResultRow): Alias[] => Object.entries(columns).map(([name, expression]) => {
       const value = expression(row);
       return value instanceof Attribute ? value.alias(name) : new Alias(value, name);
     });
-    return this._next([...keepNames(existing), ...added]);
+    const shown = this._shown();
+    if (shown !== undefined && !Object.keys(columns).some(name => shown.has(name))) {
+      const made = this._tryFolded(() => madeOf(rowOf(shown)));
+      // a window keeps every row, so it is a column of this select, though nothing after it can fold
+      if (made !== undefined && !made.some(m => containsAggregate(m))) return this._folded([...this._columns, ...made], this._op);
+    }
+    const { attributes: existing } = this.relation();
+    return this._next([...keepNames(existing), ...madeOf(rowOf(existing))]);
   }
 
   /** Only some of this result's columns, by name, as Legend's `select(~[sym, price])`. To rename or work out a column use `extend` first. */
@@ -333,7 +353,59 @@ export class FinderResult {
     const { attributes: columns } = this.relation();
     const missing = names.filter(n => !columns.has(n));
     if (missing.length > 0) throw new Error(`No column ${JSON.stringify(missing)} in this result: its columns are ${JSON.stringify([...columns.keys()])}`);
+    const shown = this._shown();
+    if (shown !== undefined) {   // the columns of the select that are asked for, in the order asked for
+      const byName = new Map(this._columns.map(c => [columnName(c), c]));
+      return this._folded(names.map(n => byName.get(n)!), this._op);
+    }
     return this._next(names.map(n => columns.get(n)!.alias(n)));
+  }
+
+  /**
+   * What this result shows, by the name that reads it, when a step can be part of its select: each column is what it is worked out
+   * from, so a condition or a column made of them is written over the columns of the select and not over a select of it. Nothing when
+   * the select has gone beyond what a step can be added to: it groups, is distinct, is ordered, offset or limited (a step comes after
+   * those), or shows an aggregate, a window or something that is not a column, a constant, arithmetic or a function.
+   */
+  private _shown(): Map<string, RelationalOperationElement | Attribute> | undefined {
+    if (this._orderBy.length > 0 || this._groupBy.length > 0 || this._distinct || this._having !== undefined
+        || this._limit !== undefined || this._offset !== undefined) return undefined;
+    const shown = new Map<string, RelationalOperationElement | Attribute>();
+    for (const column of this._columns) {
+      let element: RelationalOperationElement | Attribute = column;
+      while (element instanceof Alias) element = element.element;
+      const simple = element instanceof Attribute || element instanceof ColumnWithJoin || element instanceof Column
+        || element instanceof ConstantOperation || element instanceof ArithmeticOperation || element instanceof ScalarFunctionOperation
+        || element instanceof ComparisonOperation || element instanceof LogicalOperation;
+      if (!simple || containsAggregateOrWindow(element)) return undefined;
+      const name = columnName(column);
+      if (shown.has(name)) return undefined;   // a name twice is refused when a step reads this result as a relation
+      shown.set(name, element);
+    }
+    return shown;
+  }
+
+  /**
+   * What a step makes of the columns of the select, or nothing when one of them is something that has not what a column of a
+   * relation has (a method of an attribute): it is then read as a column of the select.
+   */
+  private _tryFolded<T>(make: () => T): T | undefined {
+    try {
+      return make();
+    } catch (error) {
+      if (error instanceof TypeError) return undefined;
+      throw error;
+    }
+  }
+
+  /** This result with a step added to its select: the same query, so the same relation. */
+  private _folded(columns: (Attribute | RelationalOperationElement)[], op: RelationalOperationElement): FinderResult {
+    // each column under the name a step reads it by, as the select over this one would show it
+    const labelled = columns.map(c => (c instanceof Alias ? c : c instanceof Attribute ? c.alias(columnName(c)) : new Alias(c, columnName(c))));
+    const next = new FinderResult(this._businessDate, this._processingDatetime, labelled, this._table, op, this._businessDateTo, this._processingDatetimeTo);
+    next._relationName = this._relationName;
+    next._timeoutMs = this._timeoutMs;
+    return next;
   }
 
   /**
