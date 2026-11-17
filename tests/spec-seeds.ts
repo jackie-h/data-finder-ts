@@ -148,8 +148,9 @@ export const seeds: Record<string, Seed> = {
       'CREATE TABLE org.trades (acc_num INT, gsn VARCHAR, qty INT)',
       'CREATE TABLE org.rates (code VARCHAR, amount DOUBLE, from_z DATE, thru_z DATE)',
       'CREATE TABLE org.quotes (code VARCHAR, amount DOUBLE, in_z TIMESTAMP, out_z TIMESTAMP, from_z DATE, thru_z DATE)',
-      'CREATE TABLE org.holders (id INT, rate_code VARCHAR)');
-    for (const table of ['people', 'firms', 'trades', 'rates', 'quotes', 'holders']) await loadCsv(conn, `org.${table}`, `sql_queries_${table}.csv`);
+      'CREATE TABLE org.holders (id INT, rate_code VARCHAR)',
+      'CREATE TABLE org.units (unit_id INT, name VARCHAR, parent_id INT, active INT)');
+    for (const table of ['people', 'firms', 'trades', 'rates', 'quotes', 'holders', 'units']) await loadCsv(conn, `org.${table}`, `sql_queries_${table}.csv`);
   },
 
   processing_snapshot: async conn => {
