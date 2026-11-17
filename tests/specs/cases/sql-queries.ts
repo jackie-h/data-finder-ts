@@ -8,6 +8,7 @@ import type { QuoteFinder } from '../../generated_examples/sql_queries/QuoteFind
 import type { RateFinder } from '../../generated_examples/sql_queries/RateFinder';
 import type { ShoutFinder } from '../../generated_examples/sql_queries/ShoutFinder';
 import type { TagFinder } from '../../generated_examples/sql_queries/TagFinder';
+import type { UnitFinder } from '../../generated_examples/sql_queries/UnitFinder';
 
 export const SQL_QUERIES_FIRM_FINDER_SPECS: SpecCase<FirmFinder>[] = [
   {
@@ -158,6 +159,29 @@ export const SQL_QUERIES_HOLDER_FINDER_SPECS: SpecCase<HolderFinder>[] = [
   },
 ];
 
+export const SQL_QUERIES_UNIT_FINDER_SPECS: SpecCase<UnitFinder>[] = [
+  {
+    name: 'a_query_is_joined_to_a_second_copy_of_itself_through_its_parent',
+    query: () => { throw new Error('a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet' },
+  },
+  {
+    name: 'the_parent_of_a_parent',
+    query: () => { throw new Error('a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet' },
+  },
+  {
+    name: 'a_filter_on_the_parent',
+    query: () => { throw new Error('a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet' },
+  },
+  {
+    name: 'the_children_of_a_unit',
+    query: () => { throw new Error('a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet' },
+  },
+];
+
 /** Every spec group of this module, with the name of the finder class it runs on. */
 export const SPEC_GROUPS = {
   'SQL_QUERIES_FIRM_FINDER_SPECS': { finder: 'FirmFinder', cases: SQL_QUERIES_FIRM_FINDER_SPECS },
@@ -168,4 +192,5 @@ export const SPEC_GROUPS = {
   'SQL_QUERIES_RATE_FINDER_SPECS': { finder: 'RateFinder', cases: SQL_QUERIES_RATE_FINDER_SPECS },
   'SQL_QUERIES_QUOTE_FINDER_SPECS': { finder: 'QuoteFinder', cases: SQL_QUERIES_QUOTE_FINDER_SPECS },
   'SQL_QUERIES_HOLDER_FINDER_SPECS': { finder: 'HolderFinder', cases: SQL_QUERIES_HOLDER_FINDER_SPECS },
+  'SQL_QUERIES_UNIT_FINDER_SPECS': { finder: 'UnitFinder', cases: SQL_QUERIES_UNIT_FINDER_SPECS },
 };

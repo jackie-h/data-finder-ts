@@ -19,7 +19,11 @@
     "bitemporal_infinity_model.md",
     "sql_queries_model.md",
     "join_conditions_model.md",
-    "tpch_bih_model.md"
+    "tpch_bih_model.md",
+    "schema_milestoning_model.md",
+    "sql_query_sets_model.md",
+    "sql_query_sets_embedded_model.md",
+    "table_milestoning_model.md"
   ],
   "mappings": [
     "companies_mapping.md",
@@ -39,6 +43,10 @@
     "business_range_infinity_mapping.md",
     "sql_queries_mapping.md",
     "join_conditions_mapping.md",
-    "tpch_bih_mapping.md"
+    "tpch_bih_mapping.md",
+    "schema_milestoning_mapping.md",
+    "sql_query_sets_mapping.md",
+    "sql_query_sets_embedded_mapping.md",
+    "table_milestoning_mapping.md"
   ]
 }

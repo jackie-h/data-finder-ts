@@ -5,7 +5,7 @@ Used by generate.py to produce TypeScript finders.
 from model.m3 import Class, Property, String, Float, Package, Integer, Date, TaggedValue, DateTime, ONE_TO_ONE
 from model.mapping import Mapping, ProcessingDateMilestonesPropertyMapping, SingleBusinessDateMilestonePropertyMapping
 from model.relational import Column, Table, Schema, Database
-from model.relational_mapping import RelationalPropertyMapping, RelationalClassMapping, Join
+from model.relational_mapping import RelationalNavigationPropertyMapping, RelationalPropertyMapping, RelationalClassMapping, Join
 
 
 def create_description(text: str) -> TaggedValue:
@@ -78,31 +78,31 @@ def create_mappings_normalized() -> Mapping:
     c6 = Column('end_at', 'TIMESTAMP')
     trade_t = Table('trades', [c1, c2, c3, c4, c5, c6], trading)
 
-    pm1 = RelationalPropertyMapping(trade_c.property('symbol'), c3)
-    pm2 = RelationalPropertyMapping(trade_c.property('price'), c4)
-    pm3 = RelationalPropertyMapping(trade_c.property('account'), Join(c2, ac1))
-    pm4 = RelationalPropertyMapping(trade_c.property('validFrom'), c5)
-    pm5 = RelationalPropertyMapping(trade_c.property('validTo'), c6)
-    pm6 = RelationalPropertyMapping(trade_c.property('instrument'), Join(c3, ic1))
+    pm1 = RelationalPropertyMapping(trade_c.property('symbol'), c3, 'Trade')
+    pm2 = RelationalPropertyMapping(trade_c.property('price'), c4, 'Trade')
+    pm3 = RelationalNavigationPropertyMapping(trade_c.property('account'), Join(c2, ac1), 'Trade', 'Account')
+    pm4 = RelationalPropertyMapping(trade_c.property('validFrom'), c5, 'Trade')
+    pm5 = RelationalPropertyMapping(trade_c.property('validTo'), c6, 'Trade')
+    pm6 = RelationalNavigationPropertyMapping(trade_c.property('instrument'), Join(c3, ic1), 'Trade', 'Instrument')
     mpm = ProcessingDateMilestonesPropertyMapping(pm4, pm5)
     rm_t = RelationalClassMapping(trade_c, [pm1, pm2, pm3, pm4, pm5, pm6], mpm)
 
-    a_pm1 = RelationalPropertyMapping(account_c.property('id'), ac1)
-    a_pm2 = RelationalPropertyMapping(account_c.property('name'), ac2)
+    a_pm1 = RelationalPropertyMapping(account_c.property('id'), ac1, 'Account')
+    a_pm2 = RelationalPropertyMapping(account_c.property('name'), ac2, 'Account')
     rm_a = RelationalClassMapping(account_c, [a_pm1, a_pm2])
 
-    i_pm1 = RelationalPropertyMapping(instrument_c.property('symbol'), ic1)
-    i_pm2 = RelationalPropertyMapping(instrument_c.property('price'), ic2)
-    i_pm3 = RelationalPropertyMapping(trade_c.property('validFrom'), ic3)
-    i_pm4 = RelationalPropertyMapping(trade_c.property('validTo'), ic4)
+    i_pm1 = RelationalPropertyMapping(instrument_c.property('symbol'), ic1, 'Instrument')
+    i_pm2 = RelationalPropertyMapping(instrument_c.property('price'), ic2, 'Instrument')
+    i_pm3 = RelationalPropertyMapping(trade_c.property('validFrom'), ic3, 'Instrument')
+    i_pm4 = RelationalPropertyMapping(trade_c.property('validTo'), ic4, 'Instrument')
     i_mpm = ProcessingDateMilestonesPropertyMapping(i_pm3, i_pm4)
     rm_i = RelationalClassMapping(instrument_c, [i_pm1, i_pm2, i_pm3, i_pm4], i_mpm)
 
-    cpm1 = RelationalPropertyMapping(c_position_c.property('businessDate'), p1)
-    cpm2 = RelationalPropertyMapping(c_position_c.property('quantity'), p4)
-    cpm3 = RelationalPropertyMapping(c_position_c.property('counterparty'), p3)
-    cpm4 = RelationalPropertyMapping(c_position_c.property('instrument'), Join(p2, ic1))
-    cpm5 = RelationalPropertyMapping(c_position_c.property('npv'), p5)
+    cpm1 = RelationalPropertyMapping(c_position_c.property('businessDate'), p1, 'ContractualPosition')
+    cpm2 = RelationalPropertyMapping(c_position_c.property('quantity'), p4, 'ContractualPosition')
+    cpm3 = RelationalPropertyMapping(c_position_c.property('counterparty'), p3, 'ContractualPosition')
+    cpm4 = RelationalNavigationPropertyMapping(c_position_c.property('instrument'), Join(p2, ic1), 'ContractualPosition', 'Instrument')
+    cpm5 = RelationalPropertyMapping(c_position_c.property('npv'), p5, 'ContractualPosition')
     cpm_t = SingleBusinessDateMilestonePropertyMapping(cpm1)
     rm_cp = RelationalClassMapping(c_position_c, [cpm1, cpm2, cpm3, cpm4, cpm5], cpm_t)
 

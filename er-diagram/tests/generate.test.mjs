@@ -256,7 +256,7 @@ test("e2e: column hover shows the logical property description", () => {
 });
 
 test("e2e: every foreign key is drawn and every association resolved", () => {
-  assert.match(gen.stdout, /18 mappings, 34 foreign keys \(0 associations unresolved\)/);
+  assert.match(gen.stdout, /22 mappings, 36 foreign keys \(0 associations unresolved\)/);
 });
 
 test("e2e: a class mapped to a SQL query is drawn as a query, with what it reads", () => {
@@ -271,7 +271,7 @@ test("e2e: a class mapped to a SQL query is drawn as a query, with what it reads
 });
 
 test("e2e: the database page counts the queries apart from the tables, and shows the reads", () => {
-  assert.match(read("sql_queries_mapping__database.mmd"), /SQL queries<\/b><br\/>7 queries/);
-  assert.match(read("sql_queries_mapping__database.mmd"), /-\.->\|"7 reads"\|/);
-  assert.match(read("index.html"), /6 tables and 7 SQL queries in 2 schemas/);
+  assert.match(read("sql_queries_mapping__database.mmd"), /SQL queries<\/b><br\/>8 queries/);
+  assert.match(read("sql_queries_mapping__database.mmd"), /-\.->\|"8 reads"\|/);
+  assert.match(read("index.html"), /7 tables and 8 SQL queries in 2 schemas/);
 });
