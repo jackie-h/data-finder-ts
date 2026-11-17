@@ -344,11 +344,25 @@ export class FinderResult {
     return found instanceof Attribute ? found.cwj() : found;
   }
 
+  /** Whether a limit or an offset has cut the rows of this result. */
+  private _isCut(): boolean { return this._limit !== undefined || this._offset !== undefined; }
+
+  /** Whether the column is one this result shows, as `column(name)` gives it. */
+  private _isColumnOfThis(element: RelationalOperationElement | Attribute): boolean {
+    const column = element instanceof Attribute ? element.column() : element instanceof ColumnWithJoin ? element.column : undefined;
+    return column !== undefined && this._relationName !== undefined && column.owner instanceof TableAlias && column.owner.name === this._relationName;
+  }
+
   /**
    * Order the rows. Calls accumulate: the sorts of the latest call take priority and earlier ones order the
    * rows it leaves tied, as in a chain of `sortBy` calls. Sorting a column again replaces its earlier direction.
    */
   orderBy(...given: SortOperation[]): this {
+    if (this._isCut() && given.every(s => this._isColumnOfThis(s.column))) {
+      // an order of the columns of rows already cut by a limit or an offset orders those rows: it is a select over this one
+      const { attributes: columns } = this.relation();
+      return this._next([...columns.values()]).orderBy(...given) as unknown as this;
+    }
     const sorts = given.map(s => new SortOperation(this._own(s.column) as RelationalOperationElement, s.direction));
     const resorted = new Set(sorts.map(sortTarget));
     this._orderBy = [...sorts, ...this._orderBy.filter(s => !resorted.has(sortTarget(s)))];
@@ -415,15 +429,18 @@ export class FinderResult {
     return new GroupedRows(this, []).aggregate(columns);
   }
 
+  /** Keep the first `n` rows. After a limit, or an offset, it keeps that many of what is left: the fewer rows. */
   limit(n: number): this {
-    this._limit = n;
+    this._limit = this._limit === undefined ? n : Math.min(this._limit, n);
     return this;
   }
 
   /** Skip the first `n` rows. Sort the rows first: without an order, which rows are first is not defined. */
   offset(n: number): this {
     if (!Number.isInteger(n) || n < 0) throw new Error('offset cannot be negative');
-    this._offset = n;
+    // the rows skipped are of the rows left by a limit before it: that many fewer remain
+    if (this._limit !== undefined) this._limit = Math.max(0, this._limit - n);
+    this._offset = (this._offset ?? 0) + n;
     return this;
   }
 
