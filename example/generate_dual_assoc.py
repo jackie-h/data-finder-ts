@@ -11,7 +11,7 @@ from ts_generator.generator import generate
 from model.m3 import Class, Property, String, Integer, Package, ONE_TO_ONE
 from model.mapping import Mapping
 from model.relational import Column, Table, Schema, Database
-from model.relational_mapping import RelationalPropertyMapping, RelationalClassMapping, Join
+from model.relational_mapping import RelationalNavigationPropertyMapping, RelationalPropertyMapping, RelationalClassMapping, Join
 
 repo = Database('test_db', 'duckdb://test.db')
 schema = Schema('shop', repo)
@@ -36,13 +36,13 @@ oc2 = Column('BILLING_ACCOUNT_ID', 'INT')
 oc3 = Column('SHIPPING_ACCOUNT_ID', 'INT')
 order_t = Table('order_', [oc1, oc2, oc3], schema)
 
-a_pm1 = RelationalPropertyMapping(account_c.property('id'), ac1)
-a_pm2 = RelationalPropertyMapping(account_c.property('name'), ac2)
+a_pm1 = RelationalPropertyMapping(account_c.property('id'), ac1, 'Account')
+a_pm2 = RelationalPropertyMapping(account_c.property('name'), ac2, 'Account')
 rm_a = RelationalClassMapping(account_c, [a_pm1, a_pm2])
 
-o_pm1 = RelationalPropertyMapping(order_c.property('id'), oc1)
-o_pm2 = RelationalPropertyMapping(order_c.property('billingAccount'), Join(oc2, ac1))
-o_pm3 = RelationalPropertyMapping(order_c.property('shippingAccount'), Join(oc3, ac1))
+o_pm1 = RelationalPropertyMapping(order_c.property('id'), oc1, 'Order')
+o_pm2 = RelationalNavigationPropertyMapping(order_c.property('billingAccount'), Join(oc2, ac1), 'Order', 'Account')
+o_pm3 = RelationalNavigationPropertyMapping(order_c.property('shippingAccount'), Join(oc3, ac1), 'Order', 'Account')
 rm_o = RelationalClassMapping(order_c, [o_pm1, o_pm2, o_pm3])
 
 mapping = Mapping('Dual Assoc', [rm_a, rm_o])
