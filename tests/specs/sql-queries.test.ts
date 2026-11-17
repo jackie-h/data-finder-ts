@@ -12,8 +12,9 @@ import { QuoteFinder } from '../generated_examples/sql_queries/QuoteFinder';
 import { RateFinder } from '../generated_examples/sql_queries/RateFinder';
 import { ShoutFinder } from '../generated_examples/sql_queries/ShoutFinder';
 import { TagFinder } from '../generated_examples/sql_queries/TagFinder';
+import { UnitFinder } from '../generated_examples/sql_queries/UnitFinder';
 import '../generated_examples/sql_queries/PersonFinder';
-import { SQL_QUERIES_FIRM_FINDER_SPECS, SQL_QUERIES_FIRM_X_PERSON_FINDER_SPECS, SQL_QUERIES_HOLDER_FINDER_SPECS, SQL_QUERIES_POSITION_FINDER_SPECS, SQL_QUERIES_QUOTE_FINDER_SPECS, SQL_QUERIES_RATE_FINDER_SPECS, SQL_QUERIES_SHOUT_FINDER_SPECS, SQL_QUERIES_TAG_FINDER_SPECS } from './cases/sql-queries';
+import { SQL_QUERIES_FIRM_FINDER_SPECS, SQL_QUERIES_FIRM_X_PERSON_FINDER_SPECS, SQL_QUERIES_HOLDER_FINDER_SPECS, SQL_QUERIES_POSITION_FINDER_SPECS, SQL_QUERIES_QUOTE_FINDER_SPECS, SQL_QUERIES_RATE_FINDER_SPECS, SQL_QUERIES_SHOUT_FINDER_SPECS, SQL_QUERIES_TAG_FINDER_SPECS, SQL_QUERIES_UNIT_FINDER_SPECS } from './cases/sql-queries';
 
 let instance: DuckDBInstance;
 let conn: DuckDBConnection;
@@ -91,6 +92,14 @@ describe('SQL_QUERIES_HOLDER_FINDER_SPECS', () => {
   const f = new HolderFinder();
 
   for (const c of SQL_QUERIES_HOLDER_FINDER_SPECS) {
+    (c.expected.skip === undefined ? it : it.skip)(c.name, () => runExpectation(c.query(f), runner, c.expected));
+  }
+});
+
+describe('SQL_QUERIES_UNIT_FINDER_SPECS', () => {
+  const f = new UnitFinder();
+
+  for (const c of SQL_QUERIES_UNIT_FINDER_SPECS) {
     (c.expected.skip === undefined ? it : it.skip)(c.name, () => runExpectation(c.query(f), runner, c.expected));
   }
 });

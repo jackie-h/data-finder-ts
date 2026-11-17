@@ -22,6 +22,100 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
       ] },
   },
   {
+    name: 'a_step_keeps_the_name_a_column_was_given',
+    query: () => { throw new Error('a result is ordered by an expression column by the name it is selected under, and a step keeps its alias (data-finder 0.1.22, #266, #268): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result is ordered by an expression column by the name it is selected under, and a step keeps its alias (data-finder 0.1.22, #266, #268): not ported yet' },
+  },
+  {
+    name: 'a_step_is_ordered_by_a_column_of_the_result_before_it',
+    query: () => { throw new Error('a result is ordered by an expression column by the name it is selected under, and a step keeps its alias (data-finder 0.1.22, #266, #268): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result is ordered by an expression column by the name it is selected under, and a step keeps its alias (data-finder 0.1.22, #266, #268): not ported yet' },
+  },
+  {
+    name: 'the_manager_of_a_manager',
+    query: f => f.findAll([f.name(), f.manager().manager().name()], f.name().eq('Dave')),
+    expected: { columns: ['Name', 'Manager Manager Name'], rows: [
+        ['Dave', 'Alice'],
+      ], skipGraphql: 'The GraphQL finder does not follow a navigation of a class to itself twice' },
+  },
+  {
+    name: 'a_result_is_ordered_by_a_column_that_is_a_constant',
+    query: () => { throw new Error('a result is ordered by an expression column by the name it is selected under, and a step keeps its alias (data-finder 0.1.22, #266, #268): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result is ordered by an expression column by the name it is selected under, and a step keeps its alias (data-finder 0.1.22, #266, #268): not ported yet' },
+  },
+  {
+    name: 'a_result_is_ordered_by_a_column_of_the_result_it_was_made_from',
+    query: f => ((r: any) => r.distinct().orderBy(r.column('employeeName').descending()))(f.findAll([f.name().alias('employeeName')])),
+    expected: { columns: ['employeeName'], rows: [
+        ['Dave'],
+        ['Carol'],
+        ['Bob'],
+        ['Alice'],
+      ], skipGraphql: 'The GraphQL engine does not order the columns of a result' },
+  },
+  {
+    name: 'a_filter_of_a_result_is_in_its_select',
+    query: () => { throw new Error('a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet' },
+  },
+  {
+    name: 'an_extend_and_a_filter_on_the_column_it_made_are_in_one_select',
+    query: () => { throw new Error('a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet' },
+  },
+  {
+    name: 'a_filter_of_a_filter_is_one_where',
+    query: () => { throw new Error('a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet' },
+  },
+  {
+    name: 'a_select_of_the_columns_of_a_result_is_in_its_select',
+    query: () => { throw new Error('a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet' },
+  },
+  {
+    name: 'a_column_renamed_by_extend_and_select_is_in_one_select',
+    query: () => { throw new Error('a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet' },
+  },
+  {
+    name: 'an_aggregate_of_a_filtered_result_is_in_one_select',
+    query: () => { throw new Error('a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet' },
+  },
+  {
+    name: 'an_aggregate_of_the_whole_result_is_in_one_select',
+    query: () => { throw new Error('a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet' },
+  },
+  {
+    name: 'a_filter_on_an_aggregate_is_over_the_select_that_made_it',
+    query: f => f.findAll([f.id().alias('id')]).aggregate({ total: (r: any) => r.id.sum() }).filter((r: any) => r.total.gt(5)),
+    expected: { columns: ['total'], rows: [
+        [10],
+      ], sql: '(SELECT', skipGraphql: 'The GraphQL engine does not run steps over a result' },
+  },
+  {
+    name: 'distinct_after_an_order_is_in_the_select_that_orders',
+    query: f => ((r: any) => r.orderBy(r.column('employeeName').descending()).distinct())(f.findAll([f.name().alias('employeeName')])),
+    expected: { columns: ['employeeName'], rows: [
+        ['Dave'],
+        ['Carol'],
+        ['Bob'],
+        ['Alice'],
+      ], sql: 'SELECT DISTINCT', unexpectedSql: '(SELECT', skipGraphql: 'The GraphQL engine does not run steps over a result' },
+  },
+  {
+    name: 'a_column_that_is_a_condition_can_be_tested_in_a_list_in_the_select',
+    query: () => { throw new Error('a condition that is a column of a result is a boolean (data-finder 0.1.22, #273): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a condition that is a column of a result is a boolean (data-finder 0.1.22, #273): not ported yet' },
+  },
+  {
+    name: 'a_filter_on_a_window_column_is_still_over_the_select_that_made_it',
+    query: () => { throw new Error('a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet' },
+  },
+  {
     name: 'fill_null_replaces_a_missing_manager',
     query: f => f.findAll([f.name(), f.manager().name().orElse('nobody')]).orderBy(f.id().ascending()),
     expected: { columns: ['Name', 'Or Else Manager Name'], rows: [

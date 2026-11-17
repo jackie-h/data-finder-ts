@@ -889,6 +889,29 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
       ], sql: 'LIMIT 3 OFFSET 1', skipGraphql: 'The GraphQL finder has no union' },
   },
   {
+    name: 'concatenate_then_take_then_sort',
+    query: () => { throw new Error('a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet' },
+  },
+  {
+    name: 'concatenate_then_take_then_drop',
+    query: () => { throw new Error('a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet' },
+  },
+  {
+    name: 'concatenate_then_take_then_slice',
+    query: f => _ascending(f.findAll([f.id()], f.id().lt(3)).concatenate(f.findAll([f.id()], f.id().gte(3))), 'id').limit(4).slice(1, 3),
+    expected: { columns: ['id'], rows: [
+        [2],
+        [3],
+      ], skipGraphql: 'The GraphQL finder has no union' },
+  },
+  {
+    name: 'concatenate_then_drop_then_take_and_drop_again',
+    query: () => { throw new Error('a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet'); },
+    expected: { columns: [], rows: [], skip: 'a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet' },
+  },
+  {
     name: 'concatenate_a_result_with_its_own_order_and_limit',
     query: f => _ascending(f.findAll([f.id()]).orderBy(f.id().descending()).limit(2).concatenate(f.findAll([f.id()], f.id().eq(1)), { all: true }), 'id'),
     expected: { columns: ['id'], rows: [
