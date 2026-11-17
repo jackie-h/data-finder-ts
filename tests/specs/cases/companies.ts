@@ -890,13 +890,21 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'concatenate_then_take_then_sort',
-    query: () => { throw new Error('a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet' },
+    query: f => ((top: any) => top.orderBy(top.column('id').ascending()))(_descending(f.findAll([f.id()], f.id().lt(3)).concatenate(f.findAll([f.id()], f.id().gte(3))), 'id').limit(3)),
+    expected: { columns: ['id'], rows: [
+        [3],
+        [4],
+        [5],
+      ], sql: 'LIMIT 3) AS', skipGraphql: 'The GraphQL finder has no union' },
   },
   {
     name: 'concatenate_then_take_then_drop',
-    query: () => { throw new Error('a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet' },
+    query: f => _ascending(f.findAll([f.id()], f.id().lt(3)).concatenate(f.findAll([f.id()], f.id().gte(3))), 'id').limit(4).offset(1),
+    expected: { columns: ['id'], rows: [
+        [2],
+        [3],
+        [4],
+      ], skipGraphql: 'The GraphQL finder has no union' },
   },
   {
     name: 'concatenate_then_take_then_slice',
@@ -908,8 +916,11 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'concatenate_then_drop_then_take_and_drop_again',
-    query: () => { throw new Error('a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a result made by distinct, limit or offset is ordered by the columns of the result it came from (data-finder 0.1.22, #269): not ported yet' },
+    query: f => _ascending(f.findAll([f.id()], f.id().lt(3)).concatenate(f.findAll([f.id()], f.id().gte(3))), 'id').offset(1).limit(3).offset(1),
+    expected: { columns: ['id'], rows: [
+        [3],
+        [4],
+      ], skipGraphql: 'The GraphQL finder has no union' },
   },
   {
     name: 'concatenate_a_result_with_its_own_order_and_limit',
