@@ -14,7 +14,7 @@ supported-markers = [
 
 [[package]]
 name = "data-finder"
-version = "0.1.21"
+version = "0.1.22"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -22,9 +22,9 @@ dependencies = [
     { name = "pandas", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "sqlglot", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/9e/8b2a91015380a0cc30383a5d92136d036becf9a70fd54ed6557a12626d8b/data_finder-0.1.21.tar.gz", hash = "sha256:7bf057415318e6c5d63272e79f93c42536d1878213d4de78f99dac25b48a16ec", size = 279927, upload-time = "2026-11-12T02:17:48.557Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dd/70/9f539e1e7737cb2efdad73532ffd63a5b26f2e6a41223a60776bda9ee0d4/data_finder-0.1.22.tar.gz", hash = "sha256:17258f516ec70cdf234cf39f0d294ea5825b571c789ca425ae63a50d10b564f9", size = 314377, upload-time = "2026-11-17T03:19:47.561Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c0/ea/74e4235f30e159005792b1007310621f325bfc2421d333b90eff20e5d8ca/data_finder-0.1.21-py3-none-any.whl", hash = "sha256:e653f62fc991ca9f9a9c613da11ef791d79306ca8fa096acb0f27e38e126c4ab", size = 312915, upload-time = "2026-11-12T02:17:46.459Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/87/1f3a3323ccd66da6630d6eadb36ac64edd1d74c7a62b93b6cdc33e1cc83d/data_finder-0.1.22-py3-none-any.whl", hash = "sha256:237a07bfcff78fbdf0ffa23c3fa3fdeb1e07ee192d2852dc76288ad89c9b5540", size = 349394, upload-time = "2026-11-17T03:19:45.919Z" },
 ]
 
 [package.optional-dependencies]
@@ -44,7 +44,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "data-finder", extras = ["markdown"], specifier = ">=0.1.21" },
+    { name = "data-finder", extras = ["markdown"], specifier = ">=0.1.22" },
     { name = "duckdb", specifier = ">=1.0,<2" },
     { name = "pytest", specifier = ">=9.0.0" },
 ]
