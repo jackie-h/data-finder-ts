@@ -116,8 +116,6 @@ UNPORTED = [
      'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'),
     (r'^a_column_that_is_a_condition_can_be_tested_in_a_list_in_the_select$',
      'a condition that is a column of a result is a boolean (data-finder 0.1.22, #273): not ported yet'),
-    (r'^(a_filter_on_the_parent|a_query_is_joined_to_a_second_copy_of_itself_through_its_parent|the_children_of_a_unit|the_parent_of_a_parent)$',
-     'a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet'),
 ]
 
 

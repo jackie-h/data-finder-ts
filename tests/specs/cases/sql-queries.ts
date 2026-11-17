@@ -162,23 +162,36 @@ export const SQL_QUERIES_HOLDER_FINDER_SPECS: SpecCase<HolderFinder>[] = [
 export const SQL_QUERIES_UNIT_FINDER_SPECS: SpecCase<UnitFinder>[] = [
   {
     name: 'a_query_is_joined_to_a_second_copy_of_itself_through_its_parent',
-    query: () => { throw new Error('a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet' },
+    query: f => f.findAll([f.name(), f.parent().name()]).orderBy(f.id().ascending()),
+    expected: { columns: ['Name', 'Parent Name'], rows: [
+        ['Root', null],
+        ['Sales', 'Root'],
+        ['Support', 'Root'],
+        ['EMEA Sales', 'Sales'],
+        ['Under Hidden', null],
+      ], sql: 'ON (t1.unit_id = t0.parent_id)', skipGraphql: 'The GraphQL finder does not read a mapping\'s SQL queries' },
   },
   {
     name: 'the_parent_of_a_parent',
-    query: () => { throw new Error('a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet' },
+    query: f => f.findAll([f.name(), f.parent().parent().name()], f.name().eq('EMEA Sales')),
+    expected: { columns: ['Name', 'Parent Parent Name'], rows: [
+        ['EMEA Sales', 'Root'],
+      ], skipGraphql: 'The GraphQL finder does not read a mapping\'s SQL queries' },
   },
   {
     name: 'a_filter_on_the_parent',
-    query: () => { throw new Error('a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet' },
+    query: f => f.findAll([f.name()], f.parent().name().eq('Root')).orderBy(f.name().ascending()),
+    expected: { columns: ['Name'], rows: [
+        ['Sales'],
+        ['Support'],
+      ], skipGraphql: 'The GraphQL finder does not read a mapping\'s SQL queries' },
   },
   {
     name: 'the_children_of_a_unit',
-    query: () => { throw new Error('a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a class mapped to a query can be associated with itself (data-finder 0.1.22, #267): not ported yet' },
+    query: f => f.findAll([f.name(), f.children().name()], f.name().eq('Sales')),
+    expected: { columns: ['Name', 'Children Name'], rows: [
+        ['Sales', 'EMEA Sales'],
+      ], skipGraphql: 'The GraphQL finder does not read a mapping\'s SQL queries' },
   },
 ];
 

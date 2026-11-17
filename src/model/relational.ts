@@ -636,6 +636,19 @@ export function sameRelation(a: Relation | undefined, b: Relation | undefined): 
 }
 
 /**
+ * `relation` under `name`, for the far side of a join of it to itself. A query has columns of its own there, so the two sides can be
+ * told apart, and is read as the query it is, not as an alias of an alias.
+ */
+function aliasOfItself(relation: Table | TableAlias, name: string): TableAlias {
+  if (!(relation instanceof TableAlias && relation.relation instanceof QueryExpression)) return new TableAlias(relation, name);
+  if (relation.milestoningColumns !== undefined) {
+    throw new Error(`${relation.name} is milestoned and joined to itself: a milestoned query cannot be associated with itself yet`);
+  }
+  const own = relation.columns.filter((c): c is Column => c instanceof Column).map(c => new Column(c.name, c.type, undefined, c.primaryKey, c.nullable));
+  return new TableAlias(relation.relation, name, own);
+}
+
+/**
  * A relation joined on a condition, as Legend's `Join` and ANSI SQL's `<join type> JOIN <table reference> ON <search condition>`:
  * its `target`, the kind of join and the condition `operation`.
  *
@@ -667,7 +680,7 @@ export class JoinOperation {
    */
   static onKeys(name: string, table: Table | TableAlias, source: Column, target: Column, kind: JoinKind): JoinOperation {
     if (sameRelation(source.ownerRelation, table)) {
-      const alias = new TableAlias(table, name || table.name + '_joined');
+      const alias = aliasOfItself(table, name || table.name + '_joined');
       return new JoinOperation(name, alias, new ComparisonOperation(source, ComparisonOperator.EQUAL, alias.column(target.name, target.type)), kind);
     }
     return new JoinOperation(name, table, new ComparisonOperation(source, ComparisonOperator.EQUAL, target), kind);
