@@ -43,9 +43,9 @@ import type { {{source_rcm.clazz.name}}Filter } from '{{class_module_map_base[so
 import { registerRelatedFinderClass, getRelatedFinderClass } from '@datafinder/finder-registry';
 {% else %}
 import { registerRelatedFinderClass } from '@datafinder/finder-registry';
+{% endif %}
 {% if queries_module %}
 import { {{query_constants | join(', ')}} } from './{{queries_module}}';
-{% endif %}
 {% endif %}
 
 {% for rpm in rcm.property_mappings %}
