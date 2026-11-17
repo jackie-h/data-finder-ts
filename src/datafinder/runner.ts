@@ -88,6 +88,7 @@ let nextExpressionId = 1;
  */
 function sortTarget(sort: SortOperation): string {
   const column = sort.column;
+  if (column instanceof Alias) return JSON.stringify(['alias', column.name]);   // a column of the select, by the name it is shown under
   if (!(column instanceof ColumnWithJoin)) {
     if (!expressionIds.has(column)) expressionIds.set(column, nextExpressionId++);
     return JSON.stringify(['expression', expressionIds.get(column)]);
@@ -186,6 +187,11 @@ export class GroupedRows {
     const keys = this._keys.map(key => (key instanceof Alias ? key.element : key));
     return this._result.step([...this._keys, ...aggregates], undefined, keys as Comparand[]);
   }
+}
+
+/** The columns of a relation as a step shows them again: each under the name it has, which is not always the snake_case of its display name (`alias('employeeName')`). */
+function keepNames(columns: Map<string, Attribute>): Alias[] {
+  return [...columns].map(([name, attribute]) => attribute.alias(name));
 }
 
 export class FinderResult {
@@ -302,7 +308,7 @@ export class FinderResult {
       if (typeof condition !== 'function') throw new TypeError('A filter condition is a function of a row: filter(r => r.price.gt(250))');
       op = op === undefined ? condition(row) : op.and(condition(row)) as Operation;
     }
-    return this._next([...columns.values()], op);
+    return this._next(keepNames(columns), op);
   }
 
   /**
@@ -319,7 +325,7 @@ export class FinderResult {
       const value = expression(row);
       return value instanceof Attribute ? value.alias(name) : new Alias(value, name);
     });
-    return this._next([...existing.values(), ...added]);
+    return this._next([...keepNames(existing), ...added]);
   }
 
   /** Only some of this result's columns, by name, as Legend's `select(~[sym, price])`. To rename or work out a column use `extend` first. */
@@ -327,7 +333,7 @@ export class FinderResult {
     const { attributes: columns } = this.relation();
     const missing = names.filter(n => !columns.has(n));
     if (missing.length > 0) throw new Error(`No column ${JSON.stringify(missing)} in this result: its columns are ${JSON.stringify([...columns.keys()])}`);
-    return this._next(names.map(n => columns.get(n)!));
+    return this._next(names.map(n => columns.get(n)!.alias(n)));
   }
 
   /**
@@ -339,9 +345,12 @@ export class FinderResult {
     if (column === undefined || this._relationName === undefined) return element;
     const owner = column.owner;
     if (!(owner instanceof TableAlias) || owner.name !== this._relationName) return element;
-    const shown = new Map(this._columns.map(c => [columnName(c), c instanceof Alias ? c.element : c]));
-    const found = shown.get(column.name) ?? element;
-    return found instanceof Attribute ? found.cwj() : found;
+    const shown = new Map(this._columns.map(c => [columnName(c), c]));
+    const found = shown.get(column.name);
+    if (found === undefined) return element;
+    const inner = found instanceof Alias ? found.element : found;
+    // a column is ordered by itself, and an expression by the name it is selected under
+    return inner instanceof Attribute ? inner.cwj() : found;
   }
 
   /** Whether a limit or an offset has cut the rows of this result. */

@@ -106,8 +106,6 @@ UNPORTED = [
      r'|day_of_year_extract|most_recent_monday|the_date_of_a_datetime|the_most_recent_friday_of_a_friday_is_that_day|the_previous_friday_of_a_friday_is_a_week_before'
      r'|the_previous_sunday|rows_before_today|no_row_is_today|rows_before_now|rows_before_the_first_day_of_this_month_quarter_and_year|rows_after_the_previous_monday)$',
      'the date functions of data-finder 0.1.22 (today, now, add_weeks, add_microseconds, date, day name and year, the most recent and previous day of the week) are not ported yet'),
-    (r'^(a_result_is_ordered_by_a_column_that_is_a_constant|a_step_keeps_the_name_a_column_was_given|a_step_is_ordered_by_a_column_of_the_result_before_it)$',
-     'a result is ordered by an expression column by the name it is selected under, and a step keeps its alias (data-finder 0.1.22, #266, #268): not ported yet'),
     (r'^(a_filter_of_a_filter_is_one_where|a_filter_of_a_result_is_in_its_select|a_filter_on_a_window_column_is_still_over_the_select_that_made_it'
      r'|a_select_of_the_columns_of_a_result_is_in_its_select|an_aggregate_of_a_filtered_result_is_in_one_select|an_aggregate_of_the_whole_result_is_in_one_select'
      r'|an_extend_and_a_filter_on_the_column_it_made_are_in_one_select|a_column_renamed_by_extend_and_select_is_in_one_select|chain_filter_on_a_column)$',

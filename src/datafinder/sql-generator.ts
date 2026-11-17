@@ -897,6 +897,7 @@ class SQLQueryGenerator {
 
   /** What a sort orders by: a column, or an expression such as an aggregate. */
   private _sortExpression(expression: RelationalOperationElement): string {
+    if (expression instanceof Alias) return this._dialect.quoteIdentifier(expression.name);   // a column of the select, by the name it is given there
     if (expression instanceof ColumnWithJoin || expression instanceof Attribute) return this.buildFilter(expression);
     return sqlOperationToString(this._rewriteOperation(expression), this._dialect);
   }
