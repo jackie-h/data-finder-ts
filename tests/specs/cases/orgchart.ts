@@ -110,13 +110,18 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'an_aggregate_of_a_filtered_result_is_in_one_select',
-    query: () => { throw new Error('a group and an aggregate of a plain select are part of it (data-finder 0.1.22, #275): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a group and an aggregate of a plain select are part of it (data-finder 0.1.22, #275): not ported yet' },
+    query: f => ((r: any) => r.orderBy(r.column('small').ascending()))(f.findAll([f.name().alias('employeeName'), f.id().alias('id')]).filter((r: any) => r.employeeName.ne('Dave')).extend({ small: (r: any) => r.id.lt(3) }).groupBy((r: any) => r.small).aggregate({ total: (r: any) => r.id.sum() })),
+    expected: { columns: ['small', 'total'], rows: [
+        [false, 3],
+        [true, 3],
+      ], sql: 'GROUP BY t0.id < 3', unexpectedSql: '(SELECT', skipGraphql: 'The GraphQL engine does not run steps over a result' },
   },
   {
     name: 'an_aggregate_of_the_whole_result_is_in_one_select',
-    query: () => { throw new Error('a group and an aggregate of a plain select are part of it (data-finder 0.1.22, #275): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a group and an aggregate of a plain select are part of it (data-finder 0.1.22, #275): not ported yet' },
+    query: f => f.findAll([f.id().alias('id')]).filter((r: any) => r.id.gt(1)).aggregate({ total: (r: any) => r.id.sum(), n: (r: any) => r.id.count() }),
+    expected: { columns: ['total', 'n'], rows: [
+        [9, 3],
+      ], unexpectedSql: '(SELECT', skipGraphql: 'The GraphQL engine does not run steps over a result' },
   },
   {
     name: 'a_filter_on_an_aggregate_is_over_the_select_that_made_it',
@@ -137,8 +142,13 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'a_column_that_is_a_condition_can_be_tested_in_a_list_in_the_select',
-    query: () => { throw new Error('a condition that is a column of a result is a boolean, tested in a list in the select (data-finder 0.1.22, #273, #274): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a condition that is a column of a result is a boolean, tested in a list in the select (data-finder 0.1.22, #273, #274): not ported yet' },
+    query: f => ((r: any) => r.orderBy(r.column('id').ascending()))(f.findAll([f.id().alias('id'), f.id().gt(2).alias('big')]).extend({ listed: (r: any) => r.big.isIn([true]) })),
+    expected: { columns: ['id', 'big', 'listed'], rows: [
+        [1, false, false],
+        [2, false, false],
+        [3, true, true],
+        [4, true, true],
+      ], unexpectedSql: '(SELECT', skipGraphql: 'The GraphQL engine does not run steps over a result' },
   },
   {
     name: 'a_filter_on_a_window_column_is_still_over_the_select_that_made_it',
