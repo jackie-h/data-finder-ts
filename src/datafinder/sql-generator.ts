@@ -54,6 +54,9 @@ import {
   CaseOperation,
   ConcatOperation,
   DateTruncOperation,
+  RecentDayOfWeekOperation,
+  CurrentDateOperation,
+  CurrentTimestampOperation,
   ArithmeticOperation,
   IntervalOperation,
   IntervalConstantOperation,
@@ -153,6 +156,7 @@ const WINDOW_SQL_NAMES: Record<WindowFunction, string> = {
 };
 
 const SCALAR_SQL_NAMES: Record<ScalarFunction, string> = {
+  [ScalarFunction.DAY_NAME]: 'DAYNAME',
   [ScalarFunction.ABS]: 'ABS',
   [ScalarFunction.CEILING]: 'CEILING',
   [ScalarFunction.FLOOR]: 'FLOOR',
@@ -193,6 +197,8 @@ function constantValueString(op: ConstantOperation, d: SqlDialect): string {
   if (op instanceof BooleanConstantOperation) return op.value ? 'TRUE' : 'FALSE';
   if (op instanceof DecimalConstantOperation) return String(op.value);
   if (op instanceof IntervalConstantOperation) return "INTERVAL '" + op.value.totalSeconds() + "' SECOND";
+  if (op instanceof CurrentDateOperation) return 'CURRENT_DATE';
+  if (op instanceof CurrentTimestampOperation) return 'CURRENT_TIMESTAMP';
   throw new Error('Unknown constant operation');
 }
 
@@ -307,6 +313,12 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
   if (operation instanceof DateExtractOperation) {
     const element = sqlOperationToString(operation.element, d);
     return operation.part === DatePart.DOW ? d.dayOfWeek(element) : 'EXTRACT(' + operation.part + ' FROM ' + element + ')';
+  }
+  if (operation instanceof RecentDayOfWeekOperation) {
+    const date = 'CAST(' + sqlOperationToString(operation.element, d) + ' AS DATE)';
+    // the days back to that day of the week: 0 to 6 on or before the date, 1 to 7 before it
+    const back = `((${d.isoDayOfWeek(date)} - ${operation.day} + ${operation.inclusive ? 7 : 6}) % 7${operation.inclusive ? '' : ' + 1'})`;
+    return `(${date} - CAST(${back} AS INTEGER))`;
   }
   if (operation instanceof DateTruncOperation) {
     return "CAST(DATE_TRUNC('" + operation.part.toLowerCase() + "', " + sqlOperationToString(operation.element, d) + ') AS DATE)';
@@ -1027,6 +1039,9 @@ class SQLQueryGenerator {
     }
     if (op instanceof DateExtractOperation) {
       return new DateExtractOperation(this._rewriteOperation(op.element), op.part, op.displayName);
+    }
+    if (op instanceof RecentDayOfWeekOperation) {
+      return new RecentDayOfWeekOperation(this._rewriteOperation(op.element), op.day, op.inclusive, op.displayName);
     }
     if (op instanceof DateTruncOperation) {
       return new DateTruncOperation(this._rewriteOperation(op.element), op.part, op.displayName);

@@ -30,6 +30,9 @@ export interface SqlDialect {
   /** The day of the week of a date or timestamp, 0 = Sunday through 6 = Saturday. */
   dayOfWeek(expression: string): string;
 
+  /** The ISO day of the week of a date or timestamp, 1 = Monday through 7 = Sunday. */
+  isoDayOfWeek(expression: string): string;
+
   /** Whole `unit`s from `from` to `to`; both are SQL expressions. */
   dateDiff(unit: DatePart, from: string, to: string): string;
 
@@ -52,6 +55,7 @@ export const POSTGRES: SqlDialect = {
   orderDirection: direction => (direction === SortDirection.ASC ? ' ASC' : ' DESC'),
   doubleType: 'DOUBLE PRECISION',
   dayOfWeek: expression => `EXTRACT(DOW FROM ${expression})`,
+  isoDayOfWeek: expression => `EXTRACT(ISODOW FROM ${expression})`,
   dateDiff(unit, from, to) {
     const start = `CAST(${from} AS TIMESTAMP)`;
     const end = `CAST(${to} AS TIMESTAMP)`;
@@ -94,6 +98,7 @@ export const DATABRICKS: SqlDialect = {
   doubleType: 'DOUBLE',
   // DAYOFWEEK is 1 = Sunday through 7 = Saturday
   dayOfWeek: expression => `(DAYOFWEEK(${expression}) - 1)`,
+  isoDayOfWeek: expression => `EXTRACT(DAYOFWEEK_ISO FROM ${expression})`,
   dateDiff: (unit, from, to) => `DATEDIFF(${unit}, ${from}, ${to})`,
   // RLIKE searches anywhere in the text
   regexMatches: (expression, pattern) => `(${expression} RLIKE ${pattern})`,

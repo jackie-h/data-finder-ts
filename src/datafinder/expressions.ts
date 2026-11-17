@@ -3,6 +3,11 @@ import {
   BooleanConstantOperation,
   CountAllOperation,
   ConstantOperation,
+  CurrentDateOperation,
+  CurrentTimestampOperation,
+  DateTruncOperation,
+  DayOfWeek,
+  RecentDayOfWeekOperation,
   DateConstantOperation,
   DateOnly,
   DateTimeConstantOperation,
@@ -50,4 +55,39 @@ export function constant(value: boolean | number | string | Date | Interval): Co
  */
 export function countAll(): CountAllOperation {
   return new CountAllOperation('');
+}
+
+/** The date of the day the query runs, to compare a date with or to work out another date from: `f.tradeDate().lt(today())`. */
+export function today(): CurrentDateOperation {
+  return new CurrentDateOperation();
+}
+
+/** The time the query runs: `f.settledAt().lt(now())`. */
+export function now(): CurrentTimestampOperation {
+  return new CurrentTimestampOperation();
+}
+
+/** The first day of the month that today is in. */
+export function firstDayOfThisMonth(): DateTruncOperation {
+  return today().firstDayOfMonth();
+}
+
+/** The first day of the quarter that today is in. */
+export function firstDayOfThisQuarter(): DateTruncOperation {
+  return today().firstDayOfQuarter();
+}
+
+/** The first day of the year that today is in. */
+export function firstDayOfThisYear(): DateTruncOperation {
+  return today().firstDayOfYear();
+}
+
+/** The date of `day` on or before today. */
+export function mostRecentDayOfWeek(day: DayOfWeek): RecentDayOfWeekOperation {
+  return today().mostRecentDayOfWeek(day);
+}
+
+/** The date of `day` before today: a week ago, if today is that day. */
+export function previousDayOfWeek(day: DayOfWeek): RecentDayOfWeekOperation {
+  return today().previousDayOfWeek(day);
 }

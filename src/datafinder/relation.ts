@@ -16,6 +16,8 @@ import {
   ColumnWithJoin,
   ConcatOperation,
   ConstantOperation,
+  CurrentDateOperation,
+  CurrentTimestampOperation,
   CountAllOperation,
   DateArithmeticOperation,
   DateConstantOperation,
@@ -46,6 +48,7 @@ const CONSTANT_TYPES: [ConstantClass, string][] = [
   [IntegerConstantOperation, 'BIGINT'], [FloatConstantOperation, 'DOUBLE'], [StringConstantOperation, 'VARCHAR'],
   [DateConstantOperation, 'DATE'], [DateTimeConstantOperation, 'TIMESTAMP'], [DecimalConstantOperation, 'DECIMAL'],
   [BooleanConstantOperation, 'BOOLEAN'], [IntervalConstantOperation, 'INTERVAL'],
+  [CurrentDateOperation, 'DATE'], [CurrentTimestampOperation, 'TIMESTAMP'],
 ];
 const NUMBER_TYPES: Record<string, string> = { integer: 'BIGINT', double: 'DOUBLE', decimal: 'DECIMAL' };
 

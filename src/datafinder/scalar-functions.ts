@@ -91,7 +91,7 @@ function labelOf(operation: ScalarFunctionOperation): string {
   return operation.displayName ?? operation.func.charAt(0) + operation.func.slice(1).toLowerCase();
 }
 
-function stringFunction(
+export function stringFunction(
   element: RelationalOperationElement, func: ScalarFunction, label: string,
   secondArg?: number, extraArgs: (string | number)[] = [],
 ): StringFunctionOperation {

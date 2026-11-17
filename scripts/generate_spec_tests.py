@@ -102,10 +102,6 @@ SKIPPED_MODULES = {
 # Expectations of the Python specs for features that are not ported yet, by the pattern their names match. Each is generated
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 UNPORTED = [
-    (r'^(a_filter_on_the_name_of_the_day|add_microseconds_to_a_datetime|a_timedelta_with_microseconds_is_added_to_a_datetime|add_weeks|subtract_weeks|day_of_week_name'
-     r'|day_of_year_extract|most_recent_monday|the_date_of_a_datetime|the_most_recent_friday_of_a_friday_is_that_day|the_previous_friday_of_a_friday_is_a_week_before'
-     r'|the_previous_sunday|rows_before_today|no_row_is_today|rows_before_now|rows_before_the_first_day_of_this_month_quarter_and_year|rows_after_the_previous_monday)$',
-     'the date functions of data-finder 0.1.22 (today, now, add_weeks, add_microseconds, date, day name and year, the most recent and previous day of the week) are not ported yet'),
 ]
 
 
@@ -144,7 +140,10 @@ def camel(name: str) -> str:
 
 
 # Free functions of the Python package that the specs call, and their TypeScript names.
-FREE_FUNCTIONS = {'count_all': 'countAll', 'constant': 'constant', 'when': 'when', 'concat': 'concat', 'exists': 'exists'}
+FREE_FUNCTIONS = {'count_all': 'countAll', 'constant': 'constant', 'when': 'when', 'concat': 'concat', 'exists': 'exists',
+                  'today': 'today', 'now': 'now', 'first_day_of_this_month': 'firstDayOfThisMonth',
+                  'first_day_of_this_quarter': 'firstDayOfThisQuarter', 'first_day_of_this_year': 'firstDayOfThisYear',
+                  'most_recent_day_of_week': 'mostRecentDayOfWeek', 'previous_day_of_week': 'previousDayOfWeek'}
 # Methods whose result is a number or text, which decides how `+ - * /` between them translates.
 NUMBER_METHODS = {'length', 'abs', 'ceil', 'ceiling', 'floor', 'round', 'sqrt', 'power', 'mod', 'sum', 'average',
                   'min', 'max', 'count', 'count_distinct', 'std', 'var', 'year', 'month', 'day', 'hour', 'minute',
@@ -235,6 +234,8 @@ class Translator:
 
     def visit_Attribute(self, node: ast.Attribute) -> str:
         """A namespace of the query's own (`q.order`, `p.APP_TIME`): its names are kept."""
+        if isinstance(node.value, ast.Name) and node.value.id == 'DayOfWeek':   # a day of the week, from the model
+            self.model_used.add('DayOfWeek')
         return f'{self.expr(node.value)}.{node.attr}'
 
     def visit_ListComp(self, node: ast.ListComp) -> str:
@@ -284,8 +285,12 @@ class Translator:
         left, right = self.expr(node.left), node.right
         if isinstance(node.op, (ast.Add, ast.Sub)) and isinstance(right, ast.Call) \
                 and getattr(right.func, 'attr', None) == 'timedelta':
-            (kw,) = right.keywords
             verb = 'add' if isinstance(node.op, ast.Add) else 'subtract'
+            if len(right.keywords) > 1 or right.keywords[0].arg == 'microseconds':   # a length with microseconds: all of them are microseconds
+                scale = {'days': 86400 * 10**6, 'hours': 3600 * 10**6, 'minutes': 60 * 10**6, 'seconds': 10**6, 'microseconds': 1}
+                microseconds = sum(ast.literal_eval(kw.value) * scale[kw.arg] for kw in right.keywords)
+                return f'{left}.{verb}Microseconds({microseconds})'
+            (kw,) = right.keywords
             return f'{left}.{verb}{TIMEDELTA_UNITS[kw.arg]}({self.expr(kw.value)})'
         try:   # two literals fold, as Python does before the query is built
             return repr(ast.literal_eval(node))

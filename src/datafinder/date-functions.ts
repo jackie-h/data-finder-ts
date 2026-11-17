@@ -13,11 +13,17 @@ import {
   DatePart,
   DateTimeConstantOperation,
   DateTruncOperation,
+  CurrentDateOperation,
+  CurrentTimestampOperation,
+  DayOfWeek,
   IntervalOperation,
+  RecentDayOfWeekOperation,
+  ScalarFunction,
   RelationalOperationElement,
   applyMixins,
 } from '../model/relational';
 import { Comparand, comparandOperand } from './attribute';
+import { StringFunctionOperation, stringFunction } from './scalar-functions';
 
 function diffOther(other: Date | Comparand): Date | RelationalOperationElement {
   return other instanceof Date ? other : comparandOperand(other);
@@ -29,6 +35,21 @@ export abstract class DateFunctions {
   abstract functionInput(): RelationalOperationElement;
   /** @internal What a function of this is labelled after. */
   abstract functionLabel(): string;
+
+  /** Extract the day of the year (1–366). */
+  dayOfYear(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.DOY, 'Day Of Year ' + this.functionLabel()); }
+  /** The name of the day of the week: `Monday` ... `Sunday`. */
+  dayOfWeekName(): StringFunctionOperation { return stringFunction(this.functionInput(), ScalarFunction.DAY_NAME, 'Day Of Week Name ' + this.functionLabel()); }
+  /** The date part: a timestamp without its time of day. */
+  date(): DateTruncOperation { return new DateTruncOperation(this.functionInput(), DatePart.DAY, 'Date ' + this.functionLabel()); }
+  /** The date of `day` on or before this date: the date itself if it is that day. */
+  mostRecentDayOfWeek(day: DayOfWeek): RecentDayOfWeekOperation { return new RecentDayOfWeekOperation(this.functionInput(), day, true, 'Most Recent Day Of Week ' + this.functionLabel()); }
+  /** The date of `day` before this date: a week before, if it is that day. */
+  previousDayOfWeek(day: DayOfWeek): RecentDayOfWeekOperation { return new RecentDayOfWeekOperation(this.functionInput(), day, false, 'Previous Day Of Week ' + this.functionLabel()); }
+  /** Add `n` weeks. */
+  addWeeks(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.functionInput(), n, DatePart.WEEK, true, 'Add Weeks ' + this.functionLabel()); }
+  /** Subtract `n` weeks. */
+  subtractWeeks(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.functionInput(), n, DatePart.WEEK, false, 'Subtract Weeks ' + this.functionLabel()); }
 
   /** Extract the four-digit calendar year. */
   year(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.YEAR, 'Year ' + this.functionLabel()); }
@@ -78,6 +99,25 @@ export abstract class DateTimeFunctions {
   abstract functionInput(): RelationalOperationElement;
   /** @internal What a function of this is labelled after. */
   abstract functionLabel(): string;
+
+  /** Extract the day of the year (1–366). */
+  dayOfYear(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.DOY, 'Day Of Year ' + this.functionLabel()); }
+  /** The name of the day of the week: `Monday` ... `Sunday`. */
+  dayOfWeekName(): StringFunctionOperation { return stringFunction(this.functionInput(), ScalarFunction.DAY_NAME, 'Day Of Week Name ' + this.functionLabel()); }
+  /** The date part: a timestamp without its time of day. */
+  date(): DateTruncOperation { return new DateTruncOperation(this.functionInput(), DatePart.DAY, 'Date ' + this.functionLabel()); }
+  /** The date of `day` on or before this date: the date itself if it is that day. */
+  mostRecentDayOfWeek(day: DayOfWeek): RecentDayOfWeekOperation { return new RecentDayOfWeekOperation(this.functionInput(), day, true, 'Most Recent Day Of Week ' + this.functionLabel()); }
+  /** The date of `day` before this date: a week before, if it is that day. */
+  previousDayOfWeek(day: DayOfWeek): RecentDayOfWeekOperation { return new RecentDayOfWeekOperation(this.functionInput(), day, false, 'Previous Day Of Week ' + this.functionLabel()); }
+  /** Add `n` weeks. */
+  addWeeks(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.functionInput(), n, DatePart.WEEK, true, 'Add Weeks ' + this.functionLabel()); }
+  /** Subtract `n` weeks. */
+  subtractWeeks(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.functionInput(), n, DatePart.WEEK, false, 'Subtract Weeks ' + this.functionLabel()); }
+  /** Add `n` microseconds to this timestamp. */
+  addMicroseconds(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.functionInput(), n, DatePart.MICROSECOND, true, 'Add Microseconds ' + this.functionLabel()); }
+  /** Subtract `n` microseconds from this timestamp. */
+  subtractMicroseconds(n: number): DateArithmeticOperation { return new DateArithmeticOperation(this.functionInput(), n, DatePart.MICROSECOND, false, 'Subtract Microseconds ' + this.functionLabel()); }
 
   /** Extract the four-digit calendar year. */
   year(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.YEAR, 'Year ' + this.functionLabel()); }
@@ -157,6 +197,10 @@ export abstract class DateTimeFunctions {
 declare module '../model/relational' {
   interface DateConstantOperation extends DateFunctions {}
   interface DateTimeConstantOperation extends DateTimeFunctions {}
+  interface CurrentDateOperation extends DateFunctions {}
+  interface CurrentTimestampOperation extends DateTimeFunctions {}
 }
 applyMixins(DateConstantOperation, [DateFunctions]);
 applyMixins(DateTimeConstantOperation, [DateTimeFunctions]);
+applyMixins(CurrentDateOperation, [DateFunctions]);
+applyMixins(CurrentTimestampOperation, [DateTimeFunctions]);

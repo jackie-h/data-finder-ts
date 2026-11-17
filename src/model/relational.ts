@@ -44,6 +44,7 @@ export enum AggregateOperator {
 }
 
 export enum ScalarFunction {
+  DAY_NAME = 'DAY_NAME',
   ABS = 'ABS',
   CEILING = 'CEILING',
   FLOOR = 'FLOOR',
@@ -85,6 +86,19 @@ export enum DatePart {
   QUARTER = 'QUARTER',
   WEEK = 'WEEK',
   DOW = 'DOW',
+  DOY = 'DOY',
+  MICROSECOND = 'MICROSECOND',
+}
+
+/** A day of the week, numbered as ISO does: Monday is 1 and Sunday is 7. */
+export enum DayOfWeek {
+  MONDAY = 1,
+  TUESDAY = 2,
+  WEDNESDAY = 3,
+  THURSDAY = 4,
+  FRIDAY = 5,
+  SATURDAY = 6,
+  SUNDAY = 7,
 }
 
 export enum SortDirection {
@@ -210,6 +224,18 @@ export class DateConstantOperation extends ConstantOperation {
 
 export class DateTimeConstantOperation extends ConstantOperation {
   constructor(readonly value: Date) { super(); }
+  comparisonOperand(): RelationalOperationElement { return this; }
+}
+
+/** The date of the day the query runs, as `today()` gives it. */
+export class CurrentDateOperation extends ConstantOperation {
+  functionLabel(): string { return 'Today'; }
+  comparisonOperand(): RelationalOperationElement { return this; }
+}
+
+/** The time the query runs, as `now()` gives it. */
+export class CurrentTimestampOperation extends ConstantOperation {
+  functionLabel(): string { return 'Now'; }
   comparisonOperand(): RelationalOperationElement { return this; }
 }
 
@@ -442,6 +468,13 @@ export class DateTruncOperation extends UnaryOperation implements Sortable {
   descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
 
   comparisonOperand(): RelationalOperationElement { return this; }
+}
+
+/** The date of a day of the week on or before a date (`inclusive`: the date itself if it is that day), or strictly before it. */
+export class RecentDayOfWeekOperation extends DateTruncOperation {
+  constructor(element: RelationalOperationElement, readonly day: DayOfWeek, readonly inclusive: boolean, displayName?: string) {
+    super(element, DatePart.DAY, displayName);
+  }
 }
 
 export class DateArithmeticOperation extends UnaryOperation implements Sortable {
@@ -1426,6 +1459,12 @@ applyMixins(DateTimeConstantOperation, [Equatable, Orderable, Aggregates]);
 
 export interface BooleanConstantOperation extends Equatable<boolean>, Aggregates {}
 applyMixins(BooleanConstantOperation, [Equatable, Aggregates]);
+
+export interface CurrentDateOperation extends Equatable<DateValue>, Orderable<DateValue>, Aggregates {}
+applyMixins(CurrentDateOperation, [Equatable, Orderable, Aggregates]);
+
+export interface CurrentTimestampOperation extends Equatable<DateValue>, Orderable<DateValue>, Aggregates {}
+applyMixins(CurrentTimestampOperation, [Equatable, Orderable, Aggregates]);
 
 export interface CaseOperation extends Aggregates {}
 applyMixins(CaseOperation, [Aggregates]);
