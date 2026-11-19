@@ -113,8 +113,12 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'chain_filter_on_a_column',
-    query: () => { throw new Error('a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet'); },
-    expected: { columns: [], rows: [], skip: 'a filter and an extend of a result, an aggregate and a distinct after an order are part of its select (data-finder 0.1.22, #274, #275): not ported yet' },
+    query: f => _expensive_trades(f),
+    expected: { columns: ['account', 'sym', 'price'], rows: [
+        ['Beta Fund', 'MSFT', 300.0],
+        ['Beta Fund', 'TSLA', 400.0],
+        ['Gamma Fund', 'GS', 500.0],
+      ], sql: 'WHERE t0.price > 250.0', unexpectedSql: 'FROM (SELECT', skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
   {
     name: 'chain_window_then_filter_on_it',
