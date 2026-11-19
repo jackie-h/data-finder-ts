@@ -82,7 +82,7 @@ tf.findAll(null, null, [tf.symbol().alias('Symbol')]).orderBy(tf.symbol().descen
 // SELECT t0.sym AS `Symbol` FROM … ORDER BY t0.sym DESC NULLS FIRST
 ```
 
-Only what differs is written per dialect; everything the databases share is written once:
+The SQL the generator writes is Postgres, which is ANSI SQL wherever ANSI has the construct, as in Python: an interval is in the ANSI units (a week is 7 days, a quarter 3 months and a microsecond a millionth of a second), the name of a day is a `CASE` over its ISO number, and a difference between dates is written with `EXTRACT`, `DATE_TRUNC` and `CAST` and not a function of one database. A difference counts the boundaries crossed (a day is a change of date, an hour a change of hour, a month a change of month: January 31st to February 1st is one month) and whole weeks, as DuckDB's `DATE_DIFF` counts them; microseconds are refused. DuckDB runs the Postgres SQL as it is, apart from what the table below lists. Only what differs is written per dialect; everything the databases share is written once:
 
 | | Postgres | DuckDB | Databricks |
 |---|---|---|---|
@@ -91,10 +91,11 @@ Only what differs is written per dialect; everything the databases share is writ
 | sort null placement | default | `DESC NULLS FIRST` | `ASC NULLS LAST` / `DESC NULLS FIRST` |
 | join a group's values | `STRING_AGG(x, ',' ORDER BY …)` | same | `LISTAGG(x, ',') WITHIN GROUP (ORDER BY …)` |
 | day of the week (0 = Sunday) | `EXTRACT(DOW FROM x)` | same | `(DAYOFWEEK(x) - 1)` |
-| `diffDays` and the others | date and `AGE` arithmetic | `DATE_DIFF('day', a, b)` | `DATEDIFF(DAY, a, b)` |
+| `diffDays` and the others | `EXTRACT`, `DATE_TRUNC` and `CAST` | same | `DATEDIFF(DAY, a, b)` |
+| a regular expression | `x ~ p` | `REGEXP_MATCHES(x, p)` | `RLIKE` |
 | a selected float | `CAST(1.5 AS DOUBLE PRECISION)` | `CAST(1.5 AS DOUBLE)` | `CAST(1.5 AS DOUBLE)` |
 
-A sort puts nulls where Postgres does (last when ascending, first when descending) in every dialect, so the same query gives the same order everywhere. `npm run check:dialects` parses the SQL the finders write in each dialect with sqlglot and lists where it differs from what sqlglot would write; a parse is weak evidence, though, since sqlglot accepts constructs a database does not. Months and years between dates are whole units in Postgres and Databricks, but DuckDB counts the month or year boundaries crossed.
+A sort puts nulls where Postgres does (last when ascending, first when descending) in every dialect, so the same query gives the same order everywhere. `npm run check:dialects` parses the SQL the finders write in each dialect with sqlglot and lists where it differs from what sqlglot would write; a parse is weak evidence, though, since sqlglot accepts constructs a database does not. The dates in a difference are counted the same way in every dialect.
 
 ## Databricks
 

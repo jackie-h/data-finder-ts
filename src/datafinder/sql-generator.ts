@@ -41,6 +41,7 @@ import {
   CountAllOperation,
   UnaryOperation,
   Alias,
+  DateOnly,
   LIKE_ESCAPE,
   ExistsOperation,
   NotExistsOperation,
@@ -158,8 +159,8 @@ const WINDOW_SQL_NAMES: Record<WindowFunction, string> = {
   [WindowFunction.PERCENT_RANK]: 'PERCENT_RANK',
 };
 
-const SCALAR_SQL_NAMES: Record<ScalarFunction, string> = {
-  [ScalarFunction.DAY_NAME]: 'DAYNAME',
+/** The SQL name of each scalar function that is one function of the database (the name of a day is spelled out). */
+const SCALAR_SQL_NAMES: Partial<Record<ScalarFunction, string>> = {
   [ScalarFunction.ABS]: 'ABS',
   [ScalarFunction.CEILING]: 'CEILING',
   [ScalarFunction.FLOOR]: 'FLOOR',
@@ -266,6 +267,25 @@ function isCondition(op: unknown): boolean {
     || op instanceof ExistsOperation || op instanceof NotExistsOperation || op instanceof RelationExistsOperation || op instanceof NotOperation;
 }
 
+/**
+ * `INTERVAL '5' DAY` in the units ANSI has (YEAR, MONTH, DAY, HOUR, MINUTE, SECOND): a week is 7 days, a quarter 3 months and a microsecond a
+ * millionth of a second.
+ */
+export function intervalString(n: number, unit: DatePart): string {
+  if (unit === DatePart.WEEK) { n *= 7; unit = DatePart.DAY; }
+  else if (unit === DatePart.QUARTER) { n *= 3; unit = DatePart.MONTH; }
+  else if (unit === DatePart.MICROSECOND) {
+    const sign = n < 0 ? '-' : '';
+    const whole = Math.trunc(Math.abs(n) / 1_000_000);
+    return `INTERVAL '${sign}${whole}.${String(Math.abs(n) % 1_000_000).padStart(6, '0')}' SECOND`;
+  } else if (unit === DatePart.DOW || unit === DatePart.DOY) {
+    throw new Error(`A length of time is not counted in ${unit}`);
+  }
+  return `INTERVAL '${n}' ${unit}`;
+}
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 function sqlOperationToString(operation: RelationalOperationElement, d: SqlDialect): string {
   if (operation instanceof TableAliasColumn) {
     return operation.tableAlias.name + '.' + operation.column.name;
@@ -303,8 +323,13 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
     }
     return sql;
   }
+  if (operation instanceof ScalarFunctionOperation && operation.func === ScalarFunction.DAY_NAME) {
+    // the name of the day is spelled out, as there is no standard function for it
+    const whens = DAY_NAMES.map((name, i) => `WHEN ${i + 1} THEN '${name}'`).join(' ');
+    return `CASE ${d.isoDayOfWeek(sqlOperationToString(operation.element, d))} ${whens} END`;
+  }
   if (operation instanceof ScalarFunctionOperation) {
-    const fn = SCALAR_SQL_NAMES[operation.func];
+    const fn = SCALAR_SQL_NAMES[operation.func]!;
     const parts: string[] = [sqlOperationToString(operation.element, d)];
     if (operation.secondArg !== undefined) parts.push(String(operation.secondArg));
     for (const arg of operation.extraArgs) {
@@ -328,12 +353,12 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
   }
   if (operation instanceof DateArithmeticOperation) {
     const op = operation.isAdd ? '+' : '-';
-    return sqlOperationToString(operation.element, d) + ' ' + op + " INTERVAL '" + operation.n + "' " + operation.unit;
+    return sqlOperationToString(operation.element, d) + ' ' + op + ' ' + intervalString(operation.n, operation.unit);
   }
   if (operation instanceof DateDiffOperation) {
     const other = operation.other instanceof RelationalOperationElement
       ? sqlOperationToString(operation.other, d)
-      : 'TIMESTAMP ' + sqlFormatDatetime(operation.other);
+      : operation.other instanceof DateOnly ? sqlFormatDate(operation.other) : sqlFormatDatetime(operation.other);
     return d.dateDiff(operation.unit, sqlOperationToString(operation.element, d), other);
   }
   if (operation instanceof CountAllOperation) return 'COUNT(*)';
