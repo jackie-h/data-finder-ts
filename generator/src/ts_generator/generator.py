@@ -218,6 +218,24 @@ def _queries_of(mapping) -> list[TableAlias]:
     return found
 
 
+def _read_code(read) -> str:
+    """What a query reads, as the relation it is: another query of the mapping, or a table of the data store."""
+    if (query := query_of(read)) is not None:
+        return _query_constant(query)
+    assert isinstance(read, Table), f"A query reads a table or a query, not {read!r}"
+    return f"new Table('{table_qualified_name(read)}', [])"
+
+
+def _scheme_code(scheme) -> str:
+    """TypeScript source for a milestoning scheme: its columns and infinities, in the order of the constructor."""
+    values = [scheme.processing_start, scheme.processing_end, scheme.business_date, scheme.business_date_from, scheme.business_date_to,
+              scheme.processing_infinite_datetime, scheme.processing_datetime, scheme.business_infinite_datetime]
+    args = [js_string(v) if v is not None else "undefined" for v in values]
+    while args and args[-1] == "undefined":
+        args.pop()
+    return f"new MilestoningScheme({', '.join([js_string(scheme.name), *args])})"
+
+
 def query_definitions(mapping) -> str:
     """TypeScript source for the module of the queries the mapping's classes are mapped to: each is built where it is imported, from
     the query model the loader read its SQL into, and a query over the class writes it as a derived table."""
@@ -232,7 +250,12 @@ def query_definitions(mapping) -> str:
         lines = [*("  " + d for d in code.definitions)]
         body = "\n".join(lines + [f"  return new TableAlias({query}, '{alias.name}', [{columns}]);"])
         block = f"export const {constant} = (() => {{\n{body}\n}})();"
+        if alias.sql is not None:
+            block += f"\n{constant}.sql = {js_string(alias.sql)};"
+        if alias.reads:
+            block += f"\n{constant}.reads = [{', '.join(_read_code(r) for r in alias.reads)}];"
         if alias.milestoning_scheme is not None:
+            block += f"\n{constant}.milestoningScheme = {_scheme_code(alias.milestoning_scheme)};"
             block += f"\n{constant}.milestoningColumns = {_scheme_columns_code(alias, constant)};"
         blocks.append(block)
     return "\n\n".join(blocks)
@@ -253,7 +276,7 @@ def main_query(rcm) -> str:
 
 
 def js_string(value: str) -> str:
-    return "'" + value.replace('\\', '\\\\').replace("'", "\\'") + "'"
+    return "'" + value.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n').replace('\r', '\\r') + "'"
 
 
 def condition_args(join: Join, *rest) -> str:
@@ -693,7 +716,7 @@ def generate(mapping: Mapping, output_directory: str):
                 "  CaseOperation, Column, ComparisonOperation, ComparisonOperator, ConcatOperation, CountAllOperation,\n"
                 "  DecimalConstantOperation, FloatConstantOperation, InOperation, IntegerConstantOperation, IsNotNullOperation,\n"
                 "  IsNullOperation, JoinKind, LogicalOperation, LogicalOperator, NoOperation, NotInOperation, NotOperation,\n"
-                "  JoinOperation, QuerySpecification, ScalarFunction, ScalarFunctionOperation, StringConstantOperation, Table, TableAlias,\n"
+                "  JoinOperation, MilestoningScheme, QuerySpecification, ScalarFunction, ScalarFunctionOperation, StringConstantOperation, Table, TableAlias,\n"
                 "  UnionOperation,\n} from '@model/relational';\n"
                 "import {\n  BiTemporalColumns, BusinessDateAndProcessingTemporalColumns, BusinessDateRangeColumns, ProcessingTemporalColumns,\n"
                 "  SingleBusinessDateColumn, SingleProcessingDatetimeColumn,\n} from '@model/milestoning';\n\n"

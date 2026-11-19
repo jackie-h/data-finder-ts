@@ -35,7 +35,7 @@ Finder output (`example/generated/`, `tests/generated_examples/`, `tests/generat
 ### TypeScript library (`src/`)
 
 **`src/model/`** — core data model, no dependencies on datafinder:
-- `relational.ts` — operation tree (`ComparisonOperation`, `LogicalOperation`, `AggregateOperation`, `ColumnWithJoin`, `JoinOperation`, `JoinTreeNodeOperation`, …), `Column`, `Relation`/`NamedRelation`/`Table`/`TableAlias`, `Schema`. A column's `owner` is a Relation, never a name. Uses `instanceof` checks throughout (mirrors Python's `isinstance`). `Operation.and()` replaces Python's `__and__`.
+- `relational.ts` — operation tree (`ComparisonOperation`, `LogicalOperation`, `AggregateOperation`, `ColumnWithJoin`, `JoinOperation`, `JoinTreeNodeOperation`, …), `Column`, `Relation`/`NamedRelation`/`Table`/`TableAlias`, `Schema`, `MilestoningScheme`. A query a class is mapped to is a `TableAlias` of a `QueryExpression` (`queryOf` says so, `tablesReadBy` and `schemaOf` follow what it reads), with the `sql` it was read from, its `reads` and its milestoning scheme, as in Python. A column's `owner` is a Relation, never a name. Uses `instanceof` checks throughout (mirrors Python's `isinstance`). `Operation.and()` replaces Python's `__and__`.
 - `milestoning.ts` — temporal types: `ProcessingTemporalColumns`, `SingleBusinessDateColumn`, `BusinessDateAndProcessingTemporalColumns`, `BiTemporalColumns`, `MilestonedTable`.
 
 **`src/datafinder/`** — query building and execution:
