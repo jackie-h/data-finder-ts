@@ -34,6 +34,8 @@ _MAPPINGS = [
     'sql_queries_mapping.md',
     'schema_milestoning_mapping.md',
     'table_milestoning_mapping.md',
+    'sql_query_sets_mapping.md',
+    'sql_query_sets_embedded_mapping.md',
     'tpch_bih_mapping.md',
 ]
 
