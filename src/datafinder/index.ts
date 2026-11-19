@@ -5,7 +5,10 @@ export {
   StringFunctionOperation, NumericFunctionOperation, IntegerFunctionOperation, DoubleFunctionOperation,
   DecimalFunctionOperation, DateFunctionOperation, BooleanFunctionOperation,
 } from './scalar-functions';
-export { constant, countAll } from './expressions';
+export {
+  constant, countAll, today, now, firstDayOfThisMonth, firstDayOfThisQuarter, firstDayOfThisYear, mostRecentDayOfWeek, previousDayOfWeek,
+} from './expressions';
+export { DayOfWeek } from '../model/relational';
 export { concat } from '../model/relational';
 export { when } from './conditional';
 export { toSql, querySqlToString } from './sql-generator';
