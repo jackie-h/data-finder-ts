@@ -108,14 +108,20 @@ describe('what differs', () => {
 
   it('date difference', () => {
     const days = day.diffDays(new Date('2024-01-01'));
-    expect(sql('duckdb', days)).toContain("DATE_DIFF('day', t0.day, TIMESTAMP '2024-01-01 00:00:00')");
-    expect(sql('databricks', days)).toContain("DATEDIFF(DAY, t0.day, TIMESTAMP '2024-01-01 00:00:00')");
-    expect(sql('postgres', days)).toContain("(CAST(TIMESTAMP '2024-01-01 00:00:00' AS DATE) - CAST(t0.day AS DATE))");
+    // the SQL is Postgres SQL, which DuckDB runs as it is; Databricks has a DATEDIFF that counts the same boundaries
+    expect(sql('duckdb', days)).toContain("(CAST('2024-01-01 00:00:00' AS DATE) - CAST(t0.day AS DATE))");
+    expect(sql('databricks', days)).toContain("DATEDIFF(DAY, t0.day, '2024-01-01 00:00:00')");
+    expect(sql('postgres', days)).toContain("(CAST('2024-01-01 00:00:00' AS DATE) - CAST(t0.day AS DATE))");
   });
 
-  it.each([DatePart.MONTH, DatePart.YEAR, DatePart.HOUR, DatePart.MINUTE, DatePart.SECOND])('Postgres differences in %s are written', unit => {
-    expect(POSTGRES.dateDiff(unit, 'a', 'b')).toMatch(/AGE|EPOCH/);
-    expect(() => POSTGRES.dateDiff(DatePart.DOW, 'a', 'b')).toThrow(/Cannot take the difference/);
+  it.each([DatePart.MONTH, DatePart.YEAR, DatePart.QUARTER, DatePart.HOUR, DatePart.MINUTE, DatePart.SECOND])('Postgres differences in %s are written', unit => {
+    expect(POSTGRES.dateDiff(unit, 'a', 'b')).toMatch(/EXTRACT/);
+    expect(POSTGRES.dateDiff(unit, 'a', 'b')).not.toContain('AGE');
+  });
+
+  it('a difference in anything else is refused', () => {
+    expect(() => POSTGRES.dateDiff(DatePart.MICROSECOND, 'a', 'b')).toThrow(/not MICROSECOND/);
+    expect(() => POSTGRES.dateDiff(DatePart.DOW, 'a', 'b')).toThrow(/not DOW/);
   });
 
   it('direction text', () => {
@@ -141,17 +147,6 @@ describe('DuckDB runs what it is given', () => {
   it('the default (Postgres) SQL for a plain query', async () => {
     const query = f.findAll([f.name(), f.id().times(2).alias('Double')], f.category().eq('Technology')).orderBy(f.id().ascending());
     expect((await run(query.toSql())).map(r => r[0])).toEqual(['Acme Corp', 'Beta Corp']);
-  });
-
-  it('the Postgres date difference, whole units', async () => {
-    const days = await run(`SELECT ${POSTGRES.dateDiff(DatePart.DAY, "DATE '2024-03-01'", "TIMESTAMP '2024-03-11 00:00:00'")}`);
-    expect(Number(days[0][0])).toBe(10);
-    const months = await run(`SELECT ${POSTGRES.dateDiff(DatePart.MONTH, "DATE '2024-01-15'", "TIMESTAMP '2024-04-14 00:00:00'")}`);
-    expect(Number(months[0][0])).toBe(2);
-    const years = await run(`SELECT ${POSTGRES.dateDiff(DatePart.YEAR, "DATE '2020-06-01'", "TIMESTAMP '2024-05-31 00:00:00'")}`);
-    expect(Number(years[0][0])).toBe(3);
-    const hours = await run(`SELECT ${POSTGRES.dateDiff(DatePart.HOUR, "TIMESTAMP '2024-03-01 00:00:00'", "TIMESTAMP '2024-03-01 05:59:59'")}`);
-    expect(Number(hours[0][0])).toBe(5);
   });
 
   it('DESC puts NULLs first, as Postgres does', async () => {

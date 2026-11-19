@@ -57,21 +57,28 @@ export const POSTGRES: SqlDialect = {
   dayOfWeek: expression => `EXTRACT(DOW FROM ${expression})`,
   isoDayOfWeek: expression => `EXTRACT(ISODOW FROM ${expression})`,
   dateDiff(unit, from, to) {
-    const start = `CAST(${from} AS TIMESTAMP)`;
-    const end = `CAST(${to} AS TIMESTAMP)`;
-    switch (unit) {
-      case DatePart.DAY: return `(CAST(${to} AS DATE) - CAST(${from} AS DATE))`;
-      case DatePart.MONTH:
-        return `CAST(EXTRACT(YEAR FROM AGE(${end}, ${start})) * 12 + EXTRACT(MONTH FROM AGE(${end}, ${start})) AS BIGINT)`;
-      case DatePart.YEAR: return `CAST(EXTRACT(YEAR FROM AGE(${end}, ${start})) AS BIGINT)`;
-      default: {
-        const seconds = SECONDS_PER[unit];
-        if (seconds === undefined) throw new Error(`Cannot take the difference in ${unit}`);
-        return `CAST(FLOOR(EXTRACT(EPOCH FROM (${end} - ${start})) / ${seconds}) AS BIGINT)`;
-      }
+    // the number of `unit` from `from` to `to`: boundaries crossed for a year, quarter, month, day, hour, minute or second (a day is a
+    // change of date, an hour a change of hour), and whole weeks for a week, as DuckDB's DATE_DIFF counts them, in standard operators and
+    // EXTRACT, DATE_TRUNC and CAST, which Postgres and the other databases all have, where DATE_DIFF is DuckDB's own
+    if (unit === DatePart.YEAR || unit === DatePart.QUARTER || unit === DatePart.MONTH) {
+      const a = `CAST(${from} AS DATE)`;
+      const b = `CAST(${to} AS DATE)`;
+      const years = `(EXTRACT(YEAR FROM ${b}) - EXTRACT(YEAR FROM ${a}))`;
+      if (unit === DatePart.YEAR) return years;
+      const [perYear, part] = unit === DatePart.QUARTER ? [4, 'QUARTER'] : [12, 'MONTH'];
+      return `(${years} * ${perYear} + EXTRACT(${part} FROM ${b}) - EXTRACT(${part} FROM ${a}))`;
     }
+    const days = `(CAST(${to} AS DATE) - CAST(${from} AS DATE))`;
+    if (unit === DatePart.DAY) return days;
+    if (unit === DatePart.WEEK) return `CAST(SIGN(${days}) * FLOOR(ABS(${days}) / 7.0) AS BIGINT)`;   // whole weeks, as a week is 7 days
+    const seconds = SECONDS_PER[unit];
+    if (seconds === undefined) {
+      throw new Error(`A difference between dates is counted in years, quarters, months, weeks, days, hours, minutes or seconds, not ${unit}`);
+    }
+    const part = unit.toLowerCase();
+    return `CAST(EXTRACT(EPOCH FROM (DATE_TRUNC('${part}', CAST(${to} AS TIMESTAMP)) - DATE_TRUNC('${part}', CAST(${from} AS TIMESTAMP)))) / ${seconds} AS BIGINT)`;
   },
-  regexMatches: (expression, pattern) => `(${expression} ~ ${pattern})`,
+  regexMatches: (expression, pattern) => `${expression} ~ ${pattern}`,
   stringAgg: (expression, separator, orderBy) =>
     `STRING_AGG(${expression}, ${separator}${orderBy.length > 0 ? ' ORDER BY ' + orderBy.join(', ') : ''})`,
 };
@@ -82,7 +89,6 @@ export const DUCKDB: SqlDialect = {
   // DuckDB sorts nulls last whichever way the sort goes
   orderDirection: direction => (direction === SortDirection.ASC ? ' ASC' : ' DESC NULLS FIRST'),
   doubleType: 'DOUBLE',
-  dateDiff: (unit, from, to) => `DATE_DIFF('${unit.toLowerCase()}', ${from}, ${to})`,
   regexMatches: (expression, pattern) => `REGEXP_MATCHES(${expression}, ${pattern})`,
 };
 
@@ -99,6 +105,7 @@ export const DATABRICKS: SqlDialect = {
   // DAYOFWEEK is 1 = Sunday through 7 = Saturday
   dayOfWeek: expression => `(DAYOFWEEK(${expression}) - 1)`,
   isoDayOfWeek: expression => `EXTRACT(DAYOFWEEK_ISO FROM ${expression})`,
+  // Databricks' own DATEDIFF counts the boundaries crossed too, in the units the shared form is written in terms of
   dateDiff: (unit, from, to) => `DATEDIFF(${unit}, ${from}, ${to})`,
   // RLIKE searches anywhere in the text
   regexMatches: (expression, pattern) => `(${expression} RLIKE ${pattern})`,

@@ -496,19 +496,19 @@ describe('DateAttribute arithmetic operations (SQL)', () => {
 // Date diff operations — SQL shape
 // ---------------------------------------------------------------------------
 describe('DateAttribute diff operations (SQL)', () => {
-  it('diffDays() → DATE_DIFF(day, ...)', async () => {
+  it('diffDays() → a difference of CASTs to DATE', async () => {
     const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().diffDays(new Date('2024-01-01'))]).toSql('duckdb');
-    expect(sql).toContain('DATE_DIFF(');
-    expect(sql).toContain("'day'");
+    expect(sql).toContain("(CAST('2024-01-01 00:00:00' AS DATE) - CAST(");
+    expect(sql).not.toContain('DATE_DIFF');
   });
 
-  it('diffMonths() → DATE_DIFF(month, ...)', async () => {
+  it('diffMonths() → EXTRACT of the month and the year', async () => {
     const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().diffMonths(new Date('2024-01-01'))]).toSql('duckdb');
-    expect(sql).toContain("'month'");
+    expect(sql).toContain("EXTRACT(MONTH FROM CAST('2024-01-01 00:00:00' AS DATE))");
   });
 });
 
@@ -547,11 +547,12 @@ describe('DateTimeAttribute extract and arithmetic (SQL)', () => {
     expect(sql).toContain('+');
   });
 
-  it('diffHours() → DATE_DIFF(hour, ...)', async () => {
+  it('diffHours() → EXTRACT(EPOCH ...) of DATE_TRUNC(hour)', async () => {
     const { TradeFinder } = await import('./generated_examples/finance/TradeFinder');
     const tf = new TradeFinder();
     const sql = tf.findAll(null, null, [tf.validFrom().diffHours(new Date('2024-01-01'))]).toSql('duckdb');
-    expect(sql).toContain("'hour'");
+    expect(sql).toContain("DATE_TRUNC('hour', CAST('2024-01-01 00:00:00' AS TIMESTAMP))");
+    expect(sql).not.toContain('DATE_DIFF');
   });
 });
 

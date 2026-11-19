@@ -61,12 +61,21 @@ describe('comparing an attribute with another attribute', () => {
   });
 });
 
+// the SQL the generator writes is Postgres SQL: a difference is EXTRACT, DATE_TRUNC and CAST, and not DuckDB's DATE_DIFF
+const DATE_DIFFS = {
+  diffDays: '(CAST(t0.B AS DATE) - CAST(t0.A AS DATE))',
+  diffMonths: '((EXTRACT(YEAR FROM CAST(t0.B AS DATE)) - EXTRACT(YEAR FROM CAST(t0.A AS DATE))) * 12 + '
+    + 'EXTRACT(MONTH FROM CAST(t0.B AS DATE)) - EXTRACT(MONTH FROM CAST(t0.A AS DATE)))',
+  diffYears: '(EXTRACT(YEAR FROM CAST(t0.B AS DATE)) - EXTRACT(YEAR FROM CAST(t0.A AS DATE)))',
+} as const;
+
 describe('a date difference with a column', () => {
-  for (const [method, unit] of [['diffDays', 'day'], ['diffMonths', 'month'], ['diffYears', 'year']] as const) {
+  for (const method of Object.keys(DATE_DIFFS) as (keyof typeof DATE_DIFFS)[]) {
     it(`${method} between two dates`, () => {
       const { left: start, right: end } = kinds.date;
-      expect(toSql(null, null, [start[method](end)], table(), new NoOperation(), [], [], undefined, null, false, undefined, undefined, 'duckdb'))
-        .toContain(`DATE_DIFF('${unit}', t0.A, t0.B)`);
+      const query = toSql(null, null, [start[method](end)], table(), new NoOperation(), [], [], undefined, null, false, undefined, undefined, 'duckdb');
+      expect(query).toContain(DATE_DIFFS[method]);
+      expect(query).not.toContain('DATE_DIFF');   // DuckDB's own function
     });
   }
 
@@ -74,13 +83,14 @@ describe('a date difference with a column', () => {
     it(`${method} between two timestamps`, () => {
       const { left: start, right: end } = kinds.datetime;
       expect(toSql(null, null, [start[method](end)], table(), new NoOperation(), [], [], undefined, null, false, undefined, undefined, 'duckdb'))
-        .toContain(`DATE_DIFF('${unit}', t0.U, t0.V)`);
+        .toContain(`CAST(EXTRACT(EPOCH FROM (DATE_TRUNC('${unit}', CAST(t0.V AS TIMESTAMP)) - `
+          + `DATE_TRUNC('${unit}', CAST(t0.U AS TIMESTAMP)))) / ${{ hour: 3600, minute: 60, second: 1 }[unit]} AS BIGINT)`);
     });
   }
 
-  it('a date difference with a value is unchanged', () => {
+  it('a date difference with a value has the value as a date', () => {
     const { left: start } = kinds.date;
     expect(toSql(null, null, [start.diffDays(new Date('2024-06-15T00:00:00Z'))], table(), new NoOperation(), [], [], undefined, null, false, undefined, undefined, 'duckdb'))
-      .toContain("DATE_DIFF('day', t0.A, TIMESTAMP '2024-06-15 00:00:00')");
+      .toContain("(CAST('2024-06-15 00:00:00' AS DATE) - CAST(t0.A AS DATE))");
   });
 });
