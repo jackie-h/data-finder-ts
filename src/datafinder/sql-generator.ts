@@ -76,6 +76,7 @@ import {
   ProcessingTemporalColumns,
   SingleBusinessDateColumn,
   SingleProcessingDatetimeColumn,
+  AsOf,
   hasProcessingRange,
   milestoningColumnsOf,
 } from '../model/milestoning';
@@ -700,40 +701,25 @@ function joinFiltersOf(
   return joinFilters;
 }
 
-function buildQuerySpecification(
-  businessDate: Date | null,
-  processingDatetime: Date | null,
-  columns: (Attribute | RelationalOperationElement)[],
-  table: Relation,
+/**
+ * What the joins a query needs add to it, from the columns it reads and the dates it reads them as of: the ON conditions of the joins, and the
+ * queries that stand for the steps it only asks the existence of. A step folded into a query can read another join.
+ */
+function deriveJoins(
+  columns: readonly (Attribute | RelationalOperationElement)[],
+  groupBy: readonly RelationalOperationElement[],
+  orderBy: readonly SortOperation[],
   op: RelationalOperationElement,
-  orderBy: SortOperation[] = [],
-  groupBy: Comparand[] = [],
-  limit?: number,
-  businessDateTo: Date | null = null,
-  distinct: boolean = false,
-  offset?: number,
-  having?: Operation,
-  processingDatetimeTo: Date | null = null,
-): OrderedQuerySpecification {
-  let filter = op;
-  const milestoningFor = (t: Table | TableAlias, node?: JoinTreeNodeOperation) => {
-    const dates = node === undefined
-      ? { businessDate, businessDateTo, processingDatetime, processingDatetimeTo }
-      : datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
+  having: Operation | undefined,
+  asOf: AsOf,
+): { joinFilters: Map<JoinTreeNodeOperation, Operation>; subSelects: Map<JoinTreeNodeOperation, QuerySpecification> } {
+  const { businessDate, businessDateTo, processingDatetime, processingDatetimeTo } = asOf;
+  const milestoningFor = (t: Table | TableAlias, node: JoinTreeNodeOperation) => {
+    const dates = datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
     return dates.businessDateTo !== null || dates.processingDatetimeTo !== null
       ? buildMilestoningFilterOperationForDateRange(dates.businessDate, dates.businessDateTo, dates.processingDatetime, t, node, dates.processingDatetimeTo)
       : buildMilestoningFilterOperation(dates.businessDate, dates.processingDatetime, t, node);
   };
-
-  if (milestoningColumnsOf(table) !== undefined) {
-    const milestonedOp = milestoningFor(table as Table | TableAlias);
-    if (milestonedOp !== null) {
-      filter = filter instanceof NoOperation
-        ? milestonedOp
-        : new LogicalOperation(filter, LogicalOperator.AND, milestonedOp);
-    }
-  }
-
   const joinFilters = joinFiltersOf(requiredJoinNodes([...columns, ...groupBy, ...orderBy, op]),
     node => milestoningColumnsOf(node.join.table) === undefined ? null : milestoningFor(node.join.table, node));
 
@@ -753,8 +739,47 @@ function buildQuerySpecification(
       dates.businessDate, dates.processingDatetime, [new Alias(right, right.name)], node.join.table, condition,
       [], [], undefined, dates.businessDateTo, true, undefined, undefined, dates.processingDatetimeTo));
   }
+  return { joinFilters, subSelects };
+}
 
-  return new OrderedQuerySpecification(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having, subSelects);
+/** What was asked of the rows of a query, and what the dates it reads them as of add to that. */
+function askedWithDates(query: QuerySpecification): RelationalOperationElement {
+  const dates = query.asOf?.filter;
+  if (dates === undefined) return query.filter;
+  return query.filter instanceof NoOperation ? dates : new LogicalOperation(query.filter, LogicalOperator.AND, dates);
+}
+
+/**
+ * The query for the rows asked of `table`, as of the dates. The `filter` of the query is the `op` that was asked, and what the dates add to
+ * it, by the milestoning of the table, is `asOf.filter`.
+ */
+function buildQuerySpecification(
+  businessDate: Date | null,
+  processingDatetime: Date | null,
+  columns: (Attribute | RelationalOperationElement)[],
+  table: Relation,
+  op: RelationalOperationElement,
+  orderBy: SortOperation[] = [],
+  groupBy: Comparand[] = [],
+  limit?: number,
+  businessDateTo: Date | null = null,
+  distinct: boolean = false,
+  offset?: number,
+  having?: Operation,
+  processingDatetimeTo: Date | null = null,
+): OrderedQuerySpecification {
+  let milestoned: Operation | undefined;
+  if (milestoningColumnsOf(table) !== undefined) {
+    const found = businessDateTo !== null || processingDatetimeTo !== null
+      ? buildMilestoningFilterOperationForDateRange(businessDate, businessDateTo, processingDatetime, table as Table | TableAlias, undefined, processingDatetimeTo)
+      : buildMilestoningFilterOperation(businessDate, processingDatetime, table as Table | TableAlias, undefined);
+    if (found !== null) milestoned = found;
+  }
+  const asOf = new AsOf(businessDate, businessDateTo, processingDatetime, processingDatetimeTo, milestoned);
+  const { joinFilters, subSelects } = deriveJoins(columns, groupBy, orderBy, op, having, asOf);
+  const query = new OrderedQuerySpecification(columns, op, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having, subSelects);
+  query.asOf = asOf;
+  return query;
 }
 
 /**
@@ -855,7 +880,7 @@ class SQLQueryGenerator {
       this._join.push(new Join(join.kind, target, this.buildFilter(join.operation)));
     }
     this.processSelect([...query.columns]);
-    this._where = this.buildFilter(this._guarded(query.filter));
+    this._where = this.buildFilter(this._guarded(askedWithDates(query)));
     const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
     for (const expr of query.groupBy) {
       this._collectRequiredJoins(expr, groupByJoins);
@@ -947,7 +972,7 @@ class SQLQueryGenerator {
     for (const col of query.columns) walkRefs(col, record);
     for (const expr of query.groupBy) walkRefs(expr, record);
     for (const sort of query instanceof OrderedQuerySpecification ? query.orderBy : []) walkRefs(sort, record);
-    walkRefs(query.filter, record);
+    walkRefs(askedWithDates(query), record);
 
     const elidable = new Set<JoinTreeNodeOperation>();
     for (const [node, refs] of refsByNode) {

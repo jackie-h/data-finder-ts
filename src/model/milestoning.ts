@@ -1,4 +1,4 @@
-import { Column, Table, Schema, TableAlias, type Relation } from './relational';
+import { Column, Table, Schema, TableAlias, type Operation, type Relation } from './relational';
 
 export abstract class MilestoningColumns {
   abstract columns(): Column[];
@@ -96,6 +96,22 @@ export class MilestonedTable extends Table {
       col.owner = this;
     }
   }
+}
+
+/**
+ * The dates a query reads its rows as of, and what they add to it. A date is a point in time, or the start of a range when it has an end
+ * (`businessDateTo`, `processingDatetimeTo`). `filter` is the predicate that the dates and the milestoning of the table add to what was
+ * asked of the rows; it is none for a table that is not milestoned. The joins a query needs read their tables as of the same dates, unless
+ * a step of a navigation was given others, so they are kept for working those out again.
+ */
+export class AsOf {
+  constructor(
+    readonly businessDate: Date | null = null,
+    readonly businessDateTo: Date | null = null,
+    readonly processingDatetime: Date | null = null,
+    readonly processingDatetimeTo: Date | null = null,
+    readonly filter?: Operation,
+  ) {}
 }
 
 /**
