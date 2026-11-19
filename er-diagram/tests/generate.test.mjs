@@ -259,6 +259,15 @@ test("e2e: every foreign key is drawn and every association resolved", () => {
   assert.match(gen.stdout, /22 mappings, 36 foreign keys \(0 associations unresolved\)/);
 });
 
+test("e2e: a join with a condition says so on the foreign key, and the hover has all of it", () => {
+  const mmd = read("join_conditions_mapping__database__org.mmd");
+  assert.match(mmd, /org__memberships \}o--o\{ org__persons : "id to person_id"/);                       // no condition: the columns only
+  assert.match(mmd, /org__firms \}o--o\{ org__memberships : "firm_id to id if memberships\.active = 1"/);   // a short condition is in the label
+  assert.match(mmd, /"manager_id to id if staff\.active = 1 AND \{target\}\.a…"/);                          // a long one is cut
+  const html = read("join_conditions_mapping__database__org.html");
+  assert.match(html, /Foreign key to staff\.id when staff\.active = 1 AND \{target\}\.active = 1/);        // the hover has it whole
+});
+
 test("e2e: a class mapped to a SQL query is drawn as a query, with what it reads", () => {
   const mmd = read("sql_queries_mapping__database__SQL_queries.mmd");
   assert.match(mmd, /FIRM_VIEW\["FIRM_VIEW \(SQL query\)"\] \{/);

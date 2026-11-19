@@ -221,7 +221,9 @@ function dbViews(mp, scope) {
     if (!child || !parent) { unresolved++; continue; }
     // the source property sits on the child (the table with the foreign key) and returns the parent, so its multiplicity is how many
     // parents a child has; the target multiplicity is how many children a parent has
-    edges.push({ def: { sourceMult: a.sourceMultiplicity, targetMult: a.targetMultiplicity }, r: { srcCol: r.sourceColumn, tgtCol: r.targetColumn }, child, parent });
+    // a join can also hold only when its condition does (and, for a class of sets, between the sets it names)
+    edges.push({ def: { sourceMult: a.sourceMultiplicity, targetMult: a.targetMultiplicity, sourceSet: a.sourceSet, targetSet: a.targetSet },
+      r: { srcCol: r.sourceColumn, tgtCol: r.targetColumn, condition: r.condition }, child, parent });
   }
   const schemas = [...new Set(mp.tables.map(t => t.schema))];
   const pages = schemas.flatMap(schema => {
@@ -229,7 +231,8 @@ function dbViews(mp, scope) {
     return parts.map((tables, i) => ({ schema, name: `${prefix}__${slug(schema)}${parts.length > 1 ? `_part${i + 1}` : ""}`, part: i + 1, of: parts.length, tables, rels: [], reads: [], stubs: new Map() }));
   });
   const pageOf = new Map(pages.flatMap(pg => pg.tables.map(t => [t, pg])));
-  const relOf = ({ def, r, child, parent }) => ({ child, parent, srcCol: r.srcCol, tgtCol: r.tgtCol, childMult: def.targetMult, parentMult: def.sourceMult });
+  const relOf = ({ def, r, child, parent }) => ({ child, parent, srcCol: r.srcCol, tgtCol: r.tgtCol, childMult: def.targetMult, parentMult: def.sourceMult,
+    condition: r.condition ?? null, sets: [def.sourceSet && `source set ${def.sourceSet}`, def.targetSet && `target set ${def.targetSet}`].filter(Boolean).join(", ") });
   for (const e of edges) {
     const pg = pageOf.get(e.child);
     pg.rels.push(relOf(e));
@@ -285,7 +288,7 @@ function dbViews(mp, scope) {
       ...common, title: `${mp.title}: ${pg.schema}${pg.of > 1 ? ` (part ${pg.part} of ${pg.of})` : ""}`, mmd: text, descs, footer: others,
       stubs: Object.fromEntries([...pg.stubs].map(([id, st]) => [id, st.href])),
       nav: `<nav>${home} &middot; <a href="${prefix}.html">&larr; Database</a>${modelLink}</nav>`,
-      intro: `${pg.schema === QUERY_SCHEMA ? `${plural(pg.tables.length, "SQL query")}, each a relation written as SQL that a class is mapped to (hover a box for its SQL and what it reads)` : `${plural(pg.tables.length, "table")} of schema ${pg.schema}`}, with database types and PK/FK. Foreign keys are the mapping's associations, labelled source column to target column.${pg.stubs.size ? " Dashed boxes are tables in another schema; click one to open it." : ""}`,
+      intro: `${pg.schema === QUERY_SCHEMA ? `${plural(pg.tables.length, "SQL query")}, each a relation written as SQL that a class is mapped to (hover a box for its SQL and what it reads)` : `${plural(pg.tables.length, "table")} of schema ${pg.schema}`}, with database types and PK/FK. Foreign keys are the mapping's associations, labelled source column to target column, with the condition of a join that has one (hover a column for all of it).${pg.stubs.size ? " Dashed boxes are tables in another schema; click one to open it." : ""}`,
     }));
   }
 
@@ -302,6 +305,17 @@ function dbViews(mp, scope) {
   return { edges: edges.length, schemas: schemas.length };
 }
 
+/** What a join holds only when: its condition and the sets it joins, as text for a hover. */
+function whenText(r) {
+  return [r.condition ? `when ${r.condition}` : "", r.sets ? `between ${r.sets}` : ""].filter(Boolean).join(", ");
+}
+
+/** The label of a foreign key: the columns, and a short mark that it has a condition (the hover has all of it). */
+function relLabel(r) {
+  const when = r.condition ? ` if ${r.condition.length > 32 ? r.condition.slice(0, 31) + "…" : r.condition}` : "";
+  return `${r.srcCol} to ${r.tgtCol}${when}`.replaceAll('"', "'");
+}
+
 /** The hover text of a query: the class it is mapped to, the scheme that milestones it, what it reads, and its SQL on one line. */
 function queryNote(q, cls) {
   const reads = q.reads.map(r => r.query ?? `${r.schema ? r.schema + "." : ""}${r.table}`).join(", ");
@@ -311,7 +325,7 @@ function queryNote(q, cls) {
 
 function dbText(pg, scope) {
   const fkCols = new Map();                      // entity id -> Map(column -> "Parent.col")
-  for (const r of pg.rels) { const id = entityId(r.child); if (!fkCols.has(id)) fkCols.set(id, new Map()); fkCols.get(id).set(r.srcCol, `${r.parent.name}.${r.tgtCol}`); }
+  for (const r of pg.rels) { const id = entityId(r.child); if (!fkCols.has(id)) fkCols.set(id, new Map()); fkCols.get(id).set(r.srcCol, `${r.parent.name}.${r.tgtCol}${whenText(r) ? ` ${whenText(r)}` : ""}`); }
   const lines = ["erDiagram"], descs = {};
   for (const t of pg.tables) {
     const id = entityId(t), fks = fkCols.get(id) ?? new Map();
@@ -329,7 +343,7 @@ function dbText(pg, scope) {
   for (const [id, s] of pg.stubs) { lines.push(`    ${id}["${s.table.name}${s.table.isQuery ? " (SQL query)" : ""}"]`); descs[id] = { _label: s.table.name, _: s.table.schema }; }
   // what a query reads: a dotted (non-identifying) line from the table or query read
   for (const r of pg.reads ?? []) lines.push(`    ${entityId(r.parent)} ||..o{ ${entityId(r.child)} : "read by"`);
-  for (const r of pg.rels) lines.push(`    ${entityId(r.parent)} ${multLeft(r.parentMult)}--${multRight(r.childMult)} ${entityId(r.child)} : "${r.srcCol} to ${r.tgtCol}"`);
+  for (const r of pg.rels) lines.push(`    ${entityId(r.parent)} ${multLeft(r.parentMult)}--${multRight(r.childMult)} ${entityId(r.child)} : "${relLabel(r)}"`);
   return { text: lines.join("\n") + "\n", descs };
 }
 
