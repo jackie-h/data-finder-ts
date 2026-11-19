@@ -193,6 +193,12 @@ rows.orderBy(rows.column('category').ascending()).offset(1).limit(3);
 
 The two results need the same column names, in the same order, each named once (name a repeated column with `alias()`). A side keeps its own `orderBy` and `limit` (in brackets in the SQL). The GraphQL runner has no union.
 
+## Steps give a result of their own
+
+`orderBy`, `limit`, `offset`, `slice`, `distinct`, `groupBy` and `having`, like `filter`, `extend`, `select` and `concatenate`, return a new result and leave the one they are written after as it was (`timeout` is the exception: it sets the timeout of the result it is called on). Keep what is returned: `rows.limit(3)` alone changes nothing.
+
+A SELECT applies DISTINCT, then the order, then the offset, then the limit, in that order only. A step that comes next, or again, is folded into the SELECT it is written after (`orderBy(...).limit(3)` is one SELECT, `offset(1).limit(3)` is `LIMIT 3 OFFSET 1`, `limit(5).limit(2)` is `LIMIT 2` and `offset(2).offset(3)` is `OFFSET 5`). One that comes earlier than the last clause applied is a SELECT over the rows that SELECT gives: `limit(3).orderBy(...)` orders the three rows taken, and `limit(3).offset(1)` skips one of them. A sort after a limit or an offset is of the columns the result shows (`rows.column('name').ascending()`). `groupBy` and `having` apply to the rows a finder reads, so they come before a distinct, an order, an offset and a limit.
+
 ## Steps over a result: filter, extend, select
 
 A result can be read as a relation, and each step is a query over the one before it, as Legend's relation functions are. A step takes functions of a row, whose columns are attributes (`r.price`, as Legend's `$r.price`): a column that is not there is refused when the query is built, with the columns there are.

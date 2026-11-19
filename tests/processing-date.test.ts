@@ -3,7 +3,7 @@
  * YYYY-MM-DD string) renders as a date literal, a timestamp as a timestamp literal.
  */
 import { describe, it, expect } from 'vitest';
-import { convertInputsAndSelect } from '../src/datafinder/runner';
+import { FinderResult, convertInputsAndSelect } from '../src/datafinder/runner';
 import { toSql } from '../src/datafinder/sql-generator';
 import { DateTimeAttribute, IntegerAttribute } from '../src/datafinder/typed-attributes';
 import { Column, DateOnly, NoOperation, Table } from '../src/model/relational';
@@ -44,7 +44,7 @@ describe('processing date rendering', () => {
   });
 
   it('keeps a date string a DateOnly and a datetime string a plain Date', () => {
-    const private_ = (r: unknown) => (r as { _processingDatetime: Date })._processingDatetime;
+    const private_ = (r: FinderResult) => r.query().asOf?.processingDatetime;
     expect(private_(convertInputsAndSelect(null, '2024-06-01', [], new Table('t', []), new NoOperation()))).toBeInstanceOf(DateOnly);
     expect(private_(convertInputsAndSelect(null, '2024-06-01 00:00:00', [], new Table('t', []), new NoOperation()))).not.toBeInstanceOf(DateOnly);
   });

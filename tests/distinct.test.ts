@@ -27,11 +27,13 @@ describe('the SQL', () => {
     expect(toSql(null, null, [attr], table, new NoOperation())).not.toContain('DISTINCT');
   });
 
-  it('is requested on a result and returned for chaining', () => {
+  it('is requested on a result, which a step leaves as it was', () => {
     const result = convertInputsAndSelect(null, null, [attr], table);
     expect(result.toSql()).not.toContain('DISTINCT');
-    expect(result.distinct()).toBe(result);
-    expect(result.toSql()).toContain('SELECT DISTINCT');
+    const distinct = result.distinct();
+    expect(distinct).not.toBe(result);   // a step gives a result of its own
+    expect(result.toSql()).not.toContain('DISTINCT');
+    expect(distinct.toSql()).toContain('SELECT DISTINCT');
   });
 });
 

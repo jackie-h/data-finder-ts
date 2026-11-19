@@ -1,8 +1,11 @@
 import { Attribute, Comparand } from './attribute';
-import { buildQuerySpecification, checkViewJoins, toSql, viewSqlToString } from './sql-generator';
+import {
+  ClauseChanges, acceptsGroupBy, buildQuerySpecification, checkViewJoins, columnName, columnOf, columnType, dropped, labelled, madeDistinct,
+  querySqlToString, relationNumber, sortedBy, stage, taken, viewSqlToString, withClauses,
+} from './sql-generator';
+import { typedAttribute } from './typed-attributes';
 import { View, ViewDefinitionError } from '../model/view';
-import { attributes, columnName } from './relation';
-import { MilestonedTable, hasProcessingRange, milestoningColumnsOf } from '../model/milestoning';
+import { AsOf, MilestonedTable, hasProcessingRange, milestoningColumnsOf } from '../model/milestoning';
 import { DialectName, SqlDialect } from './dialect';
 import {
   Alias,
@@ -12,6 +15,7 @@ import {
   QueryExpression,
   RelationExistsOperation,
   QuerySpecification,
+  OrderedQuerySpecification,
   JoinOperation,
   JoinKind,
   Table,
@@ -86,26 +90,18 @@ export function getRunner(): QueryRunner {
   return _runner;
 }
 
-const expressionIds = new WeakMap<object, number>();
-let nextExpressionId = 1;
-
 /**
- * What a sort orders by: a column and the joins to reach it. Any other expression, such as an aggregate, is its
- * own target, so sorting by an expression again adds a sort.
+ * The columns of a relation under a name, as a query that reads from it sees them: a typed attribute for each, named as
+ * `columnName` names it and owned by the alias.
  */
-function sortTarget(sort: SortOperation): string {
-  const column = sort.column;
-  if (column instanceof Alias) return JSON.stringify(['alias', column.name]);   // a column of the select, by the name it is shown under
-  if (!(column instanceof ColumnWithJoin)) {
-    if (!expressionIds.has(column)) expressionIds.set(column, nextExpressionId++);
-    return JSON.stringify(['expression', expressionIds.get(column)]);
+function attributes(alias: TableAlias): Map<string, Attribute> {
+  const names = alias.columns.map(columnName);
+  const duplicates = [...new Set(names.filter(n => names.filter(m => m === n).length > 1))].sort();
+  if (duplicates.length > 0) {
+    throw new Error(`A result needs each column named once, but ${JSON.stringify(duplicates)} are repeated: name them with alias()`);
   }
-  const joins: string[] = [];
-  for (let node = column.parent; node !== undefined; node = node.parent) joins.push(node.join.name);
-  return JSON.stringify([column.column.ownerName, column.column.name, joins]);
+  return new Map(alias.columns.map((element, i) => [names[i], typedAttribute(names[i], columnType(element), alias)]));
 }
-
-let nextRelationNumber = 1;
 
 /**
  * A row of a result as a function of it reads it: its columns are attributes, `r.price`, as Legend's `$r.price`. The
@@ -141,7 +137,7 @@ export function exists(other: FinderResult, condition: (row: ResultRow) => Opera
   }
   const { alias } = other.relation();
   // a name of its own each time, so that a result tested against itself reads as two relations
-  const inner = new TableAlias(alias.relation, `relation${nextRelationNumber++}`);
+  const inner = new TableAlias(alias.relation, `relation${relationNumber()}`);
   const test = condition(rowOf(attributes(inner)));
   if (!(test instanceof Operation)) {
     throw new TypeError(`The condition of an exists gives a comparison, such as o.key.eq(r.key), not ${test === null ? 'null' : typeof test}`);
@@ -223,42 +219,74 @@ export class GroupedRows {
   }
 }
 
-/** The columns of a relation as a step shows them again: each under the name it has, which is not always the snake_case of its display name (`alias('employeeName')`). */
-function keepNames(columns: Map<string, Attribute>): Alias[] {
-  return [...columns].map(([name, attribute]) => attribute.alias(name));
+/** A result as one side of a union. A union of the same operator is that union itself, not a SELECT over it, so `a.concatenate(b).concatenate(c)` is one flat chain of unions. */
+function unionSide(result: FinderResult, all: boolean): QueryExpression {
+  const query = result.query();
+  const table = query.table;
+  if (table instanceof TableAlias && table.relation instanceof UnionOperation && table.relation.all === all
+      && query.filter instanceof NoOperation && query.groupBy.length === 0 && !query.distinct && query.having === undefined
+      && query.limit === undefined && query.offset === undefined && query.orderBy.length === 0) {
+    return table.relation;
+  }
+  return labelled(query);
 }
 
+/**
+ * The rows of a query. A step written after it gives a result of its own and leaves this one as it was.
+ *
+ * A result is a query (`query()`) and the relation it is read as by the step after it (`relation()`). A step that comes next in a SELECT's
+ * order, or can be part of its columns and conditions, is folded into that SELECT; any other is a SELECT over it.
+ */
 export class FinderResult {
-  private _relationName?: string;
-  private _orderBy: SortOperation[] = [];
-  private _groupBy: Comparand[] = [];
-  private _limit?: number;
-  private _distinct = false;
-  private _offset?: number;
-  private _having?: Operation;
+  private _query!: OrderedQuerySpecification;
   private _timeoutMs: number = DEFAULT_TIMEOUT_MS;
+  private _alias!: TableAlias;
 
   constructor(
-    private readonly _businessDate: Date | null,
-    private readonly _processingDatetime: Date | null,
-    private readonly _columns: (Attribute | RelationalOperationElement)[],
-    private readonly _table: QueryTarget,
-    private readonly _op: RelationalOperationElement,
-    private readonly _businessDateTo: Date | null = null,
-    private readonly _processingDatetimeTo: Date | null = null,
-  ) {}
+    businessDate: Date | null,
+    processingDatetime: Date | null,
+    columns: (Attribute | RelationalOperationElement)[],
+    table: QueryTarget,
+    op: RelationalOperationElement,
+    businessDateTo: Date | null = null,
+    processingDatetimeTo: Date | null = null,
+    query?: OrderedQuerySpecification,
+  ) {
+    this._start(query ?? buildQuerySpecification(
+      businessDate, processingDatetime, columns, table as unknown as Relation, op, [], [], undefined, businessDateTo, false, undefined, undefined,
+      processingDatetimeTo));
+  }
 
-  // --- a result as a relation, for what follows it -------------------------------------------------------------------
+  private _start(query: OrderedQuerySpecification, timeoutMs: number = DEFAULT_TIMEOUT_MS, relationName?: string): void {
+    this._query = query;
+    this._timeoutMs = timeoutMs;
+    // the query as a relation that a step reads, which the columns of this result belong to
+    this._alias = new TableAlias(labelled(query), relationName ?? `relation${relationNumber()}`);
+  }
+
+  /** @internal The query of this result. */
+  query(): OrderedQuerySpecification { return this._query; }
+
+  /** The dates the rows are read as of. */
+  private get _asOf(): AsOf {
+    const asOf = this._query.asOf;
+    if (asOf === undefined) throw new Error('A result has the dates it is read as of');
+    return asOf;
+  }
+
+  /** A result of a step written after this one. */
+  private _then(query: OrderedQuerySpecification): FinderResult {
+    const result = Object.create(FinderResult.prototype) as FinderResult;
+    // a change to the same select shows the columns of this result, so it is the same relation
+    result._start(query, this._timeoutMs, query.table === this._query.table ? this._alias.name : undefined);
+    return result;
+  }
+
+  // --- a result as a relation, for what follows it ---------------------------------------------------------------------------
 
   /** @internal This result as a relation: its query, with each column named for what reads it. */
   relation(): { alias: TableAlias; attributes: Map<string, Attribute> } {
-    this._relationName ??= `relation${nextRelationNumber++}`;
-    const display = this._columns.map(c => (c instanceof Alias ? c : c instanceof Attribute ? c.alias(columnName(c)) : new Alias(c, columnName(c))));
-    const query = buildQuerySpecification(
-      this._businessDate, this._processingDatetime, display, this._table as unknown as Relation, this._op, this._orderBy, this._groupBy,
-      this._limit, this._businessDateTo, this._distinct, this._offset, this._having, this._processingDatetimeTo);
-    const alias = new TableAlias(query, this._relationName);
-    return { alias, attributes: attributes(alias) };
+    return { alias: this._alias, attributes: attributes(this._alias) };
   }
 
   /** The names of this result's columns, as what follows it reads them: the name `alias()` gave, or the display name in snake_case. */
@@ -283,48 +311,77 @@ export class FinderResult {
    * concatenated again. Its columns are named as `columnNames()` gives them.
    */
   concatenate(other: FinderResult, options: { all?: boolean } = {}): FinderResult {
-    const { alias: leftAlias, attributes: left } = this.relation();
-    const { alias: rightAlias, attributes: right } = other.relation();
-    const leftNames = [...left.keys()];
-    const rightNames = [...right.keys()];
-    if (leftNames.join('\u0000') !== rightNames.join('\u0000')) {
-      throw new Error(`Concatenated results need the same columns: ${JSON.stringify(leftNames)} and ${JSON.stringify(rightNames)} differ`);
+    const left = this.columnNames();
+    const right = other.columnNames();
+    if (left.join('\u0000') !== right.join('\u0000')) {
+      throw new Error(`Concatenated results need the same columns: ${JSON.stringify(left)} and ${JSON.stringify(right)} differ`);
     }
     const all = options.all ?? false;
-    const union = new TableAlias(
-      new UnionOperation(this._unionSide(leftAlias, all), other._unionSide(rightAlias, all), all),
-      `relation${nextRelationNumber++}`);
-    // each column keeps the name it has, so a chain of unions has the first one's names
-    return new FinderResult(null, null, [...attributes(union)].map(([name, attribute]) => attribute.alias(name)), union, new NoOperation());
+    return this._of(new TableAlias(new UnionOperation(unionSide(this, all), unionSide(other, all), all), `relation${relationNumber()}`));
   }
 
-  /**
-   * This result as one side of a union. A result that is only the union of two more with the same operator is that union
-   * itself, not a SELECT over it, so `a.concatenate(b).concatenate(c)` is one flat chain of unions.
-   */
-  private _unionSide(asRelation: TableAlias, all: boolean): QueryExpression {
-    const source = this._table as unknown;
-    const bare = source instanceof TableAlias && source.relation instanceof UnionOperation && source.relation.all === all
-      && this._op instanceof NoOperation
-      && this._orderBy.length === 0 && this._groupBy.length === 0 && !this._distinct && this._having === undefined
-      && this._limit === undefined && this._offset === undefined;
-    return (bare ? (source as TableAlias).relation : asRelation.relation) as QueryExpression;
-  }
-
-  /** A result that reads from this one: a query over this result's query, as Legend's relation functions are. */
-  private _next(display: (Attribute | RelationalOperationElement)[], op?: Operation, groupBy: Comparand[] = []): FinderResult {
-    const { alias } = this.relation();
-    const step = new FinderResult(null, null, display, alias, op ?? new NoOperation());
-    step._groupBy = groupBy;
-    return step;
+  /** A result of every column of a relation that is read under a name of its own. */
+  private _of(alias: TableAlias): FinderResult {
+    return this._then(buildQuerySpecification(null, null, [...attributes(alias)].map(([name, attribute]) => attribute.alias(name)), alias, new NoOperation()));
   }
 
   /** @internal A row of this result, for the functions of a step. */
   row(): ResultRow { return rowOf(this.relation().attributes); }
 
-  /** @internal */
+  /**
+   * What this result shows, by the name that reads it, when a step can be part of its select: each column is what it is worked out
+   * from, so a condition or a column made of them is written over the columns of the select and not over a select of it. Nothing when
+   * the select has gone beyond what a step can be added to: it groups, is distinct, is ordered, offset or limited (a step comes after
+   * those), or shows an aggregate, a window or something that is not a column, a constant, arithmetic or a function.
+   * @internal
+   */
+  shown(): Map<string, RelationalOperationElement | Attribute> | undefined {
+    const query = this._query;
+    if (stage(query) !== 0 || query.groupBy.length > 0 || query.having !== undefined) return undefined;
+    const shown = new Map<string, RelationalOperationElement | Attribute>();
+    for (const column of query.columns) {
+      let element: RelationalOperationElement | Attribute = column;
+      while (element instanceof Alias) element = element.element;
+      const simple = element instanceof Attribute || element instanceof ColumnWithJoin || element instanceof Column
+        || element instanceof ConstantOperation || element instanceof ArithmeticOperation || element instanceof ScalarFunctionOperation
+        || element instanceof ComparisonOperation || element instanceof LogicalOperation;
+      if (!simple || containsAggregateOrWindow(element)) return undefined;
+      const name = columnName(column);
+      if (shown.has(name)) return undefined;   // a name twice is refused when a step reads this result as a relation
+      shown.set(name, element);
+    }
+    return shown;
+  }
+
+  /**
+   * What a step makes of the columns of the select, or nothing when one of them is something that has not what a column of a
+   * relation has (a method of an attribute): it is then read as a column of the select.
+   * @internal
+   */
+  tryFolded<T>(make: () => T): T | undefined {
+    try {
+      return make();
+    } catch (error) {
+      if (error instanceof TypeError) return undefined;
+      throw error;
+    }
+  }
+
+  /** @internal This result's rows grouped by `keys`, with `aggregates` over each group, in its own select. */
+  grouped(keys: (Attribute | Alias)[], aggregates: Alias[]): FinderResult {
+    return this._then(withClauses(this._query, {
+      columns: [...keys, ...aggregates], groupBy: keys.map(key => (key instanceof Alias ? key.element : key)) as Comparand[],
+    }));
+  }
+
+  /** This result with a step added to its select. */
+  private _folded(changes: ClauseChanges): FinderResult {
+    return this._then(withClauses(this._query, changes));
+  }
+
+  /** @internal A result that reads from this one: a query over this result's query. */
   step(display: (Attribute | RelationalOperationElement)[], op?: Operation, groupBy: Comparand[] = []): FinderResult {
-    return this._next(display, op, groupBy);
+    return this._then(buildQuerySpecification(null, null, display, this._alias, op ?? new NoOperation(), [], groupBy));
   }
 
   /**
@@ -346,9 +403,12 @@ export class FinderResult {
     const shown = this.shown();
     if (shown !== undefined) {
       const op = this.tryFolded(() => together(rowOf(shown)));
-      if (op !== undefined) return this._folded(this._columns, this._op instanceof NoOperation ? op : this._op instanceof Operation ? this._op.and(op) : op);
+      if (op !== undefined) {
+        const asked = this._query.filter;
+        return this._folded({ filter: asked instanceof NoOperation ? op : asked instanceof Operation ? asked.and(op) : op });
+      }
     }
-    return this._next(keepNames(this.relation().attributes), together(this.row()));
+    return this.step([...this.relation().attributes.values()], together(this.row()));
   }
 
   /**
@@ -369,10 +429,9 @@ export class FinderResult {
     if (shown !== undefined && !Object.keys(columns).some(name => shown.has(name))) {
       const made = this.tryFolded(() => madeOf(rowOf(shown)));
       // a window keeps every row, so it is a column of this select, though nothing after it can fold
-      if (made !== undefined && !made.some(m => containsAggregate(m))) return this._folded([...this._columns, ...made], this._op);
+      if (made !== undefined && !made.some(m => containsAggregate(m))) return this._folded({ columns: [...this._query.columns, ...made] });
     }
-    const { attributes: existing } = this.relation();
-    return this._next([...keepNames(existing), ...madeOf(rowOf(existing))]);
+    return this.step([...this.relation().attributes.values(), ...madeOf(this.row())]);
   }
 
   /** Only some of this result's columns, by name, as Legend's `select(~[sym, price])`. To rename or work out a column use `extend` first. */
@@ -380,110 +439,11 @@ export class FinderResult {
     const { attributes: columns } = this.relation();
     const missing = names.filter(n => !columns.has(n));
     if (missing.length > 0) throw new Error(`No column ${JSON.stringify(missing)} in this result: its columns are ${JSON.stringify([...columns.keys()])}`);
-    const shown = this.shown();
-    if (shown !== undefined) {   // the columns of the select that are asked for, in the order asked for
-      const byName = new Map(this._columns.map(c => [columnName(c), c]));
-      return this._folded(names.map(n => byName.get(n)!), this._op);
+    if (this.shown() !== undefined) {   // the columns of the select that are asked for, in the order asked for
+      const byName = new Map(this._query.columns.map(c => [columnName(c), c]));
+      return this._folded({ columns: names.map(n => byName.get(n)!) });
     }
-    return this._next(names.map(n => columns.get(n)!.alias(n)));
-  }
-
-  /**
-   * What this result shows, by the name that reads it, when a step can be part of its select: each column is what it is worked out
-   * from, so a condition or a column made of them is written over the columns of the select and not over a select of it. Nothing when
-   * the select has gone beyond what a step can be added to: it groups, is distinct, is ordered, offset or limited (a step comes after
-   * those), or shows an aggregate, a window or something that is not a column, a constant, arithmetic or a function.
-   */
-  /** @internal */
-  shown(): Map<string, RelationalOperationElement | Attribute> | undefined {
-    if (this._orderBy.length > 0 || this._groupBy.length > 0 || this._distinct || this._having !== undefined
-        || this._limit !== undefined || this._offset !== undefined) return undefined;
-    const shown = new Map<string, RelationalOperationElement | Attribute>();
-    for (const column of this._columns) {
-      let element: RelationalOperationElement | Attribute = column;
-      while (element instanceof Alias) element = element.element;
-      const simple = element instanceof Attribute || element instanceof ColumnWithJoin || element instanceof Column
-        || element instanceof ConstantOperation || element instanceof ArithmeticOperation || element instanceof ScalarFunctionOperation
-        || element instanceof ComparisonOperation || element instanceof LogicalOperation;
-      if (!simple || containsAggregateOrWindow(element)) return undefined;
-      const name = columnName(column);
-      if (shown.has(name)) return undefined;   // a name twice is refused when a step reads this result as a relation
-      shown.set(name, element);
-    }
-    return shown;
-  }
-
-  /**
-   * What a step makes of the columns of the select, or nothing when one of them is something that has not what a column of a
-   * relation has (a method of an attribute): it is then read as a column of the select.
-   */
-  /** @internal */
-  tryFolded<T>(make: () => T): T | undefined {
-    try {
-      return make();
-    } catch (error) {
-      if (error instanceof TypeError) return undefined;
-      throw error;
-    }
-  }
-
-  /** @internal This result's rows grouped by `keys`, with `aggregates` over each group, in its own select. */
-  grouped(keys: (Attribute | Alias)[], aggregates: Alias[]): FinderResult {
-    const next = this._folded([...keys, ...aggregates], this._op);
-    next._groupBy = keys.map(key => (key instanceof Alias ? key.element : key)) as Comparand[];
-    return next;
-  }
-
-  /** This result with a step added to its select: the same query, so the same relation. */
-  private _folded(columns: (Attribute | RelationalOperationElement)[], op: RelationalOperationElement): FinderResult {
-    // each column under the name a step reads it by, as the select over this one would show it
-    const labelled = columns.map(c => (c instanceof Alias ? c : c instanceof Attribute ? c.alias(columnName(c)) : new Alias(c, columnName(c))));
-    const next = new FinderResult(this._businessDate, this._processingDatetime, labelled, this._table, op, this._businessDateTo, this._processingDatetimeTo);
-    next._relationName = this._relationName;
-    next._timeoutMs = this._timeoutMs;
-    return next;
-  }
-
-  /**
-   * A column of this result, as `column(name)` gives it, is what this result shows under that name: so
-   * `rows.orderBy(rows.column('name').ascending())` orders by the column, not by a column of a later query.
-   */
-  private _own<T extends RelationalOperationElement | Attribute>(element: T): T | RelationalOperationElement | Attribute {
-    const column = element instanceof Attribute ? element.column() : element instanceof ColumnWithJoin ? element.column : undefined;
-    if (column === undefined || this._relationName === undefined) return element;
-    const owner = column.owner;
-    if (!(owner instanceof TableAlias) || owner.name !== this._relationName) return element;
-    const shown = new Map(this._columns.map(c => [columnName(c), c]));
-    const found = shown.get(column.name);
-    if (found === undefined) return element;
-    const inner = found instanceof Alias ? found.element : found;
-    // a column is ordered by itself, and an expression by the name it is selected under
-    return inner instanceof Attribute ? inner.cwj() : found;
-  }
-
-  /** Whether a limit or an offset has cut the rows of this result. */
-  private _isCut(): boolean { return this._limit !== undefined || this._offset !== undefined; }
-
-  /** Whether the column is one this result shows, as `column(name)` gives it. */
-  private _isColumnOfThis(element: RelationalOperationElement | Attribute): boolean {
-    const column = element instanceof Attribute ? element.column() : element instanceof ColumnWithJoin ? element.column : undefined;
-    return column !== undefined && this._relationName !== undefined && column.owner instanceof TableAlias && column.owner.name === this._relationName;
-  }
-
-  /**
-   * Order the rows. Calls accumulate: the sorts of the latest call take priority and earlier ones order the
-   * rows it leaves tied, as in a chain of `sortBy` calls. Sorting a column again replaces its earlier direction.
-   */
-  orderBy(...given: SortOperation[]): this {
-    if (this._isCut() && given.every(s => this._isColumnOfThis(s.column))) {
-      // an order of the columns of rows already cut by a limit or an offset orders those rows: it is a select over this one
-      const { attributes: columns } = this.relation();
-      return this._next([...columns.values()]).orderBy(...given) as unknown as this;
-    }
-    const sorts = given.map(s => new SortOperation(this._own(s.column) as RelationalOperationElement, s.direction));
-    const resorted = new Set(sorts.map(sortTarget));
-    this._orderBy = [...sorts, ...this._orderBy.filter(s => !resorted.has(sortTarget(s)))];
-    return this;
+    return this.step(names.map(n => columns.get(n)!.alias(n)));
   }
 
   /**
@@ -515,8 +475,7 @@ export class FinderResult {
     const columns = [...left, ...right].map(([name, attribute]) => attribute.alias(name));
     const joined = new QuerySpecification(columns, new NoOperation(), [], leftAlias, new Map(), false, undefined, new Map(),
       [new JoinOperation('', rightAlias, test, how as JoinKind)]);
-    const alias = new TableAlias(joined, `relation${nextRelationNumber++}`);
-    return new FinderResult(null, null, [...attributes(alias)].map(([name, attribute]) => attribute.alias(name)), alias, new NoOperation());
+    return this._of(new TableAlias(joined, `relation${relationNumber()}`));
   }
 
   /**
@@ -529,13 +488,24 @@ export class FinderResult {
    *     rows.groupBy(r => [r.dept, r.title]).aggregate({ total: r => r.salary.sum() })
    */
   groupBy(...keys: ((row: ResultRow) => GroupKey)[]): GroupedRows;
-  groupBy(...attrs: Comparand[]): this;
-  groupBy(...keys: (Comparand | ((row: ResultRow) => GroupKey))[]): GroupedRows | this {
+  groupBy(...attrs: Comparand[]): FinderResult;
+  groupBy(...keys: (Comparand | ((row: ResultRow) => GroupKey))[]): GroupedRows | FinderResult {
     const functions = keys.map(k => typeof k === 'function');
     if (keys.length > 0 && functions.every(Boolean)) return new GroupedRows(this, keys as ((row: ResultRow) => GroupKey)[]);
     if (functions.some(Boolean)) throw new TypeError('groupBy takes finder attributes, or functions of a row (r => r.dept), not both');
-    this._groupBy = (keys as Comparand[]).map(a => this._own(a) as Comparand);
-    return this;
+    return this._then(withClauses(this._read('groupBy'), { groupBy: (keys as Comparand[]).map(a => this._own(a) as Comparand) }));
+  }
+
+  /**
+   * The query of the rows a finder reads, which is what `groupBy` and `having` apply to. They come before a distinct, an order, an offset
+   * and a limit, so they cannot follow one.
+   */
+  private _read(name: string): OrderedQuerySpecification {
+    if (!acceptsGroupBy(this._query)) {
+      throw new Error(`${name} applies to the rows a finder reads, so it comes before distinct, orderBy, offset and limit: write ${name} first, `
+        + `or group the rows after them with groupBy(r => ...).aggregate(...)`);
+    }
+    return this._query;
   }
 
   /**
@@ -546,23 +516,57 @@ export class FinderResult {
     return new GroupedRows(this, []).aggregate(columns);
   }
 
-  /** Keep the first `n` rows. After a limit, or an offset, it keeps that many of what is left: the fewer rows. */
-  limit(n: number): this {
-    this._limit = this._limit === undefined ? n : Math.min(this._limit, n);
-    return this;
+  /**
+   * A column of this result, as `column(name)` gives it, is what this result shows under that name: so
+   * `rows.orderBy(rows.column('name').ascending())` orders by the column, not by a column of a later query.
+   */
+  private _own<T extends RelationalOperationElement | Attribute>(element: T): T | RelationalOperationElement | Attribute {
+    const column = columnOf(element);
+    if (column === undefined || !(column.owner instanceof TableAlias) || column.owner.name !== this._alias.name) return element;
+    const shown = new Map(this._query.columns.map(c => [columnName(c), c]));
+    const found = shown.get(column.name);
+    if (found === undefined) return element;
+    const inner = found instanceof Alias ? found.element : found;
+    // a column is ordered by itself, and an expression by the name it is selected under
+    return inner instanceof Attribute ? inner.cwj() : found;
   }
 
-  /** Skip the first `n` rows. Sort the rows first: without an order, which rows are first is not defined. */
-  offset(n: number): this {
+  /**
+   * Order the rows. Calls accumulate: the sorts of the latest call take priority and earlier ones order the
+   * rows it leaves tied, as in a chain of `sortBy` calls. Sorting a column again replaces its earlier direction.
+   * Rows that are already dropped or taken are ordered after that, as a step over them.
+   */
+  orderBy(...given: SortOperation[]): FinderResult {
+    const sorts = given.map(s => new SortOperation(this._own(s.column) as RelationalOperationElement, s.direction));
+    const source = this._query.table;
+    if (source instanceof TableAlias && source.name.startsWith('relation')) {   // a step over a result, not over a mapped query
+      for (const sort of sorts) {
+        const column = columnOf(sort.column);
+        if (column !== undefined && column.owner instanceof Table) {
+          throw new Error(`The rows of a step are ordered by the columns of the result before it: ${JSON.stringify(this.columnNames())} `
+            + `(result.column('${column.name}').ascending()), not by a column of the table it was first read from`);
+        }
+      }
+    }
+    return this._then(sortedBy(this._query, sorts));
+  }
+
+  /** The first `n` rows. Taking again takes from the rows taken. */
+  limit(n: number): FinderResult {
+    return this._then(taken(this._query, n));
+  }
+
+  /**
+   * Skip the first `n` rows. Sort the rows first: without an order, which rows come first is not defined. Rows that were already taken are
+   * skipped after that: `limit(5).offset(2)` is three rows.
+   */
+  offset(n: number): FinderResult {
     if (!Number.isInteger(n) || n < 0) throw new Error('offset cannot be negative');
-    // the rows skipped are of the rows left by a limit before it: that many fewer remain
-    if (this._limit !== undefined) this._limit = Math.max(0, this._limit - n);
-    this._offset = (this._offset ?? 0) + n;
-    return this;
+    return this._then(dropped(this._query, n));
   }
 
   /** Rows `start` up to but not including `stop`, counting from 0: `offset(start).limit(stop - start)`. */
-  slice(start: number, stop: number): this {
+  slice(start: number, stop: number): FinderResult {
     if (!Number.isInteger(start) || !Number.isInteger(stop) || start < 0 || stop < start) {
       throw new Error('slice needs 0 <= start <= stop');
     }
@@ -575,15 +579,16 @@ export class FinderResult {
    * column, or an expression: `.groupBy(f.date().year())`.
    * Calls accumulate, as `and` does.
    */
-  having(...conditions: Operation[]): this {
-    for (const condition of conditions) this._having = this._having === undefined ? condition : this._having.and(condition) as Operation;
-    return this;
+  having(...conditions: Operation[]): FinderResult {
+    const read = this._read('having');
+    let having = read.having;
+    for (const condition of conditions) having = having === undefined ? condition : having.and(condition) as Operation;
+    return this._then(withClauses(read, { having }));
   }
 
-  /** Return each distinct row once: `SELECT DISTINCT`. A sort on a distinct query has to use a selected column. */
-  distinct(): this {
-    this._distinct = true;
-    return this;
+  /** Return each distinct row once: `SELECT DISTINCT`. */
+  distinct(): FinderResult {
+    return this._then(madeDistinct(this._query));
   }
 
   /** Abort the query and throw QueryTimeoutError if it runs longer than `milliseconds` (default 60000). */
@@ -602,60 +607,36 @@ export class FinderResult {
    * becomes `account_name`.
    */
   toView(name: string, schema: string): ViewDefinition {
-    if (this._businessDate !== null || this._businessDateTo !== null || this._processingDatetime !== null || this._processingDatetimeTo !== null) {
+    const q = this._query;
+    const a = this._asOf;
+    if (a.businessDate !== null || a.businessDateTo !== null || a.processingDatetime !== null || a.processingDatetimeTo !== null) {
       throw new ViewDefinitionError(
         'A view has no dates: pass null for the business date and processing time, and the view will expose the milestoning columns instead');
     }
-    if (this._distinct) throw new ViewDefinitionError('A view cannot be distinct');
-    if (this._offset !== undefined) throw new ViewDefinitionError('A view has no row offset');
-    if (this._having !== undefined) throw new ViewDefinitionError('A view has no HAVING; filter the rows you read back from it');
-    if (this._orderBy.length > 0 || this._limit !== undefined) {
+    if (q.distinct) throw new ViewDefinitionError('A view cannot be distinct');
+    if (q.offset !== undefined) throw new ViewDefinitionError('A view has no row offset');
+    if (q.having !== undefined) throw new ViewDefinitionError('A view has no HAVING; filter the rows you read back from it');
+    if (q.orderBy.length > 0 || q.limit !== undefined) {
       throw new ViewDefinitionError('A view has no ORDER BY or row limit; order the rows when you read them with result().orderBy()');
     }
-    if (!(this._table instanceof Table)) throw new ViewDefinitionError('A view is defined over a table, not over a union');
-    const projection = this._columns.map(column => (column instanceof Alias ? column : column instanceof Attribute ? column.alias(columnName(column)) : new Alias(column, columnName(column))));
-    const view = new ViewDefinition(name, schema, this._table, projection, this._op, this._groupBy);
+    if (!(q.table instanceof Table)) throw new ViewDefinitionError('A view is defined over a table, not over a union');
+    const projection = q.columns.map(column => (column instanceof Alias ? column : new Alias(column, columnName(column))));
+    const view = new ViewDefinition(name, schema, q.table, projection, q.filter, [...q.groupBy]);
     checkViewJoins(view);
     return view;
   }
 
   /** The query as SQL, in Postgres unless a dialect is given: `toSql('databricks')`. Nothing is run. */
   toSql(dialect: DialectName | SqlDialect = 'postgres'): string {
-    return toSql(
-      this._businessDate,
-      this._processingDatetime,
-      this._columns,
-      this._table as Table,
-      this._op,
-      this._orderBy,
-      this._groupBy,
-      this._limit,
-      this._businessDateTo,
-      this._distinct,
-      this._offset,
-      this._having,
-      dialect,
-      this._processingDatetimeTo,
-    );
+    return querySqlToString(this._query, dialect);
   }
 
   async toRows(): Promise<Row[]> {
+    const q = this._query;
+    const a = this._asOf;
     return getRunner().select(
-      this._businessDate,
-      this._processingDatetime,
-      this._columns,
-      this._table,
-      this._op,
-      this._orderBy,
-      this._groupBy,
-      this._limit,
-      this._timeoutMs,
-      this._businessDateTo,
-      this._distinct,
-      this._offset,
-      this._having,
-      this._processingDatetimeTo,
-    );
+      a.businessDate, a.processingDatetime, q.columns as (Attribute | RelationalOperationElement)[], q.table as unknown as QueryTarget, q.filter,
+      q.orderBy, q.groupBy as Comparand[], q.limit, this._timeoutMs, a.businessDateTo, q.distinct, q.offset, q.having, a.processingDatetimeTo);
   }
 }
 
