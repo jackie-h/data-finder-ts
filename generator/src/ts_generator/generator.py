@@ -22,6 +22,7 @@ from model.relational import (
     NotInOperation, NotOperation, QueryExpression, QuerySpecification, ScalarFunctionOperation, StringConstantOperation,
     Table, TableAlias, UnionOperation, query_of,
 )
+from model.query_sets import merge_set_navigations
 from model.relational_mapping import Join, EmbeddedSetMapping
 
 _TS_RESERVED = {
@@ -427,7 +428,8 @@ class _ClassView:
         self.clazz = rcm.clazz
         self.milestone_mapping = rcm.milestone_mapping
         self.main_relation = rcm.main_relation
-        self.property_mappings = [pm for pm in rcm.property_mappings if not isinstance(pm.target, EmbeddedSetMapping)]
+        # a navigation between sets is mapped for each pair of them, and is one join to the finder
+        self.property_mappings = [pm for pm in merge_set_navigations(rcm) if not isinstance(pm.target, EmbeddedSetMapping)]
         self.embedded_mappings = [pm for pm in rcm.property_mappings if isinstance(pm.target, EmbeddedSetMapping)]
 
 
@@ -492,7 +494,7 @@ def get_used_attr_types(rcm) -> list:
             seen.add(t)
             result.append(t)
 
-    for rpm in rcm.property_mappings:
+    for rpm in rcm.property_mappings:   # a _ClassView's, which has the navigations between sets merged
         if is_primitive(rpm.property):
             _add(rpm.property)
         elif rpm.property.type.name != rcm.clazz.name:
@@ -529,7 +531,7 @@ def _build_association_lookup(mapping: Mapping) -> dict:
 def _build_reverse_assoc_map(mapping: Mapping, assoc_lookup: dict) -> dict:
     reverse_map = {}
     for rcm in mapping.mappings:
-        for rpm in rcm.property_mappings:
+        for rpm in merge_set_navigations(rcm):
             if is_primitive(rpm.property) or not isinstance(rpm.target, Join) or rpm.target.via:
                 continue
             target_cls = rpm.property.type
