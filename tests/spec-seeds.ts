@@ -153,6 +153,18 @@ export const seeds: Record<string, Seed> = {
     for (const table of ['people', 'firms', 'trades', 'rates', 'quotes', 'holders', 'units']) await loadCsv(conn, `org.${table}`, `sql_queries_${table}.csv`);
   },
 
+  sql_query_sets: async conn => {
+    await run(conn, 'CREATE SCHEMA org',
+      'CREATE TABLE org.retail_customers (id INT, name VARCHAR)',
+      'CREATE TABLE org.corporate_customers (id INT, name VARCHAR)',
+      'CREATE TABLE org.orders (id INT, customer_id INT, amount INT)',
+      'CREATE TABLE org.applications_a (id INT, first_name VARCHAR, nick_name VARCHAR, home VARCHAR, firm_name VARCHAR)',
+      'CREATE TABLE org.applications_b (id INT, given_name VARCHAR, known_as VARCHAR, address VARCHAR)');
+    for (const table of ['retail_customers', 'corporate_customers', 'orders']) await loadCsv(conn, `org.${table}`, `sql_query_sets_${table}.csv`);
+    await loadCsv(conn, 'org.applications_a', 'sql_query_sets_embedded_applications_a.csv');
+    await loadCsv(conn, 'org.applications_b', 'sql_query_sets_embedded_applications_b.csv');
+  },
+
   processing_snapshot: async conn => {
     await run(conn, 'CREATE SCHEMA mkt',
       'CREATE TABLE mkt.quotes (id INT, symbol VARCHAR, price DOUBLE, taken_at TIMESTAMP)',
