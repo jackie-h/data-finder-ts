@@ -4,7 +4,7 @@ import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb } from './duckdb-runner';
 import { seeds } from './spec-seeds';
 import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
-import { convertInputsAndSelect } from '../src/datafinder/runner';
+import { FinderResult, convertInputsAndSelect } from '../src/datafinder/runner';
 import { toSql } from '../src/datafinder/sql-generator';
 import { IntegerAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, NoOperation, SortDirection, Table } from '../src/model/relational';
@@ -36,7 +36,7 @@ describe('the SQL', () => {
 });
 
 describe('on a result', () => {
-  const orders = (r: unknown) => (r as { _orderBy: { direction: SortDirection }[] })._orderBy.map(s => s.direction);
+  const orders = (r: FinderResult) => r.query().orderBy.map(s => s.direction);
   const result = () => convertInputsAndSelect(null, null, [], new Table('t', []));
 
   it('sorting by an expression again adds a sort', () => {

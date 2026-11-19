@@ -13,7 +13,7 @@ describe('the SQL', () => {
   it('a step of a plain select is part of that select', () => {
     const sql = companies().filter(r => r.id.gt(2)).toSql('duckdb');
     // a result that is a plain select has the step in its own: the condition is over the columns it reads
-    expect(sql).toBe('SELECT t0.id AS "id",t0.name AS "company",t0.category AS "category" FROM main.companies AS t0 WHERE t0.id > 2');
+    expect(sql).toBe('SELECT t0.id AS "Id",t0.name AS "company",t0.category AS "Category" FROM main.companies AS t0 WHERE t0.id > 2');
   });
 
   it('conditions are ANDed', () => {

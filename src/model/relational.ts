@@ -106,7 +106,7 @@ export enum SortDirection {
   DESC = 'DESC',
 }
 
-import type { MilestoningColumns } from './milestoning';
+import type { AsOf, MilestoningColumns } from './milestoning';
 
 export abstract class RelationalOperationElement {}
 
@@ -1038,6 +1038,9 @@ export class QuerySpecification extends QueryExpression {
     /** Relations joined to the root on a condition, in the order they are written. */
     readonly joins: readonly JoinOperation[] = [],
   ) { super(); }
+
+  /** The dates the rows are read as of, and what they add to `filter` (which is what was asked of the rows): written with it. */
+  asOf?: AsOf;
 }
 
 /**

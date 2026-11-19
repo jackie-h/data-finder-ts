@@ -172,19 +172,19 @@ export function buildQuery(finder: unknown, metadata: MappingMetadata, spec: Que
   for (const op of filters) condition = condition instanceof NoOperation ? op : condition.and(op) as Operation;
 
   const dynamicRoot = finder as Dynamic;
-  const result = (root.dates === null
+  let result = (root.dates === null
     ? dynamicRoot.findAll(columns, condition)
     : dynamicRoot.findAll(dates?.businessDate ?? null, dates?.processingTime ?? null, columns, condition)) as FinderResult;
 
-  if (groupPaths.length > 0) result.groupBy(...groupPaths.map(p => attributeAt(p).attribute));
+  if (groupPaths.length > 0) result = result.groupBy(...groupPaths.map(p => attributeAt(p).attribute));
   if (spec.orderBy !== undefined && spec.orderBy.length > 0) {
-    result.orderBy(...spec.orderBy.map(o => {
+    result = result.orderBy(...spec.orderBy.map(o => {
       const { attribute, type } = attributeAt(o.path);
       const element = (o.aggregate === undefined ? attribute : aggregated(attribute, type, o.aggregate)) as Attribute;
       return o.direction === 'desc' ? element.descending() : element.ascending();
     }));
   }
-  if (spec.limit !== undefined) result.limit(spec.limit);
+  if (spec.limit !== undefined) result = result.limit(spec.limit);
   return result;
 }
 

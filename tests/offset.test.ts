@@ -7,7 +7,7 @@ import { seeds } from './spec-seeds';
 import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
 import { CompanyFinder as GraphQLCompanyFinder } from './generated_graphql/companies/CompanyFinder';
 import { GraphQLConnect } from '../src/datafinder/graphql-runner';
-import { clearRunner, convertInputsAndSelect, registerRunner } from '../src/datafinder/runner';
+import { FinderResult, clearRunner, convertInputsAndSelect, registerRunner } from '../src/datafinder/runner';
 import { toSql } from '../src/datafinder/sql-generator';
 import { IntegerAttribute } from '../src/datafinder/typed-attributes';
 import { GraphQLEndpoint, GraphQLFilterConvention } from '../src/model/graphql_mapping';
@@ -30,7 +30,7 @@ describe('the SQL', () => {
 
 describe('on a result', () => {
   const result = () => convertInputsAndSelect(null, null, [], new Table('t', []));
-  const state = (r: unknown) => r as { _offset?: number; _limit?: number };
+  const state = (r: FinderResult) => ({ _offset: r.query().offset, _limit: r.query().limit });
 
   it('offset and slice', () => {
     expect(state(result().offset(3))._offset).toBe(3);

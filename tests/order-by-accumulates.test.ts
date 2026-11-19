@@ -4,13 +4,13 @@ import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
 import { registerDuckDb } from './duckdb-runner';
 import { seeds } from './spec-seeds';
 import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
-import { convertInputsAndSelect } from '../src/datafinder/runner';
+import { FinderResult, convertInputsAndSelect } from '../src/datafinder/runner';
 import { StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, JoinOperation, JoinKind, JoinTreeNodeOperation, NoOperation, SortDirection, Table } from '../src/model/relational';
 
 const result = () => convertInputsAndSelect(null, null, [], new Table('t', []), new NoOperation());
-const orderOf = (r: unknown) => (r as { _orderBy: { column: { column: { name: string } }; direction: SortDirection }[] })
-  ._orderBy.map(s => [s.column.column.name, s.direction]);
+const orderOf = (r: FinderResult) => (r.query().orderBy as unknown as { column: { column: { name: string } }; direction: SortDirection }[])
+  .map(s => [s.column.column.name, s.direction]);
 const [a, b, c] = ['a', 'b', 'c'].map(n => new StringAttribute(n.toUpperCase(), n, 'VARCHAR', new Table('t', [])));
 
 describe('orderBy accumulates', () => {

@@ -76,11 +76,14 @@ import {
   ProcessingTemporalColumns,
   SingleBusinessDateColumn,
   SingleProcessingDatetimeColumn,
+  AsOf,
   hasProcessingRange,
   milestoningColumnsOf,
 } from '../model/milestoning';
 import { View, ViewDefinitionError } from '../model/view';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
+import { StringFunctionOperation } from './scalar-functions';
+import { toSnakeCase } from './naming';
 import { DialectName, SqlDialect, dialectOf } from './dialect';
 
 class TableAliasColumn extends RelationalOperationElement {
@@ -700,40 +703,25 @@ function joinFiltersOf(
   return joinFilters;
 }
 
-function buildQuerySpecification(
-  businessDate: Date | null,
-  processingDatetime: Date | null,
-  columns: (Attribute | RelationalOperationElement)[],
-  table: Relation,
+/**
+ * What the joins a query needs add to it, from the columns it reads and the dates it reads them as of: the ON conditions of the joins, and the
+ * queries that stand for the steps it only asks the existence of. A step folded into a query can read another join.
+ */
+function deriveJoins(
+  columns: readonly (Attribute | RelationalOperationElement)[],
+  groupBy: readonly RelationalOperationElement[],
+  orderBy: readonly SortOperation[],
   op: RelationalOperationElement,
-  orderBy: SortOperation[] = [],
-  groupBy: Comparand[] = [],
-  limit?: number,
-  businessDateTo: Date | null = null,
-  distinct: boolean = false,
-  offset?: number,
-  having?: Operation,
-  processingDatetimeTo: Date | null = null,
-): OrderedQuerySpecification {
-  let filter = op;
-  const milestoningFor = (t: Table | TableAlias, node?: JoinTreeNodeOperation) => {
-    const dates = node === undefined
-      ? { businessDate, businessDateTo, processingDatetime, processingDatetimeTo }
-      : datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
+  having: Operation | undefined,
+  asOf: AsOf,
+): { joinFilters: Map<JoinTreeNodeOperation, Operation>; subSelects: Map<JoinTreeNodeOperation, QuerySpecification> } {
+  const { businessDate, businessDateTo, processingDatetime, processingDatetimeTo } = asOf;
+  const milestoningFor = (t: Table | TableAlias, node: JoinTreeNodeOperation) => {
+    const dates = datesForNode(node, businessDate, businessDateTo, processingDatetime, processingDatetimeTo);
     return dates.businessDateTo !== null || dates.processingDatetimeTo !== null
       ? buildMilestoningFilterOperationForDateRange(dates.businessDate, dates.businessDateTo, dates.processingDatetime, t, node, dates.processingDatetimeTo)
       : buildMilestoningFilterOperation(dates.businessDate, dates.processingDatetime, t, node);
   };
-
-  if (milestoningColumnsOf(table) !== undefined) {
-    const milestonedOp = milestoningFor(table as Table | TableAlias);
-    if (milestonedOp !== null) {
-      filter = filter instanceof NoOperation
-        ? milestonedOp
-        : new LogicalOperation(filter, LogicalOperator.AND, milestonedOp);
-    }
-  }
-
   const joinFilters = joinFiltersOf(requiredJoinNodes([...columns, ...groupBy, ...orderBy, op]),
     node => milestoningColumnsOf(node.join.table) === undefined ? null : milestoningFor(node.join.table, node));
 
@@ -753,8 +741,47 @@ function buildQuerySpecification(
       dates.businessDate, dates.processingDatetime, [new Alias(right, right.name)], node.join.table, condition,
       [], [], undefined, dates.businessDateTo, true, undefined, undefined, dates.processingDatetimeTo));
   }
+  return { joinFilters, subSelects };
+}
 
-  return new OrderedQuerySpecification(columns, filter, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having, subSelects);
+/** What was asked of the rows of a query, and what the dates it reads them as of add to that. */
+function askedWithDates(query: QuerySpecification): RelationalOperationElement {
+  const dates = query.asOf?.filter;
+  if (dates === undefined) return query.filter;
+  return query.filter instanceof NoOperation ? dates : new LogicalOperation(query.filter, LogicalOperator.AND, dates);
+}
+
+/**
+ * The query for the rows asked of `table`, as of the dates. The `filter` of the query is the `op` that was asked, and what the dates add to
+ * it, by the milestoning of the table, is `asOf.filter`.
+ */
+function buildQuerySpecification(
+  businessDate: Date | null,
+  processingDatetime: Date | null,
+  columns: (Attribute | RelationalOperationElement)[],
+  table: Relation,
+  op: RelationalOperationElement,
+  orderBy: SortOperation[] = [],
+  groupBy: Comparand[] = [],
+  limit?: number,
+  businessDateTo: Date | null = null,
+  distinct: boolean = false,
+  offset?: number,
+  having?: Operation,
+  processingDatetimeTo: Date | null = null,
+): OrderedQuerySpecification {
+  let milestoned: Operation | undefined;
+  if (milestoningColumnsOf(table) !== undefined) {
+    const found = businessDateTo !== null || processingDatetimeTo !== null
+      ? buildMilestoningFilterOperationForDateRange(businessDate, businessDateTo, processingDatetime, table as Table | TableAlias, undefined, processingDatetimeTo)
+      : buildMilestoningFilterOperation(businessDate, processingDatetime, table as Table | TableAlias, undefined);
+    if (found !== null) milestoned = found;
+  }
+  const asOf = new AsOf(businessDate, businessDateTo, processingDatetime, processingDatetimeTo, milestoned);
+  const { joinFilters, subSelects } = deriveJoins(columns, groupBy, orderBy, op, having, asOf);
+  const query = new OrderedQuerySpecification(columns, op, orderBy, groupBy, limit, table, joinFilters, distinct, offset, having, subSelects);
+  query.asOf = asOf;
+  return query;
 }
 
 /**
@@ -809,6 +836,209 @@ export function displayAlias(col: RelationalOperationElement | Attribute): strin
   return 'Expression';
 }
 
+type ConstantClass = abstract new (...args: never[]) => ConstantOperation;
+const CONSTANT_TYPES: [ConstantClass, string][] = [
+  [IntegerConstantOperation, 'BIGINT'], [FloatConstantOperation, 'DOUBLE'], [StringConstantOperation, 'VARCHAR'],
+  [DateConstantOperation, 'DATE'], [DateTimeConstantOperation, 'TIMESTAMP'], [DecimalConstantOperation, 'DECIMAL'],
+  [BooleanConstantOperation, 'BOOLEAN'], [IntervalConstantOperation, 'INTERVAL'],
+  [CurrentDateOperation, 'DATE'], [CurrentTimestampOperation, 'TIMESTAMP'],
+];
+const NUMBER_TYPES: Record<string, string> = { integer: 'BIGINT', double: 'DOUBLE', decimal: 'DECIMAL' };
+
+/** The name a column of a result has for the step after it: the name it was given, or its display name in snake_case (as a view names its columns). */
+export function columnName(element: RelationalOperationElement | Attribute): string {
+  if (element instanceof Alias) return element.name;
+  if (element instanceof Attribute && element.column().owner instanceof TableAlias) return element.column().name;   // a column that a result already named: it keeps that name
+  return toSnakeCase(displayAlias(element));
+}
+
+/** The database type of what a result column holds, so a query over the result can compare it as that type. */
+export function columnType(element: RelationalOperationElement | Attribute): string {
+  if (element instanceof Alias) return columnType(element.element);
+  if (element instanceof Attribute) return element.column().type;
+  if (element instanceof ColumnWithJoin) return element.column.type;
+  if (element instanceof Column) return element.type;
+  if (element instanceof CountAllOperation) return 'BIGINT';
+  if (element instanceof IntervalOperation) return 'INTERVAL'; // before the number kinds: it is not a number
+  const kind = (element as { numberKind?: () => string }).numberKind?.();
+  if (kind !== undefined && kind in NUMBER_TYPES) return NUMBER_TYPES[kind];
+  if (element instanceof AggregateOperation) {
+    if (element.operator === AggregateOperator.COUNT || element.operator === AggregateOperator.COUNT_DISTINCT) return 'BIGINT';
+    if (element.operator === AggregateOperator.STRING_AGG) return 'VARCHAR';
+    if ([AggregateOperator.MIN, AggregateOperator.MAX, AggregateOperator.SUM].includes(element.operator)) return columnType(element.element);
+    if (element.operator === AggregateOperator.BOOL_AND || element.operator === AggregateOperator.BOOL_OR) return 'BOOLEAN';
+    return 'DOUBLE';
+  }
+  if (element instanceof WindowFunctionOperation) return element.element ? columnType(element.element) : 'BIGINT';
+  if (element instanceof ConstantOperation) return CONSTANT_TYPES.find(([kind]) => element instanceof kind)?.[1] ?? 'VARCHAR';
+  if (element instanceof CaseOperation) return columnType(element.then);
+  if (element instanceof ConcatOperation || element instanceof StringFunctionOperation) return 'VARCHAR';
+  if (element instanceof DateExtractOperation || element instanceof DateDiffOperation) return 'BIGINT';
+  if (element instanceof DateArithmeticOperation || element instanceof DateTruncOperation) return columnType(element.element);
+  if (element instanceof ScalarFunctionOperation) return columnType(element.element); // an untyped one, such as orElse: what it is applied to
+  if (element instanceof ArithmeticOperation) return 'DOUBLE'; // one of unknown kind
+  if (element instanceof Operation) return 'BOOLEAN'; // a condition shown as a column
+  return 'VARCHAR';
+}
+
+// --- the steps written after a query, folded into SELECTs -------------------------------------------------------------------------
+
+/** The columns of a query that something reads from, each under the name that reads it. */
+export function displayColumns(columns: readonly (Attribute | RelationalOperationElement)[]): Alias[] {
+  return columns.map(c => (c instanceof Alias ? c : c instanceof Attribute ? c.alias(columnName(c)) : new Alias(c, columnName(c))));
+}
+
+/** The query as something reads from it: its columns under the names that read them. */
+export function labelled(query: OrderedQuerySpecification): OrderedQuerySpecification {
+  return withClauses(query, { columns: displayColumns(query.columns) });
+}
+
+/** The numbers of the relations a result is read under, so each result's has a name of its own. */
+let nextRelationNumber = 1;
+export function relationNumber(): number { return nextRelationNumber++; }
+
+/** The column an attribute, or a column reached through joins, reads; none for any other expression. */
+export function columnOf(element: unknown): Column | undefined {
+  if (element instanceof Attribute) return element.column();
+  if (element instanceof ColumnWithJoin) return element.column;
+  return undefined;
+}
+
+// A SELECT applies DISTINCT, then the order, then the offset, then the limit, in that order only. A step that comes next, or again, is folded
+// into the SELECT it is written after; one that comes earlier than the last clause applied is a SELECT over the rows that SELECT gives, as
+// every other step is. The last clause a SELECT applies is read from the SELECT.
+const DISTINCT = 1, SORT = 2, DROP = 3, TAKE = 4;
+
+/** The last clause the query applies: 0 for none, else `DISTINCT`, `SORT`, `DROP` or `TAKE`. */
+export function stage(query: QuerySpecification): number {
+  if (!(query instanceof OrderedQuerySpecification)) return query.distinct ? DISTINCT : 0;
+  if (query.limit !== undefined) return TAKE;
+  if (query.offset !== undefined) return DROP;
+  return query.orderBy.length > 0 ? SORT : (query.distinct ? DISTINCT : 0);
+}
+
+/** Whether group by and having can still be applied: nothing that comes after them (distinct, an order, an offset, a limit) has been applied yet. */
+export function acceptsGroupBy(query: QuerySpecification): boolean {
+  return stage(query) === 0;
+}
+
+export interface ClauseChanges {
+  columns?: readonly RelationalOperationElement[];
+  filter?: RelationalOperationElement;
+  orderBy?: SortOperation[];
+  groupBy?: RelationalOperationElement[];
+  limit?: number;
+  offset?: number;
+  distinct?: boolean;
+  having?: Operation;
+}
+
+/**
+ * The query with some of its clauses changed. A sort can read a join the query did not, so what the joins add is worked out again.
+ * (A clause given as `undefined` is kept: use the clause it is not.)
+ */
+export function withClauses(query: OrderedQuerySpecification, changes: ClauseChanges): OrderedQuerySpecification {
+  const columns = changes.columns ?? query.columns;
+  const filter = changes.filter ?? query.filter;
+  const orderBy = changes.orderBy ?? query.orderBy;
+  const groupBy = changes.groupBy ?? query.groupBy;
+  const having = changes.having ?? query.having;
+  const asOf = query.asOf ?? new AsOf();
+  const { joinFilters, subSelects } = deriveJoins(columns as (Attribute | RelationalOperationElement)[], groupBy, orderBy, filter, having, asOf);
+  const result = new OrderedQuerySpecification(
+    columns, filter, orderBy, groupBy, changes.limit ?? query.limit, query.table, joinFilters, changes.distinct ?? query.distinct,
+    changes.offset ?? query.offset, having, subSelects, query.joins);
+  result.asOf = query.asOf;
+  return result;
+}
+
+/** A SELECT of every column of `query`, which it reads under a name of its own. */
+export function selectOver(query: OrderedQuerySpecification): { query: OrderedQuerySpecification; alias: TableAlias } {
+  const alias = new TableAlias(labelled(query), `relation${relationNumber()}`);
+  const columns = query.columns.map(c => new Alias(alias.column(columnName(c), columnType(c)), columnName(c)));
+  return { query: buildQuerySpecification(null, null, columns, alias, new NoOperation()), alias };
+}
+
+/** The sorts, which are of the columns `query` shows, as a SELECT over it reads them: the columns of `alias`. */
+function ownSorts(query: OrderedQuerySpecification, alias: TableAlias, sorts: readonly SortOperation[]): SortOperation[] {
+  return sorts.map(sort => {
+    const ref = columnOf(sort.column);
+    const found = query.columns.find(shown => {
+      const element = shown instanceof Alias ? shown.element : shown;
+      return shown === sort.column || element === sort.column || (ref !== undefined && columnOf(element) === ref);
+    });
+    if (found === undefined) {
+      throw new Error(`The rows after a limit or an offset are ordered by the columns of the result: ${JSON.stringify(query.columns.map(columnName))} (result.column('name').ascending())`);
+    }
+    return new SortOperation(new ColumnWithJoin(alias.column(columnName(found), columnType(found)), undefined), sort.direction);
+  });
+}
+
+/** Whether every sort of the query is of a column it shows, as SELECT DISTINCT ... ORDER BY needs. */
+function ordersByWhatItShows(query: OrderedQuerySpecification): boolean {
+  return query.orderBy.every(sort => {
+    const ref = columnOf(sort.column);
+    return query.columns.some(shown => {
+      const element = shown instanceof Alias ? shown.element : shown;
+      return element === sort.column || (ref !== undefined && columnOf(element) === ref);
+    });
+  });
+}
+
+/**
+ * Each distinct row of the query once. A SELECT is distinct and ordered at once, so a query that is only ordered, by columns it shows, is
+ * distinct in its own select.
+ */
+export function madeDistinct(query: OrderedQuerySpecification): OrderedQuerySpecification {
+  if (stage(query) > DISTINCT && !(stage(query) === SORT && ordersByWhatItShows(query))) query = selectOver(query).query;
+  return withClauses(query, { distinct: true });
+}
+
+/**
+ * What a sort orders by: a column and the joins to reach it. Any other expression, such as an aggregate, is its own target, so sorting by an
+ * expression again adds a sort.
+ */
+const expressionIds = new WeakMap<object, number>();
+let nextExpressionId = 1;
+function sortTarget(sort: SortOperation): string {
+  const column = sort.column;
+  if (column instanceof Alias) return JSON.stringify(['alias', column.name]);   // a column of the select, by the name it is shown under
+  if (!(column instanceof ColumnWithJoin)) {
+    if (!expressionIds.has(column)) expressionIds.set(column, nextExpressionId++);
+    return JSON.stringify(['expression', expressionIds.get(column)]);
+  }
+  const joins: string[] = [];
+  for (let node = column.parent; node !== undefined; node = node.parent) joins.push(node.join.name);
+  return JSON.stringify([column.column.ownerName, column.column.name, joins]);
+}
+
+/**
+ * The rows of the query in the order of `sorts`, which are of the columns it shows. A column sorted again is ordered as the later sort asks,
+ * and the earlier sorts order the rows it leaves tied.
+ */
+export function sortedBy(query: OrderedQuerySpecification, given: readonly SortOperation[]): OrderedQuerySpecification {
+  let sorts = [...given];
+  if (stage(query) > SORT) {
+    const inner = query;
+    const over = selectOver(inner);
+    query = over.query;
+    sorts = ownSorts(inner, over.alias, sorts);
+  }
+  const resorted = new Set(sorts.map(sortTarget));
+  return withClauses(query, { orderBy: [...sorts, ...query.orderBy.filter(s => !resorted.has(sortTarget(s)))] });
+}
+
+/** The rows of the query after the first `count` of them. */
+export function dropped(query: OrderedQuerySpecification, count: number): OrderedQuerySpecification {
+  if (stage(query) >= TAKE) query = selectOver(query).query;
+  return withClauses(query, { offset: query.offset === undefined ? count : query.offset + count });
+}
+
+/** The first `count` rows of the query. */
+export function taken(query: OrderedQuerySpecification, count: number): OrderedQuerySpecification {
+  return withClauses(query, { limit: query.limit === undefined ? count : Math.min(query.limit, count) });
+}
+
 /** A column with any alias around it taken off. */
 function unaliased(op: unknown): unknown {
   return op instanceof Alias ? unaliased(op.element) : op;
@@ -855,7 +1085,7 @@ class SQLQueryGenerator {
       this._join.push(new Join(join.kind, target, this.buildFilter(join.operation)));
     }
     this.processSelect([...query.columns]);
-    this._where = this.buildFilter(this._guarded(query.filter));
+    this._where = this.buildFilter(this._guarded(askedWithDates(query)));
     const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
     for (const expr of query.groupBy) {
       this._collectRequiredJoins(expr, groupByJoins);
@@ -947,7 +1177,7 @@ class SQLQueryGenerator {
     for (const col of query.columns) walkRefs(col, record);
     for (const expr of query.groupBy) walkRefs(expr, record);
     for (const sort of query instanceof OrderedQuerySpecification ? query.orderBy : []) walkRefs(sort, record);
-    walkRefs(query.filter, record);
+    walkRefs(askedWithDates(query), record);
 
     const elidable = new Set<JoinTreeNodeOperation>();
     for (const [node, refs] of refsByNode) {
