@@ -154,19 +154,45 @@ export type GroupKey = Attribute | Alias | readonly (Attribute | Alias)[];
 
 /** The rows of a result grouped by keys: what `groupBy(r => r.dept)` gives, which can only be aggregated. */
 export class GroupedRows {
-  private readonly _keys: (Attribute | Alias)[] = [];
+  constructor(private readonly _result: FinderResult, private readonly _functions: readonly ((row: ResultRow) => GroupKey)[]) {
+    this._keysOf(_result.row());   // a key that is not a column or a named expression is refused when the grouping is written
+  }
 
-  constructor(private readonly _result: FinderResult, keys: readonly ((row: ResultRow) => GroupKey)[]) {
-    const row = _result.row();
-    for (const key of keys) {
+  /**
+   * The keys, read from `row`. `names` are the names of the columns of a select, when the row is of what they are made of: a key
+   * that is one of those is named as the column is.
+   */
+  private _keysOf(row: ResultRow, names?: Map<unknown, string>): (Attribute | Alias)[] {
+    const keys: (Attribute | Alias)[] = [];
+    for (const key of this._functions) {
       const found = key(row);
-      this._keys.push(...(Array.isArray(found) ? found : [found as Attribute | Alias]));
+      for (let one of (Array.isArray(found) ? found : [found as Attribute | Alias])) {
+        const name = names?.get(one);
+        if (name !== undefined) one = new Alias(one as RelationalOperationElement, name);
+        keys.push(one);
+      }
     }
-    for (const key of this._keys) {
+    for (const key of keys) {
       if (key instanceof Attribute) continue;
       if (key instanceof Alias && !(key.element instanceof Alias)) continue;
       throw new TypeError('A groupBy key is a column, or an expression named with alias(): groupBy(r => r.shipDate.year().alias(\'year\'))');
     }
+    return keys;
+  }
+
+  private _aggregatesOf(row: ResultRow, keys: (Attribute | Alias)[], columns: Record<string, (row: ResultRow) => RelationalOperationElement | Attribute>): Alias[] {
+    const shown = keys.map(key => (key instanceof Alias ? key.name : key.displayName()));
+    const aggregates: Alias[] = [];
+    for (const [name, fn] of Object.entries(columns)) {
+      const expression = fn(row);
+      const element = expression instanceof Attribute ? expression.cwj() : expression;
+      if (!containsAggregate(element)) {
+        throw new TypeError(`The column '${name}' is not an aggregate of the rows of a group (sum, count, average, min, max, ...), so it has no one value for the group`);
+      }
+      if (shown.includes(name) || aggregates.some(a => a.name === name)) throw new Error(`The column '${name}' is named twice in this aggregate`);
+      aggregates.push(new Alias(element, name));
+    }
+    return aggregates;
   }
 
   /**
@@ -178,21 +204,22 @@ export class GroupedRows {
   aggregate(columns: Record<string, (row: ResultRow) => RelationalOperationElement | Attribute>): FinderResult {
     const entries = Object.entries(columns);
     if (entries.length === 0) throw new Error('aggregate needs at least one column: aggregate({ total: r => r.price.sum() })');
-    const row = this._result.row();
-    const shown = this._keys.map(key => (key instanceof Alias ? key.name : key.displayName()));
-    const aggregates: Alias[] = [];
     for (const [name, fn] of entries) {
       if (typeof fn !== 'function') throw new TypeError(`The column '${name}' is a function of a row: aggregate({ ${name}: r => r.price.sum() })`);
-      const expression = fn(row);
-      const element = expression instanceof Attribute ? expression.cwj() : expression;
-      if (!containsAggregate(element)) {
-        throw new TypeError(`The column '${name}' is not an aggregate of the rows of a group (sum, count, average, min, max, ...), so it has no one value for the group`);
-      }
-      if (shown.includes(name) || aggregates.some(a => a.name === name)) throw new Error(`The column '${name}' is named twice in this aggregate`);
-      aggregates.push(new Alias(element, name));
     }
-    const keys = this._keys.map(key => (key instanceof Alias ? key.element : key));
-    return this._result.step([...this._keys, ...aggregates], undefined, keys as Comparand[]);
+    const result = this._result;
+    const shown = result.shown();
+    if (shown !== undefined) {   // the rows are grouped in the select they are read in
+      const names = new Map([...shown].map(([name, element]) => [element, name]));
+      const made = result.tryFolded(() => {
+        const keys = this._keysOf(rowOf(shown), names);
+        return { keys, aggregates: this._aggregatesOf(rowOf(shown), keys, columns) };
+      });
+      if (made !== undefined) return result.grouped(made.keys, made.aggregates);
+    }
+    const keys = this._keysOf(result.row());
+    const aggregates = this._aggregatesOf(result.row(), keys, columns);
+    return result.step([...keys, ...aggregates], undefined, keys.map(key => (key instanceof Alias ? key.element : key)) as Comparand[]);
   }
 }
 
@@ -316,9 +343,9 @@ export class FinderResult {
       for (const condition of conditions) op = op === undefined ? condition(row) : op.and(condition(row)) as Operation;
       return op;
     };
-    const shown = this._shown();
+    const shown = this.shown();
     if (shown !== undefined) {
-      const op = this._tryFolded(() => together(rowOf(shown)));
+      const op = this.tryFolded(() => together(rowOf(shown)));
       if (op !== undefined) return this._folded(this._columns, this._op instanceof NoOperation ? op : this._op instanceof Operation ? this._op.and(op) : op);
     }
     return this._next(keepNames(this.relation().attributes), together(this.row()));
@@ -338,9 +365,9 @@ export class FinderResult {
       const value = expression(row);
       return value instanceof Attribute ? value.alias(name) : new Alias(value, name);
     });
-    const shown = this._shown();
+    const shown = this.shown();
     if (shown !== undefined && !Object.keys(columns).some(name => shown.has(name))) {
-      const made = this._tryFolded(() => madeOf(rowOf(shown)));
+      const made = this.tryFolded(() => madeOf(rowOf(shown)));
       // a window keeps every row, so it is a column of this select, though nothing after it can fold
       if (made !== undefined && !made.some(m => containsAggregate(m))) return this._folded([...this._columns, ...made], this._op);
     }
@@ -353,7 +380,7 @@ export class FinderResult {
     const { attributes: columns } = this.relation();
     const missing = names.filter(n => !columns.has(n));
     if (missing.length > 0) throw new Error(`No column ${JSON.stringify(missing)} in this result: its columns are ${JSON.stringify([...columns.keys()])}`);
-    const shown = this._shown();
+    const shown = this.shown();
     if (shown !== undefined) {   // the columns of the select that are asked for, in the order asked for
       const byName = new Map(this._columns.map(c => [columnName(c), c]));
       return this._folded(names.map(n => byName.get(n)!), this._op);
@@ -367,7 +394,8 @@ export class FinderResult {
    * the select has gone beyond what a step can be added to: it groups, is distinct, is ordered, offset or limited (a step comes after
    * those), or shows an aggregate, a window or something that is not a column, a constant, arithmetic or a function.
    */
-  private _shown(): Map<string, RelationalOperationElement | Attribute> | undefined {
+  /** @internal */
+  shown(): Map<string, RelationalOperationElement | Attribute> | undefined {
     if (this._orderBy.length > 0 || this._groupBy.length > 0 || this._distinct || this._having !== undefined
         || this._limit !== undefined || this._offset !== undefined) return undefined;
     const shown = new Map<string, RelationalOperationElement | Attribute>();
@@ -389,13 +417,21 @@ export class FinderResult {
    * What a step makes of the columns of the select, or nothing when one of them is something that has not what a column of a
    * relation has (a method of an attribute): it is then read as a column of the select.
    */
-  private _tryFolded<T>(make: () => T): T | undefined {
+  /** @internal */
+  tryFolded<T>(make: () => T): T | undefined {
     try {
       return make();
     } catch (error) {
       if (error instanceof TypeError) return undefined;
       throw error;
     }
+  }
+
+  /** @internal This result's rows grouped by `keys`, with `aggregates` over each group, in its own select. */
+  grouped(keys: (Attribute | Alias)[], aggregates: Alias[]): FinderResult {
+    const next = this._folded([...keys, ...aggregates], this._op);
+    next._groupBy = keys.map(key => (key instanceof Alias ? key.element : key)) as Comparand[];
+    return next;
   }
 
   /** This result with a step added to its select: the same query, so the same relation. */

@@ -252,6 +252,12 @@ export class NotInOperation extends UnaryOperation {
 /** The condition does not hold: `NOT (element)`. Negating it again gives the condition. */
 export class NotOperation extends UnaryOperation {
   not(): Operation { return this.element as Operation; }
+
+  /** The condition is one of `values`: `f.age().gt(50).alias('old')`, then `r.old.isIn([true, false])`. */
+  isIn(values: readonly boolean[]): InOperation { return new InOperation(this, values.map(v => new BooleanConstantOperation(v))); }
+
+  /** The condition is none of `values`. */
+  isNotIn(values: readonly boolean[]): NotInOperation { return new NotInOperation(this, values.map(v => new BooleanConstantOperation(v))); }
 }
 
 export class ComparisonOperation extends BinaryOperation {
@@ -260,6 +266,12 @@ export class ComparisonOperation extends BinaryOperation {
     readonly operator: ComparisonOperator,
     right: RelationalOperationElement,
   ) { super(left, right); }
+
+  /** The condition is one of `values`: `f.age().gt(50).alias('old')`, then `r.old.isIn([true, false])`. */
+  isIn(values: readonly boolean[]): InOperation { return new InOperation(this, values.map(v => new BooleanConstantOperation(v))); }
+
+  /** The condition is none of `values`. */
+  isNotIn(values: readonly boolean[]): NotInOperation { return new NotInOperation(this, values.map(v => new BooleanConstantOperation(v))); }
 }
 
 export class LogicalOperation extends BinaryOperation {
@@ -268,6 +280,12 @@ export class LogicalOperation extends BinaryOperation {
     readonly operator: LogicalOperator,
     right: RelationalOperationElement,
   ) { super(left, right); }
+
+  /** The condition is one of `values`: `f.age().gt(50).alias('old')`, then `r.old.isIn([true, false])`. */
+  isIn(values: readonly boolean[]): InOperation { return new InOperation(this, values.map(v => new BooleanConstantOperation(v))); }
+
+  /** The condition is none of `values`. */
+  isNotIn(values: readonly boolean[]): NotInOperation { return new NotInOperation(this, values.map(v => new BooleanConstantOperation(v))); }
 }
 
 export class WindowSpecification {

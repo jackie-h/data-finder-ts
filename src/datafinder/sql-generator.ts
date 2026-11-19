@@ -1222,10 +1222,10 @@ class SQLQueryGenerator {
       return this.buildFilter(new ColumnWithJoin(col, op.node)) + ' IS NULL';
     }
     if (op instanceof InOperation) {
-      return this.buildFilter(op.element) + ' IN (' + op.values.map(value => constantValueString(value, this._dialect)).join(', ') + ')';
+      return this._inOperand(op.element) + ' IN (' + op.values.map(value => constantValueString(value, this._dialect)).join(', ') + ')';
     }
     if (op instanceof NotInOperation) {
-      const column = this.buildFilter(op.element);
+      const column = this._inOperand(op.element);
       const sql = column + ' NOT IN (' + op.values.map(value => constantValueString(value, this._dialect)).join(', ') + ')';
       // NULL NOT IN (...) is not true in SQL, so a nullable column has to match its NULLs explicitly
       if (op.element instanceof ColumnWithJoin && this._resolve(op.element).column.nullable) {
@@ -1298,6 +1298,12 @@ class SQLQueryGenerator {
     const ta = new TableAlias(subSelect ?? (table instanceof TableAlias ? table.relation : table), 't' + this._tableAliasIncr++);
     this._tableAliasesByTable.set(cacheKey, ta);
     return ta;
+  }
+
+  /** What IN is of: a condition is bracketed, as a comparison and an AND are looser than IN. */
+  private _inOperand(element: RelationalOperationElement): string {
+    const sql = this.buildFilter(element);
+    return isCondition(element) && !(element instanceof InOperation || element instanceof NotInOperation) ? '(' + sql + ')' : sql;
   }
 
   /** What follows FROM or JOIN: the table's name, or the query in parentheses, written by a generator of its own that numbers its aliases after this one's. */
