@@ -1187,9 +1187,12 @@ export abstract class BooleanAggregates {
  */
 export function applyMixins(derived: { prototype: object }, bases: { prototype: object }[]): void {
   for (const base of bases) {
-    for (const name of Object.getOwnPropertyNames(base.prototype)) {
-      if (name === 'constructor' || Object.prototype.hasOwnProperty.call(derived.prototype, name)) continue;
-      Object.defineProperty(derived.prototype, name, Object.getOwnPropertyDescriptor(base.prototype, name)!);
+    // a base's own methods, then those of the classes it extends: a method of the nearer class wins
+    for (let proto: object | null = base.prototype; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto)) {
+      for (const name of Object.getOwnPropertyNames(proto)) {
+        if (name === 'constructor' || Object.prototype.hasOwnProperty.call(derived.prototype, name)) continue;
+        Object.defineProperty(derived.prototype, name, Object.getOwnPropertyDescriptor(proto, name)!);
+      }
     }
   }
 }
