@@ -579,6 +579,60 @@ export class DataCatalog extends DataStore {
   namespace(schemaName: string): string { return `${this.name}.${schemaName}`; }
 }
 
+/**
+ * The names of the columns that milestone the rows of a table or a query, as the mapping gives them. `kind()` says which of the supported
+ * milestonings they are; the columns themselves are `MilestoningColumns`.
+ */
+export class MilestoningScheme {
+  constructor(
+    readonly name: string,
+    readonly processingStart?: string,
+    readonly processingEnd?: string,
+    readonly businessDate?: string,
+    readonly businessDateFrom?: string,
+    readonly businessDateTo?: string,
+    /** What the end of a row that has not ended holds on each axis: a datetime or a date, or nothing for NULL. */
+    readonly processingInfiniteDatetime?: string,
+    /** A single datetime column that holds the processing time a row was taken at (a processing snapshot). */
+    readonly processingDatetime?: string,
+    readonly businessInfiniteDatetime?: string,
+  ) {}
+
+  /**
+   * Which of the supported milestonings the columns of this scheme are: `processing_only`, `business_date`, `business_date_processing`,
+   * `bitemporal`, `business_date_range` or `processing_snapshot`. Any other set of columns is refused: a range has both its ends, a business
+   * date is not beside a business range, and a processing snapshot is not beside any other column.
+   */
+  kind(): string {
+    const hasProcessing = this.processingStart !== undefined;
+    const hasRange = this.businessDateFrom !== undefined;
+    const hasDate = this.businessDate !== undefined;
+    if (hasProcessing !== (this.processingEnd !== undefined)) {
+      throw new Error(`milestoning scheme '${this.name}': a processing range has both processing_start and processing_end`);
+    }
+    if (hasRange !== (this.businessDateTo !== undefined)) {
+      throw new Error(`milestoning scheme '${this.name}': a business range has both business_date_from and business_date_to`);
+    }
+    if (hasDate && hasRange) {
+      throw new Error(`milestoning scheme '${this.name}': a business date (business_date) or a business range (business_date_from and business_date_to), not both`);
+    }
+    if (this.processingDatetime !== undefined) {
+      const others = ([
+        ['processing_start', this.processingStart], ['processing_end', this.processingEnd], ['business_date', this.businessDate],
+        ['business_date_from', this.businessDateFrom], ['business_date_to', this.businessDateTo],
+      ] as const).filter(([, value]) => value !== undefined).map(([name]) => name);
+      if (others.length > 0) {
+        throw new Error(`milestoning scheme '${this.name}' has a processing_datetime, a processing snapshot, which cannot be combined with ${others.join(', ')}`);
+      }
+      return 'processing_snapshot';
+    }
+    if (hasProcessing) return hasRange ? 'bitemporal' : hasDate ? 'business_date_processing' : 'processing_only';
+    if (hasRange) return 'business_date_range';
+    if (hasDate) return 'business_date';
+    throw new Error(`milestoning scheme '${this.name}' has no columns: it is one of processing_only, business_date, business_date_processing, bitemporal, business_date_range or processing_snapshot`);
+  }
+}
+
 export class Schema {
   readonly tables: Table[] = [];
 
@@ -636,7 +690,11 @@ export class Table extends NamedRelation {
  * which alias they belong to by its name. A table is already named, so this is for a relation that is not: a query.
  */
 export class TableAlias extends NamedRelation {
-  /** For a query a class is mapped to with a milestoning scheme: the columns the query gives that milestone it, which the alias owns. */
+  /** For a query that classes are mapped to: the SQL it was read from, and the relations of the data store it reads. */
+  sql?: string;
+  reads: NamedRelation[] = [];
+  /** For a query a class is mapped to with a milestoning scheme: the scheme that is named, and the columns the query gives that milestone it, which the alias owns. */
+  milestoningScheme?: MilestoningScheme;
   milestoningColumns?: MilestoningColumns;
   private _columns: readonly RelationalOperationElement[];
 
@@ -672,6 +730,31 @@ export class TableAlias extends NamedRelation {
   }
 }
 
+/**
+ * The relation as a query that a class is mapped to, or nothing if it is not one: a table, or an alias of one, is not. A query is an alias of a
+ * query expression: a SELECT, or the UNION ALL of the SELECTs of the sets of a class.
+ */
+export function queryOf(relation: Relation | undefined): TableAlias | undefined {
+  return relation instanceof TableAlias && relation.relation instanceof QueryExpression ? relation : undefined;
+}
+
+/** The tables a query that a class is mapped to reads, through the queries it reads; none for a table. */
+export function tablesReadBy(relation: Relation | undefined): Table[] {
+  const alias = queryOf(relation);
+  if (alias === undefined) return [];
+  const found: Table[] = [];
+  for (const read of alias.reads) {
+    for (const table of read instanceof Table ? [read] : tablesReadBy(read)) if (!found.includes(table)) found.push(table);
+  }
+  return found;
+}
+
+/** The schema of a table, and of a query the schema of the first table it reads: where its data store is. */
+export function schemaOf(relation: Relation | undefined): Schema | undefined {
+  if (relation instanceof Table) return relation.schema;
+  return tablesReadBy(relation).find(t => t.schema !== undefined)?.schema;
+}
+
 /** ANSI SQL's join types: `inner`, and the outer joins `left`, `right` and `full`, which keep the rows that find no match. */
 export enum JoinKind {
   INNER = 'inner',
@@ -691,12 +774,16 @@ export function sameRelation(a: Relation | undefined, b: Relation | undefined): 
  * told apart, and is read as the query it is, not as an alias of an alias.
  */
 function aliasOfItself(relation: Table | TableAlias, name: string): TableAlias {
-  if (!(relation instanceof TableAlias && relation.relation instanceof QueryExpression)) return new TableAlias(relation, name);
-  if (relation.milestoningColumns !== undefined) {
-    throw new Error(`${relation.name} is milestoned and joined to itself: a milestoned query cannot be associated with itself yet`);
+  const query = queryOf(relation);
+  if (query === undefined) return new TableAlias(relation, name);
+  if (query.milestoningColumns !== undefined) {
+    throw new Error(`${query.name} is milestoned and joined to itself: a milestoned query cannot be associated with itself yet`);
   }
-  const own = relation.columns.filter((c): c is Column => c instanceof Column).map(c => new Column(c.name, c.type, undefined, c.primaryKey, c.nullable));
-  return new TableAlias(relation.relation, name, own);
+  const own = query.columns.filter((c): c is Column => c instanceof Column).map(c => new Column(c.name, c.type, undefined, c.primaryKey, c.nullable));
+  const alias = new TableAlias(query.relation, name, own);
+  alias.sql = query.sql;
+  alias.reads = query.reads;
+  return alias;
 }
 
 /**
