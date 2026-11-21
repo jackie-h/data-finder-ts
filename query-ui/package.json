@@ -19,7 +19,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "data-finder-query-ui": "./bin/cli.mjs"
+    "data-finder-query-ui": "bin/cli.mjs"
   },
   "exports": {
     ".": {
