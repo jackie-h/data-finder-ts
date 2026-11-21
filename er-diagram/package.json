@@ -4,7 +4,7 @@
   "description": "Mermaid ER diagram viewer; draws the JSON that mapping_markdown.export_json writes from model and mapping markdown",
   "type": "module",
   "bin": {
-    "data-finder-er-diagram": "./generate.mjs"
+    "data-finder-er-diagram": "generate.mjs"
   },
   "files": [
     "generate.mjs",
