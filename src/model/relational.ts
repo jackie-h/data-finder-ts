@@ -1264,13 +1264,6 @@ export abstract class Aggregates<A extends AggregateOperation = UntypedAggregate
     return this._aggregate(DoubleAggregateOperation, sample(ddof) ? AggregateOperator.VAR_SAMP : AggregateOperator.VAR_POP, 'Var');
   }
   /**
-   * `percentile` as numpy and pandas name it, with `method` as numpy does: `'linear'` (the default) interpolates between the two values
-   * either side of `p`, and `'inverted_cdf'` is the nearest value that is there. `quantile(0.5)` is the median.
-   */
-  quantile(p: number, { method = 'linear' }: { method?: QuantileMethod } = {}): A | DoubleAggregateOperation {
-    return quantileOperation(this as unknown as RelationalOperationElement, p, method, 'Quantile Expression', this.aggregateKind());
-  }
-  /**
    * The value that the fraction `p` (between 0 and 1) of the group falls below: `percentile(0.5)` is the median. It interpolates between
    * the neighbouring values, so it is a double, unless `{ continuous: false }` is given, which gives the nearest value that is there, of the type of
    * the expression. `{ ascending: false }` reads the group from the largest value.
@@ -1279,9 +1272,6 @@ export abstract class Aggregates<A extends AggregateOperation = UntypedAggregate
     return percentileOperation(this as unknown as RelationalOperationElement, p, ascending, continuous, 'Percentile Expression', this.aggregateKind());
   }
 }
-
-/** The methods of numpy's quantile that SQL can write. */
-export type QuantileMethod = 'linear' | 'inverted_cdf';
 
 /**
  * A percentile of `element`: `p` is a fraction between 0 and 1 (0.5 is the median). A continuous percentile interpolates between the two
@@ -1298,20 +1288,6 @@ export function percentileOperation<A extends AggregateOperation>(
     return new DoubleAggregateOperation(element, AggregateOperator.PERCENTILE_CONT, label, undefined, undefined, [], p, !ascending);
   }
   return new discreteKind(element, AggregateOperator.PERCENTILE_DISC, label, undefined, undefined, [], p, !ascending);
-}
-
-/**
- * A quantile of `element`, as numpy names them: `'linear'` interpolates between the two values either side of the position (a continuous
- * percentile) and `'inverted_cdf'` is the smallest value that at least the fraction `p` of the group is at or below (a discrete one).
- */
-export function quantileOperation<A extends AggregateOperation>(
-  element: RelationalOperationElement, p: number, method: QuantileMethod, label: string, discreteKind: AggregateConstructor<A>,
-): A | DoubleAggregateOperation {
-  if (method !== 'linear' && method !== 'inverted_cdf') {
-    throw new Error(`A quantile is 'linear' (interpolated) or 'inverted_cdf' (a value that is there), not '${String(method)}': `
-      + 'the other methods of numpy and pandas cannot be written in SQL');
-  }
-  return percentileOperation(element, p, true, method === 'linear', label, discreteKind);
 }
 
 /**

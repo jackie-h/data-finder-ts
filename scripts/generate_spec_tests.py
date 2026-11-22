@@ -86,6 +86,8 @@ METHOD_NAMES = {
 # Result column labels that follow the TypeScript method name where it deliberately differs from Python's
 # (strip/lstrip/rstrip are trim/trimStart/trimEnd in TypeScript, see the idiomatic-naming refactor; fill_null is orElse).
 COLUMN_LABELS = {
+    'quantile_price_is_the_percentile_as_numpy_names_it': {'Quantile Price': 'Percentile Price'},
+    'quantile_price_by_inverted_cdf_is_a_value_that_is_there': {'Quantile Price': 'Percentile Price'},
     'strip': {'Strip Name': 'Trim Name'},
     'lstrip': {'Lstrip Name': 'Trim Start Name'},
     'rstrip': {'Rstrip Name': 'Trim End Name'},
@@ -428,6 +430,12 @@ class Translator:
             return 'new Date(Date.UTC(' + ', '.join(str(x) for x in [y, m - 1, d, *rest]) + '))'
         args = [self.expr(a) for a in node.args]
         name = method_name(func.attr)
+        if func.attr == 'quantile':   # the percentile as numpy names it: 'linear' interpolates, 'inverted_cdf' is a value that is there
+            methods = {k.arg: ast.literal_eval(k.value) for k in node.keywords}
+            if methods.get('method', 'linear') not in ('linear', 'inverted_cdf'):
+                raise NotImplementedError(f"quantile method {methods['method']}")
+            options = '' if methods.get('method', 'linear') == 'linear' else ', { continuous: false }'
+            return f'{self.expr(owner)}.percentile({args[0]}{options})'
         if func.attr == 'removeprefix':   # str.removeprefix on a parameter of the query
             (prefix,) = args
             return f'((s: string) => s.startsWith({prefix}) ? s.slice({prefix}.length) : s)({self.expr(owner)})'
