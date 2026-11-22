@@ -187,6 +187,6 @@ describe('an interval is written in the units ANSI has', () => {
   });
 
   it('a quarter, a day of the week and a day of the year are not a length of time', () => {
-    for (const unit of [DatePart.QUARTER, DatePart.DOW, DatePart.DOY]) expect(() => intervalString(1, unit)).toThrow(/not counted in/);
+    for (const unit of [DatePart.QUARTER, DatePart.ISODOW, DatePart.DOY]) expect(() => intervalString(1, unit)).toThrow(/not counted in/);
   });
 });
