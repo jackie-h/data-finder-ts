@@ -91,6 +91,11 @@ export abstract class CalendarFunctions {
 
   /** Number of whole days between this and `other`. */
   diffDays(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.functionInput(), diffOther(other), DatePart.DAY, 'Diff Days ' + this.functionLabel()); }
+  /**
+   * Number of weeks that start between this and `other`, as a week starts on a Monday: from a Sunday to the next day is 1, and from a
+   * Monday to the Sunday after it is 0. It is negative when `other` is earlier.
+   */
+  diffWeeks(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.functionInput(), diffOther(other), DatePart.WEEK, 'Diff Weeks ' + this.functionLabel()); }
   /** Number of whole months between this and `other`. */
   diffMonths(other: Date | Comparand): DateDiffOperation { return new DateDiffOperation(this.functionInput(), diffOther(other), DatePart.MONTH, 'Diff Months ' + this.functionLabel()); }
   /** Number of whole years between this and `other`. */

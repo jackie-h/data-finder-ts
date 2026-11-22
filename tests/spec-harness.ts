@@ -91,11 +91,10 @@ export async function runExpectation(
   backend: Backend = 'duckdb',
 ): Promise<void> {
   if (backend === 'duckdb') {
-    const sql = result.toSql(runner.dialect);
-    // the fragments are written in Postgres, where a double is DOUBLE PRECISION and DuckDB's is DOUBLE
-    const asWritten = (fragment: string) => fragment.replaceAll('DOUBLE PRECISION', 'DOUBLE');
-    if (expected.sql !== undefined) expect(sql).toContain(asWritten(expected.sql));
-    if (expected.unexpectedSql !== undefined) expect(sql).not.toContain(asWritten(expected.unexpectedSql));
+    // the fragments are of the SQL the finder writes, which is Postgres: each database it is translated for spells a few things its own way
+    const sql = result.toSql('postgres');
+    if (expected.sql !== undefined) expect(sql).toContain(expected.sql);
+    if (expected.unexpectedSql !== undefined) expect(sql).not.toContain(expected.unexpectedSql);
   }
 
   const rows = await result.toRows();

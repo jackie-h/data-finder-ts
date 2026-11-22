@@ -13,7 +13,7 @@ import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
 import { CORPUS, DIALECTS } from './dialect-corpus';
 import { constant } from '../src/datafinder';
 import { DATABRICKS, DUCKDB, POSTGRES, dialectOf, sortSuffix } from '../src/datafinder/dialect';
-import { toSql } from '../src/datafinder/sql-generator';
+import { intervalString, toSql } from '../src/datafinder/sql-generator';
 import { DateAttribute, DoubleAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
 import { Column, DatePart, NoOperation, SortOperation, Table } from '../src/model/relational';
 
@@ -117,7 +117,7 @@ describe('what differs', () => {
     expect(sql('postgres', days)).toContain("(CAST('2024-01-01 00:00:00' AS DATE) - CAST(t0.day AS DATE))");
   });
 
-  it.each([DatePart.MONTH, DatePart.YEAR, DatePart.QUARTER, DatePart.HOUR, DatePart.MINUTE, DatePart.SECOND])('Postgres differences in %s are written', unit => {
+  it.each([DatePart.MONTH, DatePart.YEAR, DatePart.HOUR, DatePart.MINUTE, DatePart.SECOND])('Postgres differences in %s are written', unit => {
     expect(POSTGRES.dateDiff(unit, 'a', 'b')).toMatch(/EXTRACT/);
     expect(POSTGRES.dateDiff(unit, 'a', 'b')).not.toContain('AGE');
   });
@@ -125,6 +125,7 @@ describe('what differs', () => {
   it('a difference in anything else is refused', () => {
     expect(() => POSTGRES.dateDiff(DatePart.MICROSECOND, 'a', 'b')).toThrow(/not MICROSECOND/);
     expect(() => POSTGRES.dateDiff(DatePart.DOW, 'a', 'b')).toThrow(/not DOW/);
+    expect(() => POSTGRES.dateDiff(DatePart.QUARTER, 'a', 'b')).toThrow(/not QUARTER/);
   });
 
 });
@@ -174,5 +175,18 @@ describe('the corpus', () => {
     const path = process.env.DIALECT_CORPUS!;
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(out, null, 2));
+  });
+});
+
+describe('an interval is written in the units ANSI has', () => {
+  it('a week is 7 days and a microsecond a millionth of a second', () => {
+    expect(intervalString(2, DatePart.WEEK)).toBe("INTERVAL '14' DAY");
+    expect(intervalString(5, DatePart.MICROSECOND)).toBe("INTERVAL '0.000005' SECOND");
+    expect(intervalString(-1_500_000, DatePart.MICROSECOND)).toBe("INTERVAL '-1.500000' SECOND");
+    expect(intervalString(3, DatePart.HOUR)).toBe("INTERVAL '3' HOUR");
+  });
+
+  it('a quarter, a day of the week and a day of the year are not a length of time', () => {
+    for (const unit of [DatePart.QUARTER, DatePart.DOW, DatePart.DOY]) expect(() => intervalString(1, unit)).toThrow(/not counted in/);
   });
 });

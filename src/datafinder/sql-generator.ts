@@ -268,17 +268,16 @@ function isCondition(op: unknown): boolean {
 }
 
 /**
- * `INTERVAL '5' DAY` in the units ANSI has (YEAR, MONTH, DAY, HOUR, MINUTE, SECOND): a week is 7 days, a quarter 3 months and a microsecond a
- * millionth of a second.
+ * `INTERVAL '5' DAY` in the units ANSI has (YEAR, MONTH, DAY, HOUR, MINUTE, SECOND): a week is 7 days and a microsecond a millionth of a
+ * second.
  */
 export function intervalString(n: number, unit: DatePart): string {
   if (unit === DatePart.WEEK) { n *= 7; unit = DatePart.DAY; }
-  else if (unit === DatePart.QUARTER) { n *= 3; unit = DatePart.MONTH; }
   else if (unit === DatePart.MICROSECOND) {
     const sign = n < 0 ? '-' : '';
     const whole = Math.trunc(Math.abs(n) / 1_000_000);
     return `INTERVAL '${sign}${whole}.${String(Math.abs(n) % 1_000_000).padStart(6, '0')}' SECOND`;
-  } else if (unit === DatePart.DOW || unit === DatePart.DOY) {
+  } else if (unit === DatePart.QUARTER || unit === DatePart.DOW || unit === DatePart.DOY) {
     throw new Error(`A length of time is not counted in ${unit}`);
   }
   return `INTERVAL '${n}' ${unit}`;
