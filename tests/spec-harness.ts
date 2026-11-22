@@ -91,9 +91,8 @@ export async function runExpectation(
   backend: Backend = 'duckdb',
 ): Promise<void> {
   if (backend === 'duckdb') {
-    // the Python specs' fragments leave null placement to the database; the dialects write it out to match Postgres
-    const sql = result.toSql(runner.dialect).replace(/ NULLS (FIRST|LAST)/g, '');
-    // and are written in Postgres, where a double is DOUBLE PRECISION and DuckDB's is DOUBLE
+    const sql = result.toSql(runner.dialect);
+    // the fragments are written in Postgres, where a double is DOUBLE PRECISION and DuckDB's is DOUBLE
     const asWritten = (fragment: string) => fragment.replaceAll('DOUBLE PRECISION', 'DOUBLE');
     if (expected.sql !== undefined) expect(sql).toContain(asWritten(expected.sql));
     if (expected.unexpectedSql !== undefined) expect(sql).not.toContain(asWritten(expected.unexpectedSql));

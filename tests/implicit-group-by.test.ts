@@ -130,13 +130,13 @@ describe('orgchart against DuckDB', () => {
   it('an explicit groupBy is used as given', async () => {
     const rows = await f.findAll([f.manager().name(), f.id().count()])
       .groupBy(f.manager().name()).orderBy(f.manager().name().ascending()).toRows();
-    expect(counts(rows)).toEqual([['Alice', 2], ['Bob', 1], [null, 1]]);
+    expect(counts(rows)).toEqual([[null, 1], ['Alice', 2], ['Bob', 1]]);
   });
 
   it('an aggregate over a to-one association groups by the plain columns', async () => {
     const query = f.findAll([f.manager().name(), f.id().count()]).orderBy(f.manager().name().ascending());
     expect(query.toSql()).toContain('GROUP BY t1.name');
-    expect(counts(await query.toRows())).toEqual([['Alice', 2], ['Bob', 1], [null, 1]]);
+    expect(counts(await query.toRows())).toEqual([[null, 1], ['Alice', 2], ['Bob', 1]]);
   });
 });
 

@@ -44,7 +44,7 @@ describe('pushing filters, sorts and limits', () => {
 
   it('pushes a nested sort as nested objects', () => {
     expect(buildServerArgs(undefined, [name().ascending()], undefined, CONVENTION))
-      .toEqual(['order_by: [{ account: { name: asc } }]']);
+      .toEqual(['order_by: [{ account: { name: asc_nulls_first } }]']);
   });
 
   it('pushes a string prefix as like', () => {

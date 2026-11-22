@@ -61,7 +61,7 @@ export const JOIN_CONDITIONS_PERSON_FINDER_SPECS: SpecCase<PersonFinder>[] = [
   },
   {
     name: 'a_condition_on_one_hop_of_a_property_mapped_through_another_table',
-    query: (f: any) => f.findAll([f.id(), f.activeFirms().legalName()]).orderBy(f.id().ascending(), f.activeFirms().legalName().ascending()),
+    query: f => f.findAll([f.id(), f.activeFirms().legalName()]).orderBy(f.id().ascending(), f.activeFirms().legalName().ascending()),
     expected: { columns: ['Id', 'Activefirms LegalName'], rows: [
         [1, null],
         [1, 'Alpha'],
@@ -70,7 +70,7 @@ export const JOIN_CONDITIONS_PERSON_FINDER_SPECS: SpecCase<PersonFinder>[] = [
         [4, 'Beta'],
         [5, null],
         [6, null],
-      ], sql: 'ON (t0.id = t2.person_id) LEFT OUTER JOIN org.firms AS t1 ON (t2.firm_id = t1.id AND t2.active = 1)', skipGraphql: 'The GraphQL finder reads no join conditions', skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
+      ], sql: 'ON (t0.id = t2.person_id) LEFT OUTER JOIN org.firms AS t1 ON (t2.firm_id = t1.id AND t2.active = 1)', skipGraphql: 'The GraphQL finder reads no join conditions' },
   },
 ];
 

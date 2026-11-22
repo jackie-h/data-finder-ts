@@ -23,7 +23,7 @@ describe('the SQL', () => {
   it('offset alone', () => { expect(sql([], undefined, 5)).toMatch(/FROM t AS t0 OFFSET 5$/); });
   it('limit then offset', () => { expect(sql([], 2, 1)).toMatch(/FROM t AS t0 LIMIT 2 OFFSET 1$/); });
   it('offset after order by', () => {
-    expect(sql([attr.ascending()], 3, 2)).toMatch(/ORDER BY t0\.id ASC LIMIT 3 OFFSET 2$/);
+    expect(sql([attr.ascending()], 3, 2)).toMatch(/ORDER BY t0\.id ASC NULLS FIRST LIMIT 3 OFFSET 2$/);
   });
   it('no offset by default', () => { expect(sql([], 2, undefined)).not.toContain('OFFSET'); });
 });

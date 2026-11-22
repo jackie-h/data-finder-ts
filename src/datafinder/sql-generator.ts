@@ -85,7 +85,7 @@ import { View, ViewDefinitionError } from '../model/view';
 import { DateAttribute, DateTimeAttribute } from './typed-attributes';
 import { StringFunctionOperation } from './scalar-functions';
 import { toSnakeCase } from './naming';
-import { DialectName, SqlDialect, dialectOf } from './dialect';
+import { DialectName, SqlDialect, dialectOf, sortSuffix } from './dialect';
 
 class TableAliasColumn extends RelationalOperationElement {
   constructor(readonly column: Column, readonly tableAlias: TableAlias) { super(); }
@@ -224,7 +224,7 @@ function windowSpecToString(window: WindowSpecification, d: SqlDialect): string 
   }
   if (window.orderBy.length > 0) {
     parts.push('ORDER BY ' + window.orderBy.map(s =>
-      sqlOperationToString(s.column, d) + d.orderDirection(s.direction),
+      sqlOperationToString(s.column, d) + sortSuffix(s),
     ).join(', '));
   }
   return 'OVER (' + parts.join(' ') + ')';
@@ -310,7 +310,7 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
     let sql = d.stringAgg(
       sqlOperationToString(operation.element, d),
       d.stringLiteral(operation.separator ?? ''),
-      operation.orderBy.map(s => sqlOperationToString(s.column, d) + d.orderDirection(s.direction)),
+      operation.orderBy.map(s => sqlOperationToString(s.column, d) + sortSuffix(s)),
     );
     if (operation.window !== undefined) sql += ' ' + windowSpecToString(operation.window, d);
     return sql;
@@ -1003,7 +1003,7 @@ function ownSorts(query: OrderedQuerySpecification, alias: TableAlias, sorts: re
     if (found === undefined) {
       throw new Error(`The rows after a limit or an offset are ordered by the columns of the result: ${JSON.stringify(query.columns.map(columnName))} (result.column('name').ascending())`);
     }
-    return new SortOperation(new ColumnWithJoin(alias.column(columnName(found), columnType(found)), undefined), sort.direction);
+    return new SortOperation(new ColumnWithJoin(alias.column(columnName(found), columnType(found)), undefined), sort.direction, sort.nullsFirst);
   });
 }
 
@@ -1136,7 +1136,7 @@ class SQLQueryGenerator {
       this._having = this.buildFilter(query.having);
     }
     this._orderByParts = (ordered?.orderBy ?? []).map(s =>
-      this._sortExpression(s.column) + this._dialect.orderDirection(s.direction),
+      this._sortExpression(s.column) + sortSuffix(s),
     );
     this._limit = ordered?.limit;
     this._distinct = query.distinct;
@@ -1173,7 +1173,8 @@ class SQLQueryGenerator {
   /** What a sort orders by: a column, or an expression such as an aggregate. */
   private _sortExpression(expression: RelationalOperationElement): string {
     if (expression instanceof Alias) return this._dialect.quoteIdentifier(expression.name);   // a column of the select, by the name it is given there
-    if (expression instanceof ColumnWithJoin || expression instanceof Attribute) return this.buildFilter(expression);
+    if (expression instanceof Attribute) return this.buildFilter(expression.cwj());
+    if (expression instanceof ColumnWithJoin) return this.buildFilter(expression);
     return sqlOperationToString(this._rewriteOperation(expression), this._dialect);
   }
 
@@ -1263,7 +1264,7 @@ class SQLQueryGenerator {
 
   private _rewriteWindowSpec(window: WindowSpecification): WindowSpecification {
     const partitionBy = window.partitionBy.map(p => this._rewriteOperation(p));
-    const orderBy = window.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column) as ColumnWithJoin, s.direction));
+    const orderBy = window.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column) as ColumnWithJoin, s.direction, s.nullsFirst));
     return new WindowSpecification(partitionBy, orderBy);
   }
 
@@ -1280,7 +1281,7 @@ class SQLQueryGenerator {
       return new AggregateOperation(
         this._rewriteOperation(op.element), op.operator, op.displayName,
         op.window ? this._rewriteWindowSpec(op.window) : undefined,
-        op.separator, op.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column), s.direction)),
+        op.separator, op.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column), s.direction, s.nullsFirst)),
         op.percentile, op.fromLargest,
       );
     }
@@ -1389,7 +1390,7 @@ class SQLQueryGenerator {
       const rewrittenAgg = new AggregateOperation(
         new TableAliasColumn(colNested.column, ta), col.operator, undefined,
         col.window ? this._rewriteWindowSpec(col.window) : undefined,
-        col.separator, col.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column), s.direction)),
+        col.separator, col.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column), s.direction, s.nullsFirst)),
         col.percentile, col.fromLargest,
       );
       this._select.push(new Alias(rewrittenAgg, alias));

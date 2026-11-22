@@ -51,12 +51,12 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'join_per_group_in_an_order',
-    query: (f: any) => f.findAll([f.category(), f.name().join(', ', [f.name().ascending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.category(), f.name().join(', ', [f.name().ascending()])]).groupBy(f.category()).orderBy(f.category().ascending()),
     expected: { columns: ['Category', 'Join Name'], rows: [
         ['Finance', 'Delta Ltd, Gamma LLC'],
         ['Manufacturing', 'Acme Industries'],
         ['Technology', 'Acme Corp, Beta Corp'],
-      ], sql: 'STRING_AGG(t0.name, \', \' ORDER BY t0.name ASC NULLS FIRST)', skipGraphql: 'The GraphQL engine cannot order the values it joins', skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
+      ], sql: 'STRING_AGG(t0.name, \', \' ORDER BY t0.name ASC NULLS FIRST)', skipGraphql: 'The GraphQL engine cannot order the values it joins' },
   },
   {
     name: 'join_descending',
@@ -314,12 +314,12 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'sort_by_an_aggregate_descending_then_a_column',
-    query: (f: any) => f.findAll([f.category(), f.id().count()]).groupBy(f.category()).orderBy(f.id().count().descending(), f.category().ascending()),
+    query: f => f.findAll([f.category(), f.id().count()]).groupBy(f.category()).orderBy(f.id().count().descending(), f.category().ascending()),
     expected: { columns: ['Category', 'Id Count'], rows: [
         ['Finance', 2],
         ['Technology', 2],
         ['Manufacturing', 1],
-      ], sql: 'ORDER BY COUNT(t0.id) DESC NULLS LAST, t0.category ASC NULLS FIRST', skipGraphql: 'The GraphQL finder has no count() yet', skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
+      ], sql: 'ORDER BY COUNT(t0.id) DESC NULLS LAST, t0.category ASC NULLS FIRST', skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'sort_by_an_aggregate_ascending',
@@ -688,14 +688,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'chained_order_by_makes_the_later_sort_primary',
-    query: (f: any) => f.findAll([f.name(), f.category()]).orderBy(f.name().ascending()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.name(), f.category()]).orderBy(f.name().ascending()).orderBy(f.category().ascending()),
     expected: { columns: ['Name', 'Category'], rows: [
         ['Delta Ltd', 'Finance'],
         ['Gamma LLC', 'Finance'],
         ['Acme Industries', 'Manufacturing'],
         ['Acme Corp', 'Technology'],
         ['Beta Corp', 'Technology'],
-      ], sql: 'ORDER BY t0.category ASC NULLS FIRST, t0.name ASC NULLS FIRST', skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
+      ], sql: 'ORDER BY t0.category ASC NULLS FIRST, t0.name ASC NULLS FIRST' },
   },
   {
     name: 'chained_order_by_replaces_the_direction_of_a_column_sorted_again',
@@ -710,14 +710,14 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'chained_order_by_of_three_calls',
-    query: (f: any) => f.findAll([f.id(), f.name(), f.category()]).orderBy(f.id().ascending()).orderBy(f.name().descending()).orderBy(f.category().ascending()),
+    query: f => f.findAll([f.id(), f.name(), f.category()]).orderBy(f.id().ascending()).orderBy(f.name().descending()).orderBy(f.category().ascending()),
     expected: { columns: ['Id', 'Name', 'Category'], rows: [
         [4, 'Gamma LLC', 'Finance'],
         [5, 'Delta Ltd', 'Finance'],
         [2, 'Acme Industries', 'Manufacturing'],
         [3, 'Beta Corp', 'Technology'],
         [1, 'Acme Corp', 'Technology'],
-      ], sql: 'ORDER BY t0.category ASC NULLS FIRST, t0.name DESC NULLS LAST, t0.id ASC NULLS FIRST', skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
+      ], sql: 'ORDER BY t0.category ASC NULLS FIRST, t0.name DESC NULLS LAST, t0.id ASC NULLS FIRST' },
   },
   {
     name: 'sort_by_category_asc_name_desc',

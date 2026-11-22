@@ -26,7 +26,7 @@ describe('the SQL', () => {
 
   it('in an order', () => {
     expect(sql([a.join(' ', [b.descending(), a.ascending()])]))
-      .toBe(`SELECT STRING_AGG(t0.a, ' ' ORDER BY t0.b DESC, t0.a ASC) AS "Join A" FROM t AS t0`);
+      .toBe(`SELECT STRING_AGG(t0.a, ' ' ORDER BY t0.b DESC NULLS LAST, t0.a ASC NULLS FIRST) AS "Join A" FROM t AS t0`);
   });
 
   it('a quote in the separator does not end it', () => {
@@ -66,7 +66,7 @@ describe('against DuckDB', () => {
   it('per group in an order', async () => {
     const query = f.findAll([f.category(), f.name().join(', ', [f.name().ascending()])])
       .groupBy(f.category()).orderBy(f.category().ascending());
-    expect(query.toSql()).toContain("STRING_AGG(t0.name, ', ' ORDER BY t0.name ASC)");
+    expect(query.toSql()).toContain("STRING_AGG(t0.name, ', ' ORDER BY t0.name ASC NULLS FIRST)");
     expect(await query.toRows()).toEqual([
       ['Finance', 'Delta Ltd, Gamma LLC'],
       ['Manufacturing', 'Acme Industries'],

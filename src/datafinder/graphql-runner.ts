@@ -192,6 +192,11 @@ function opToWhereClause(op: RelationalOperationElement | null | undefined): str
   throw new GraphQLPushdownError(`Cannot push ${op.constructor.name} to the server`);
 }
 
+/** The direction of a sort and where a missing value goes, as Hasura's `order_by` says it: `asc_nulls_first`, `desc_nulls_last`. */
+export function hasuraDirection(so: SortOperation): string {
+  return (so.direction === SortDirection.ASC ? 'asc' : 'desc') + (so.nullsFirst ? '_nulls_first' : '_nulls_last');
+}
+
 /** Translate the sorts to a GraphQL order-by array. Throws if any part cannot be expressed. */
 function toOrderByClause(orderBy: SortOperation[] | undefined): string | null {
   if (!orderBy || orderBy.length === 0) return null;
@@ -203,7 +208,7 @@ function toOrderByClause(orderBy: SortOperation[] | undefined): string | null {
       throw new GraphQLPushdownError(
         'Cannot push a sort on a to-many relation to the server: select the column too');
     }
-    return nest(fieldName(so.column, 'a sort'), so.direction === SortDirection.ASC ? 'asc' : 'desc');
+    return nest(fieldName(so.column, 'a sort'), hasuraDirection(so));
   });
   return `[${parts.join(', ')}]`;
 }
@@ -317,10 +322,13 @@ export function sortExpanded(rows: FlatRow[], orderBy: SortOperation[]): FlatRow
     if (!rows.some(r => field in r)) {
       throw new GraphQLUnsupportedError('Rows expanded by a to-many relation can only be sorted by selected columns');
     }
-    return { field, sign: so.direction === SortDirection.ASC ? 1 : -1 };
+    return { field, sign: so.direction === SortDirection.ASC ? 1 : -1, nullsFirst: so.nullsFirst };
   });
   return [...rows].sort((a, b) => {
-    for (const { field, sign } of keys) {
+    for (const { field, sign, nullsFirst } of keys) {
+      // a missing value goes where the sort says, whichever way the values go
+      const missing = (a[field] == null ? 1 : 0) - (b[field] == null ? 1 : 0);
+      if (missing !== 0) return nullsFirst ? -missing : missing;
       const c = compareValues(a[field], b[field]);
       if (c !== 0) return sign * c;
     }

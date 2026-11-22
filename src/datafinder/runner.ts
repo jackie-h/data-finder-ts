@@ -537,7 +537,7 @@ export class FinderResult {
    * Rows that are already dropped or taken are ordered after that, as a step over them.
    */
   orderBy(...given: SortOperation[]): FinderResult {
-    const sorts = given.map(s => new SortOperation(this._own(s.column) as RelationalOperationElement, s.direction));
+    const sorts = given.map(s => new SortOperation(this._own(s.column) as RelationalOperationElement, s.direction, s.nullsFirst));
     const source = this._query.table;
     if (source instanceof TableAlias && source.name.startsWith('relation')) {   // a step over a result, not over a mapped query
       for (const sort of sorts) {

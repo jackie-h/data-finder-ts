@@ -15,14 +15,14 @@ const selects = (result: FinderResult) => (result.toSql().match(/SELECT/g) ?? []
 
 describe('a step that comes next is folded into the select before it', () => {
   const cases: [string, (r: FinderResult) => FinderResult, string][] = [
-    ['order', r => r.orderBy(ID.ascending()), 'ORDER BY t0.ID ASC'],
-    ['order then limit', r => r.orderBy(ID.ascending()).limit(3), 'ORDER BY t0.ID ASC LIMIT 3'],
-    ['order then offset then limit', r => r.orderBy(ID.ascending()).offset(1).limit(3), 'ORDER BY t0.ID ASC LIMIT 3 OFFSET 1'],
+    ['order', r => r.orderBy(ID.ascending()), 'ORDER BY t0.ID ASC NULLS FIRST'],
+    ['order then limit', r => r.orderBy(ID.ascending()).limit(3), 'ORDER BY t0.ID ASC NULLS FIRST LIMIT 3'],
+    ['order then offset then limit', r => r.orderBy(ID.ascending()).offset(1).limit(3), 'ORDER BY t0.ID ASC NULLS FIRST LIMIT 3 OFFSET 1'],
     ['offset then limit', r => r.offset(1).limit(3), 'LIMIT 3 OFFSET 1'],
     ['a limit then a smaller one', r => r.limit(5).limit(2), 'LIMIT 2'],
     ['a limit then a larger one', r => r.limit(2).limit(5), 'LIMIT 2'],
     ['an offset then another', r => r.offset(2).offset(3), 'OFFSET 5'],
-    ['distinct then order', r => r.distinct().orderBy(ID.ascending()), 'ORDER BY t0.ID ASC'],
+    ['distinct then order', r => r.distinct().orderBy(ID.ascending()), 'ORDER BY t0.ID ASC NULLS FIRST'],
   ];
   it.each(cases)('%s', (_label, steps, endsWith) => {
     const result = steps(rows());
@@ -56,14 +56,14 @@ describe('the steps of a query', () => {
     const takenThenSorted = rows().limit(3).orderBy(ID.descending()).toSql();
     const sortedThenTaken = rows().orderBy(ID.descending()).limit(3).toSql();
     expect(takenThenSorted).toContain('LIMIT 3) AS');
-    expect(takenThenSorted.endsWith('ORDER BY t0.id DESC')).toBe(true);
+    expect(takenThenSorted.endsWith('ORDER BY t0.id DESC NULLS LAST')).toBe(true);
     expect((sortedThenTaken.match(/SELECT/g) ?? []).length).toBe(1);
-    expect(sortedThenTaken.endsWith('ORDER BY t0.ID DESC LIMIT 3')).toBe(true);
+    expect(sortedThenTaken.endsWith('ORDER BY t0.ID DESC NULLS LAST LIMIT 3')).toBe(true);
   });
 
   it('a sort after a limit is of the columns the result shows', () => {
     expect(() => rows(ID).limit(3).orderBy(NAME.ascending())).toThrow(/ordered by the columns of the result/);
-    expect(rows(ID, NAME).limit(3).orderBy(NAME.ascending()).toSql().endsWith('ORDER BY t0.name ASC')).toBe(true);
+    expect(rows(ID, NAME).limit(3).orderBy(NAME.ascending()).toSql().endsWith('ORDER BY t0.name ASC NULLS FIRST')).toBe(true);
   });
 
   it('a step leaves the result it is written after as it was', () => {
@@ -93,7 +93,7 @@ describe('the steps of a query', () => {
     const base = rows();
     const ordered = base.orderBy(base.column('id').descending());
     expect(selects(ordered)).toBe(1);
-    expect(ordered.toSql().endsWith('ORDER BY t0.ID DESC')).toBe(true);
+    expect(ordered.toSql().endsWith('ORDER BY t0.ID DESC NULLS LAST')).toBe(true);
   });
 
   it('group by and having come before the steps that follow them', () => {

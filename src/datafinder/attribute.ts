@@ -8,6 +8,8 @@ import {
   AggregateOperator,
   ColumnWithJoin,
   SortOperation,
+  SortOptions,
+  nullsFirst,
   SortDirection,
   IsNullOperation,
   IsNotNullOperation,
@@ -122,14 +124,20 @@ export abstract class Attribute implements Aliasable {
   /** @internal The label of an `orElse` result. */
   protected orElseLabel(): string { return 'Or Else ' + this._displayName; }
 
-  /** Sort this attribute in ascending order. Pass to `orderBy` or a window function's `orderBy`. */
-  ascending(): SortOperation {
-    return new SortOperation(this.cwj(), SortDirection.ASC);
+  /**
+   * Sort this attribute in ascending order. Pass to `orderBy` or a window function's `orderBy`. A missing value is the smallest value, so
+   * it comes first, unless `nulls` is `'last'`.
+   */
+  ascending(options?: SortOptions): SortOperation {
+    return new SortOperation(this.cwj(), SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls));
   }
 
-  /** Sort this attribute in descending order. Pass to `orderBy` or a window function's `orderBy`. */
-  descending(): SortOperation {
-    return new SortOperation(this.cwj(), SortDirection.DESC);
+  /**
+   * Sort this attribute in descending order. Pass to `orderBy` or a window function's `orderBy`. A missing value is the smallest value,
+   * so it comes last, unless `nulls` is `'first'`.
+   */
+  descending(options?: SortOptions): SortOperation {
+    return new SortOperation(this.cwj(), SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls));
   }
 
   /** Filter to rows where this attribute has no value. */

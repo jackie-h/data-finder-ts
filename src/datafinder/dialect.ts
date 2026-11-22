@@ -5,7 +5,7 @@
  * Only what differs is here. Everything the databases share (joins, CASE, window functions, COUNT(DISTINCT), LIKE ...
  * ESCAPE, `||`, typed date literals, `INTERVAL '7' DAY`, ...) is written once by the generator.
  */
-import { DatePart, SortDirection } from '../model/relational';
+import { DatePart, SortDirection, SortOperation } from '../model/relational';
 
 export type DialectName = 'postgres' | 'duckdb' | 'databricks';
 
@@ -17,12 +17,6 @@ export interface SqlDialect {
 
   /** A string as a literal that can never end early, whatever it holds. */
   stringLiteral(value: string): string;
-
-  /**
-   * ` ASC` or ` DESC`, with the null placement spelled out where the database's default differs from Postgres
-   * (nulls last when ascending, first when descending), so a sort gives the same order everywhere.
-   */
-  orderDirection(direction: SortDirection): string;
 
   /** The type a float constant is cast to, so it comes back as a double and not a decimal. */
   readonly doubleType: string;
@@ -48,11 +42,18 @@ const quoted = (value: string): string => "'" + value.replaceAll("'", "''") + "'
 
 const SECONDS_PER: Partial<Record<DatePart, number>> = { [DatePart.HOUR]: 3600, [DatePart.MINUTE]: 60, [DatePart.SECOND]: 1 };
 
+/**
+ * ` ASC` or ` DESC` and where a missing value goes, written every time. The SQL is Postgres, where a missing value is the largest, and each
+ * database has a default of its own, so the sort says it and the same rows come in the same order everywhere.
+ */
+export function sortSuffix(sort: SortOperation): string {
+  return (sort.direction === SortDirection.ASC ? ' ASC' : ' DESC') + (sort.nullsFirst ? ' NULLS FIRST' : ' NULLS LAST');
+}
+
 export const POSTGRES: SqlDialect = {
   name: 'postgres',
   quoteIdentifier: doubleQuoted,
   stringLiteral: quoted,
-  orderDirection: direction => (direction === SortDirection.ASC ? ' ASC' : ' DESC'),
   doubleType: 'DOUBLE PRECISION',
   dayOfWeek: expression => `EXTRACT(DOW FROM ${expression})`,
   isoDayOfWeek: expression => `EXTRACT(ISODOW FROM ${expression})`,
@@ -86,8 +87,6 @@ export const POSTGRES: SqlDialect = {
 export const DUCKDB: SqlDialect = {
   ...POSTGRES,
   name: 'duckdb',
-  // DuckDB sorts nulls last whichever way the sort goes
-  orderDirection: direction => (direction === SortDirection.ASC ? ' ASC' : ' DESC NULLS FIRST'),
   doubleType: 'DOUBLE',
   regexMatches: (expression, pattern) => `REGEXP_MATCHES(${expression}, ${pattern})`,
 };
@@ -99,8 +98,6 @@ export const DATABRICKS: SqlDialect = {
   // a backslash starts an escape in a Databricks string literal, and a doubled quote is not one: Spark reads
   // 'it''s' as the two literals 'it' and 's' and joins them, losing the quote. A quote is escaped with a backslash.
   stringLiteral: value => "'" + value.replaceAll('\\', '\\\\').replaceAll("'", "\\'") + "'",
-  // Databricks sorts nulls first when ascending, last when descending
-  orderDirection: direction => (direction === SortDirection.ASC ? ' ASC NULLS LAST' : ' DESC NULLS FIRST'),
   doubleType: 'DOUBLE',
   // DAYOFWEEK is 1 = Sunday through 7 = Saturday
   dayOfWeek: expression => `(DAYOFWEEK(${expression}) - 1)`,

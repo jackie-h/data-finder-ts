@@ -302,21 +302,21 @@ export const ORGCHART_AGGREGATE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'explicit_group_by_is_used_as_given',
-    query: (f: any) => f.findAll([f.manager().name(), f.id().count()]).groupBy(f.manager().name()).orderBy(f.manager().name().ascending()),
+    query: f => f.findAll([f.manager().name(), f.id().count()]).groupBy(f.manager().name()).orderBy(f.manager().name().ascending()),
     expected: { columns: ['Manager Name', 'Id Count'], rows: [
         [null, 1],
         ['Alice', 2],
         ['Bob', 1],
-      ], skipGraphql: 'The GraphQL finder has no count() yet', skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
+      ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'aggregate_over_a_to_one_association_groups_by_the_plain_columns',
-    query: (f: any) => f.findAll([f.manager().name(), f.id().count()]).orderBy(f.manager().name().ascending()),
+    query: f => f.findAll([f.manager().name(), f.id().count()]).orderBy(f.manager().name().ascending()),
     expected: { columns: ['Manager Name', 'Id Count'], rows: [
         [null, 1],
         ['Alice', 2],
         ['Bob', 1],
-      ], sql: 'GROUP BY t1.name', skipGraphql: 'The GraphQL finder has no count() yet', skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
+      ], sql: 'GROUP BY t1.name', skipGraphql: 'The GraphQL finder has no count() yet' },
   },
 ];
 
