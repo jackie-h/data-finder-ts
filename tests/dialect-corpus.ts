@@ -48,7 +48,7 @@ export const CORPUS: Record<string, Query> = {
   'conditions as columns': q([n.gt(3).alias('Big'), text.isNull().alias('Missing')]),
   'case when': q([when(n.lt(2)).then('low').when(n.lt(4)).then('mid').otherwise('high')]),
   'constants': q([constant('x'), constant(1), constant(1.5), constant(true), constant(new DateOnly('2016-08-10')), constant(new Date('2016-08-10T08:55:00Z'))]),
-  'extract': q([day.year(), day.month(), day.day(), day.quarter(), day.week(), day.dayOfWeek(), at.hour(), at.minute(), at.second()]),
+  'extract': q([day.year(), day.month(), day.day(), day.quarter(), day.weekOfYear(), day.dayOfWeek(), at.hour(), at.minute(), at.second()]),
   'date truncation': q([day.firstDayOfWeek(), day.firstDayOfMonth(), day.firstDayOfQuarter(), day.firstDayOfYear()]),
   'date arithmetic': q([day.addDays(7), day.subtractMonths(2), at.addHours(6), at.subtractMinutes(15)]),
   'date differences': q([day.diffDays(new Date('2024-01-01')), day.diffMonths(new Date('2024-01-01')), day.diffYears(new Date('2024-01-01')),

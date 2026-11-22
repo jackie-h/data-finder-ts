@@ -39,10 +39,10 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'week_extract',
-    query: (f: any) => f.findAll([f.tradeDate().weekOfYear()], f.id().eq(1)),
+    query: f => f.findAll([f.tradeDate().weekOfYear()], f.id().eq(1)),
     expected: { columns: ['Week Of Year Trade Date'], rows: [
         [11],
-      ], skip: 'week_of_year is not ported yet (data-finder #288)' },
+      ] },
   },
   {
     name: 'a_condition_that_is_a_column_of_a_result_is_a_boolean_that_can_be_tested_in_a_list',
