@@ -113,8 +113,8 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'quantile_price_is_the_percentile_as_numpy_names_it',
-    query: f => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.9)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
-    expected: { columns: ['Account Name', 'Percentile Price'], rows: [
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().quantile(0.9)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
+    expected: { columns: ['Account Name', 'Quantile Price'], rows: [
         ['Alpha Fund', 190.0],
         ['Beta Fund', 390.0],
         ['Gamma Fund', 500.0],
@@ -122,8 +122,8 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'quantile_price_by_inverted_cdf_is_a_value_that_is_there',
-    query: f => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.9, { continuous: false })]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
-    expected: { columns: ['Account Name', 'Percentile Price'], rows: [
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().quantile(0.9, { method: 'inverted_cdf' })]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
+    expected: { columns: ['Account Name', 'Quantile Price'], rows: [
         ['Alpha Fund', 200.0],
         ['Beta Fund', 400.0],
         ['Gamma Fund', 500.0],
