@@ -25,9 +25,6 @@ if __name__ == '__main__':
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src', 'mappings')
     for mapping_file in _MAPPINGS:
         mapping = load(os.path.join(_EXAMPLES_DIR, mapping_file))
-        # A vector column is not ported yet (data-finder #302): its finder is left out. Delete this with the port.
-        for rcm in mapping.mappings:
-            rcm.property_mappings = [pm for pm in rcm.property_mappings if getattr(pm.property.type, 'name', None) != 'Vector']
         name = mapping_file.replace('.md', '').replace('_mapping', '')
         out_dir = os.path.join(root, name)
         os.makedirs(out_dir, exist_ok=True)

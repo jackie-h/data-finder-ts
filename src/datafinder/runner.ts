@@ -24,7 +24,9 @@ import {
   Column,
   ConstantOperation,
   ArithmeticOperation,
+  ScalarFunction,
   ScalarFunctionOperation,
+  VECTOR_METRICS,
   ComparisonOperation,
   LogicalOperation,
   Operation,
@@ -549,6 +551,22 @@ export class FinderResult {
       }
     }
     return this._then(sortedBy(this._query, sorts));
+  }
+
+  /**
+   * The `k` rows nearest to a vector: those with the smallest `cosineDistance` or `l2Distance` of a vector column, or the largest
+   * `innerProduct` (a similarity, so the nearest are the most similar), the nearest first. A row with no vector comes after all that
+   * have one. It is an exact search of the rows the query reads, and an engine may answer it from an approximate index:
+   *
+   *     f.findAll([f.name(), distance], f.category().eq('Technology')).nearest(distance, 10)
+   */
+  nearest(distance: ScalarFunctionOperation, k: number): FinderResult {
+    if (!(distance instanceof ScalarFunctionOperation) || !VECTOR_METRICS.has(distance.func)) {
+      throw new Error('nearest is of a cosineDistance, l2Distance or innerProduct of a vector column');
+    }
+    if (!(k >= 1)) throw new Error('nearest needs at least one row: k >= 1');
+    const largest = distance.func === ScalarFunction.INNER_PRODUCT;
+    return this.orderBy(largest ? distance.descending({ nulls: 'last' }) : distance.ascending({ nulls: 'last' })).limit(k);
   }
 
   /** The first `n` rows. Taking again takes from the rows taken. */

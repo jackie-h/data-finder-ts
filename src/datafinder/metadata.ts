@@ -5,7 +5,7 @@
  */
 
 /** A primitive property's type, as the model names it. */
-export type PropertyType = 'String' | 'Integer' | 'Float' | 'Double' | 'Decimal' | 'Boolean' | 'Date' | 'DateTime';
+export type PropertyType = 'String' | 'Integer' | 'Float' | 'Double' | 'Decimal' | 'Boolean' | 'Date' | 'DateTime' | 'Vector';
 
 export interface PropertyMetadata {
   id: string;

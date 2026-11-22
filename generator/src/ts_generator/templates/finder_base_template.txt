@@ -26,7 +26,7 @@ import type { {{source_rcm.clazz.name}}RelatedFinderBase, {{source_rcm.clazz.nam
 /** Property-equality filters accepted by the accessors that join to {{rcm.clazz.name}}, keyed by property id. */
 export interface {{rcm.clazz.name}}Filter {
 {% for rpm in rcm.property_mappings %}
-{% if is_primitive(rpm.property) %}
+{% if is_primitive(rpm.property) and rpm.property.type.name != 'Vector' %}
   {{rpm.property.id}}?: {{filter_ts_type(rpm.property)}};
 {% endif %}
 {% endfor %}

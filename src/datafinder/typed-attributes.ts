@@ -2,7 +2,7 @@ import { Attribute, AttributeValue, Comparand, comparandOperand } from './attrib
 import { DateFunctions, DateTimeFunctions } from './date-functions';
 import {
   NumericFunctions, StringFunctions, StringFunctionOperation, IntegerFunctionOperation, DoubleFunctionOperation,
-  DecimalFunctionOperation, DateFunctionOperation, BooleanFunctionOperation,
+  DecimalFunctionOperation, DateFunctionOperation, BooleanFunctionOperation, VectorFunctions,
 } from './scalar-functions';
 import { Relation, Operand, DateValue } from '../model/relational';
 import {
@@ -582,6 +582,43 @@ export class IntervalAttribute extends Attribute {
 export interface IntervalAttribute extends MinMax<IntervalAggregateOperation> {}
 applyMixins(IntervalAttribute, [MinMax]);
 
+/**
+ * A vector attribute: a column of embeddings, with a fixed number of numbers (`VECTOR(1536)`). It has no equality or order of its own; it is
+ * compared with a vector by its distance, which is a number of the query:
+ *
+ *     company.embedding().cosineDistance(query)   // 1 - a . b / (|a| |b|)
+ *     company.embedding().l2Distance(query)       // |a - b|
+ *     company.embedding().innerProduct(query)     // a . b
+ */
+export class VectorAttribute extends Attribute {
+  private readonly _dimension?: number;
+
+  constructor(
+    displayName: string,
+    columnName: string,
+    columnDbType: string,
+    owner: Relation,
+    parent?: JoinTreeNodeOperation,
+    embedded?: Attribute,
+    nullable: boolean = true,
+    optional: boolean = false,
+  ) {
+    super(displayName, columnName, columnDbType, owner, parent, embedded, nullable, optional);
+    const size = columnDbType.includes('(') ? columnDbType.slice(columnDbType.indexOf('(') + 1, columnDbType.indexOf(')')) : '';
+    this._dimension = /^\d+$/.test(size) ? Number(size) : undefined;
+  }
+
+  /** The number of numbers in each vector of the column, or undefined if the column's type does not say. */
+  dimension(): number | undefined { return this._dimension; }
+
+  protected toConstant(): ConstantOperation {
+    throw new Error('A vector is compared by its distance to another: cosineDistance, l2Distance or innerProduct');
+  }
+}
+
+export interface VectorAttribute extends VectorFunctions {}
+applyMixins(VectorAttribute, [VectorFunctions]);
+
 export interface DateAttribute extends MinMax<DateAggregateOperation>, DateFunctions {}
 applyMixins(DateAttribute, [MinMax, DateFunctions]);
 
@@ -602,6 +639,7 @@ export function typedAttribute(name: string, dbType: string, owner: Relation): A
   else if (kind.startsWith('TIMESTAMP') || kind === 'DATETIME') factory = DateTimeAttribute;
   else if (['BOOLEAN', 'BOOL'].includes(kind)) factory = BooleanAttribute;
   else if (kind === 'INTERVAL') factory = IntervalAttribute;
+  else if (kind === 'VECTOR') factory = VectorAttribute;
   else factory = StringAttribute;
   return new factory(name, name, dbType, owner);
 }

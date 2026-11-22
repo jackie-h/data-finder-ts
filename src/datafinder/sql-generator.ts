@@ -24,6 +24,8 @@ import {
   AggregateOperator,
   ScalarFunctionOperation,
   ScalarFunction,
+  VectorValue,
+  VECTOR_METRICS,
   DateExtractOperation,
   DateArithmeticOperation,
   DateDiffOperation,
@@ -342,6 +344,11 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
     // the name of the day is spelled out, as there is no standard function for it
     const whens = DAY_NAMES.map((name, i) => `WHEN ${i + 1} THEN '${name}'`).join(' ');
     return `CASE ${d.isoDayOfWeek(sqlOperationToString(operation.element, d))} ${whens} END`;
+  }
+  if (operation instanceof ScalarFunctionOperation && VECTOR_METRICS.has(operation.func)) {
+    const [vector] = operation.extraArgs;
+    if (!(vector instanceof VectorValue)) throw new Error(`${operation.func} compares a vector column with a vector`);
+    return d.vectorDistance(operation.func, sqlOperationToString(operation.element, d), vector);
   }
   if (operation instanceof ScalarFunctionOperation) {
     const fn = SCALAR_SQL_NAMES[operation.func]!;
