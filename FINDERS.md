@@ -82,20 +82,20 @@ tf.findAll(null, null, [tf.symbol().alias('Symbol')]).orderBy(tf.symbol().descen
 // SELECT t0.sym AS `Symbol` FROM … ORDER BY t0.sym DESC NULLS FIRST
 ```
 
-The SQL the generator writes is Postgres, which is ANSI SQL wherever ANSI has the construct, as in Python: an interval is in the ANSI units (a week is 7 days, a quarter 3 months and a microsecond a millionth of a second), the name of a day is a `CASE` over its ISO number, and a difference between dates is written with `EXTRACT`, `DATE_TRUNC` and `CAST` and not a function of one database. A difference counts the boundaries crossed (a day is a change of date, an hour a change of hour, a month a change of month: January 31st to February 1st is one month) and whole weeks, as DuckDB's `DATE_DIFF` counts them; microseconds are refused. DuckDB runs the Postgres SQL as it is, apart from what the table below lists. Only what differs is written per dialect; everything the databases share is written once:
+The SQL the generator writes is Postgres, which is ANSI SQL wherever ANSI has the construct, as in Python: an interval is in the ANSI units (a week is 7 days and a microsecond a millionth of a second; a quarter is not a length of time), the name of a day is a `CASE` over its ISO number, and a difference between dates is written with `EXTRACT`, `DATE_TRUNC` and `CAST` and not a function of one database. A difference counts the boundaries crossed (a day is a change of date, an hour a change of hour, a month a change of month: January 31st to February 1st is one month, and a week is a change of week, which starts on a Monday); microseconds and quarters are refused. DuckDB runs the Postgres SQL as it is, apart from what the table below lists. Only what differs is written per dialect; everything the databases share is written once:
 
 | | Postgres | DuckDB | Databricks |
 |---|---|---|---|
 | a result column's name | `"Name"` | `"Name"` | `` `Name` `` |
 | a quote or backslash in a string | `'it''s'` | `'it''s'` | `'it\'s'` (a doubled quote would be lost, and `\` starts an escape) |
-| sort null placement | default | `DESC NULLS FIRST` | `ASC NULLS LAST` / `DESC NULLS FIRST` |
 | join a group's values | `STRING_AGG(x, ',' ORDER BY …)` | same | `LISTAGG(x, ',') WITHIN GROUP (ORDER BY …)` |
-| day of the week (0 = Sunday) | `EXTRACT(DOW FROM x)` | same | `(DAYOFWEEK(x) - 1)` |
+| ISO day of the week (Monday is 1) | `EXTRACT(ISODOW FROM x)` | same | `EXTRACT(DAYOFWEEK_ISO FROM x)` |
+| a distance of a vector | pgvector's `COSINE_DISTANCE(x, CAST(ARRAY[…] AS VECTOR(n)))` | `ARRAY_COSINE_DISTANCE` over a `FLOAT[n]`, cast to a double | arithmetic over `ARRAY<FLOAT>` |
 | `diffDays` and the others | `EXTRACT`, `DATE_TRUNC` and `CAST` | same | `DATEDIFF(DAY, a, b)` |
 | a regular expression | `x ~ p` | `REGEXP_MATCHES(x, p)` | `RLIKE` |
 | a selected float | `CAST(1.5 AS DOUBLE PRECISION)` | `CAST(1.5 AS DOUBLE)` | `CAST(1.5 AS DOUBLE)` |
 
-A sort puts nulls where Postgres does (last when ascending, first when descending) in every dialect, so the same query gives the same order everywhere. `npm run check:dialects` parses the SQL the finders write in each dialect with sqlglot and lists where it differs from what sqlglot would write; a parse is weak evidence, though, since sqlglot accepts constructs a database does not. The dates in a difference are counted the same way in every dialect.
+Every sort says where a missing value goes, `NULLS FIRST` or `NULLS LAST`, in every dialect (see [Sorting](#sorting)), so the same query gives the same order everywhere. `npm run check:dialects` parses the SQL the finders write in each dialect with sqlglot and lists where it differs from what sqlglot would write; a parse is weak evidence, though, since sqlglot accepts constructs a database does not. The dates in a difference are counted the same way in every dialect.
 
 ## Databricks
 
@@ -159,6 +159,10 @@ A numeric column or expression has `.sin()`, `.cos()`, `.tan()`, `.asin()`, `.ac
 
 `.power(n)` of an integer column by a whole, non-negative `n` is an integer (SQL's `POWER` gives a double, so it is written `CAST(POWER(id, 2) AS BIGINT)`); `abs`, `ceil`, `floor` and `mod` keep an integer an integer and so does `length()`. Any other power is a double.
 
+### A missing value in a comparison
+
+A missing value is different from any value, so a `ne` also matches it, whatever it compares: a column and a value (`f.category().ne('Finance')` is `category <> 'Finance' OR category IS NULL`), a function or expression of a column (`f.category().toUpperCase().ne('FINANCE')`), two columns (also true when one is missing and the other is not), and in a `having`. Two missing values are the same, so an `eq` of two columns that can be missing is also true when both are. `not()` of an equality is the other equality, and a `not()` over `and`/`or` is pushed in to what they join. The ordering comparisons (`lt`, `gt`, ...) are never true of a missing value. A count is never missing, so two counts compared are not widened.
+
 ### Comparing with another column
 
 A column's comparisons (`eq`, `ne`, `gt`, `lt`, `gte`, `lte`) take another column or an expression as well as a value: `tf.price().gt(tf.cost().times(1.075))`, `tf.commitDate().lt(tf.receiptDate())`. `ne` is on every type. The date differences (`diffDays`, `diffMonths`, `diffYears`, and `diffHours`, `diffMinutes` and `diffSeconds` on a timestamp) take a column too: `tf.startDate().diffDays(tf.endDate())`.
@@ -177,7 +181,7 @@ A numeric column, aggregate, number function or another calculation has `.plus()
 
 ### Today, now, and the days of the week
 
-`today()` and `now()` are the date and the time the query runs (`CURRENT_DATE`, `CURRENT_TIMESTAMP`): `pf.tradeDate().lt(today())`, `pf.settledAt().lt(now())`. They have the functions of a date and a timestamp, and `firstDayOfThisMonth()`, `firstDayOfThisQuarter()` and `firstDayOfThisYear()` are the first day of the period today is in. `mostRecentDayOfWeek(DayOfWeek.MONDAY)` is that day on or before today, and `previousDayOfWeek(DayOfWeek.MONDAY)` is that day before today (a week ago, if today is a Monday); both are also methods of a date or timestamp (`pf.tradeDate().previousDayOfWeek(DayOfWeek.FRIDAY)`). A date or timestamp also has `.dayOfYear()`, `.dayOfWeekName()` (`Monday` ... `Sunday`), `.date()` (a timestamp without its time of day), `.addWeeks(n)` and `.subtractWeeks(n)`; a timestamp has `.addMicroseconds(n)` and `.subtractMicroseconds(n)`. Microseconds are not an interval unit in Databricks.
+`today()` and `now()` are the date and the time the query runs (`CURRENT_DATE`, `CURRENT_TIMESTAMP`): `pf.tradeDate().lt(today())`, `pf.settledAt().lt(now())`. They have the functions of a date and a timestamp, and `firstDayOfThisMonth()`, `firstDayOfThisQuarter()` and `firstDayOfThisYear()` are the first day of the period today is in. `mostRecentDayOfWeek(DayOfWeek.MONDAY)` is that day on or before today, and `previousDayOfWeek(DayOfWeek.MONDAY)` is that day before today (a week ago, if today is a Monday); both are also methods of a date or timestamp (`pf.tradeDate().previousDayOfWeek(DayOfWeek.FRIDAY)`). A date or timestamp also has `.weekOfYear()` (the ISO week, 1 to 53, a week starting on a Monday), `.dayOfWeek()` (the ISO day: Monday is 1 and Sunday is 7), `.diffWeeks(other)` (the weeks that start between the two: from a Sunday to the next day is 1, and from a Monday to the Sunday after it is 0), `.dayOfYear()`, `.dayOfWeekName()` (`Monday` ... `Sunday`), `.date()` (a timestamp without its time of day), `.addWeeks(n)` and `.subtractWeeks(n)`; a timestamp has `.addMicroseconds(n)` and `.subtractMicroseconds(n)`. Microseconds are not an interval unit in Databricks.
 
 ### The time between two timestamps
 
@@ -259,6 +263,16 @@ cf.findAll([cf.name(), cf.category()])
   .orderBy(cf.category().ascending())
 ```
 
+A missing value is the smallest value, as in Legend's databases: it comes first when sorting ascending and last when sorting descending, on every engine. `nulls` says otherwise:
+
+```ts
+cf.category().ascending()                      // a company with no category first (the default)
+cf.category().ascending({ nulls: 'last' })     // a company with no category last
+cf.category().descending({ nulls: 'first' })   // a company with no category first, then Technology, then Finance
+```
+
+Every sort says where a missing value goes, with `NULLS FIRST` or `NULLS LAST`, a column that cannot be missing included: the SQL is Postgres, where a missing value is the largest, and each engine has a default of its own, so the SQL does not leave it to them. `nulls` is on every sort: by a column, an aggregate, the `orderBy` of `join` and of a window such as `rank`, and in the GraphQL runner, which sends `asc_nulls_first` and the like to the server. JavaScript's own `sort` puts a missing value last whichever way it sorts, so a result sorted again on the client keeps this order only if it is sorted with the same rule.
+
 A result can also be ordered by an aggregate or another expression: `cf.findAll([cf.category(), cf.id().count()]).orderBy(cf.id().count().descending(), cf.category().ascending())`. Each expression is its own sort, so ordering by one again adds a sort.
 
 `.distinct()` returns each row once (`SELECT DISTINCT`): `cf.findAll([cf.category()]).distinct()`. A sort on a distinct query has to use a selected column. The GraphQL runner removes the duplicates on the client, so it applies a limit after that rather than on the server.
@@ -308,6 +322,24 @@ A related-finder accessor accepts property values to restrict the joined rows (a
 ```ts
 ef.findAll([ef.firstName(), ef.projects({ code: 'ALPHA' }).name()])
 ```
+
+### Filtering a navigation
+
+A navigation can say which of its rows it reaches, as Legend's `x.locations->filter(f | $f.place in ['Hoboken', 'New York'])`. `filter` takes a function of the navigation, which writes the condition from its attributes:
+
+```ts
+const locations = pf.locations().filter(each => each.place().isIn(['Hoboken', 'New York']));
+pf.findAll([pf.name(), locations.place(), locations.visits()]);
+```
+
+```sql
+SELECT t0.name, t1.place, t1.visits FROM geo.people AS t0
+LEFT OUTER JOIN geo.locations AS t1 ON (t0.id = t1.person_id AND t1.place IN ('Hoboken', 'New York'))
+```
+
+The condition is in the `ON` of the join of the navigation, not in the `WHERE`. A person with no location that holds is still a row, with NULL for what the navigation reads; a condition in the query, `findAll(columns, pf.locations().place().isIn([...]))`, is a `WHERE` and drops that person.
+
+Read the columns from a filtered navigation to read them from one join. A filter whose condition is the same as one already made on that navigation is that filtered navigation, so the filter can be written out for each column and still be one join. Conditions are the same when they say the same thing the same way: the same operations over the same columns and values, so `isIn(['Hoboken', 'New York'])` and `isIn(['New York', 'Hoboken'])` are two joins. A condition that says something else is a join of its own, so two different filters on one navigation are two joins. A filter of a filtered navigation holds both conditions, a filter on a navigation below another filters that join, and the condition is ANDed with the condition a mapping gives the join, and, on a milestoned class, with its milestoning at the dates of the query. A to-one milestoned step reached through another milestoned step that the filter and the columns both read is joined once for the filter and again for the columns, as Legend joins it. The GraphQL finder cannot filter a to-one navigation: only a list takes a `where`.
 
 ### Dates for a navigation
 
@@ -385,6 +417,8 @@ text literally. The GraphQL runner cannot push a negation or a regular expressio
 
 `.countDistinct()` counts the different non-NULL values (`COUNT(DISTINCT column)`); use it with `.groupBy()` to count per group. The GraphQL runner does not compute aggregates on the client.
 
+`.percentile(p)` is the value that the fraction `p` (between 0 and 1) of a group falls below, so `percentile(0.5)` is the median: `tf.findAll(null, null, [tf.account().name(), tf.price().percentile(0.5)]).groupBy(tf.account().name())`. It interpolates between the neighbouring values, so it is a double, unless `percentile(0.5, { continuous: false })`, which gives the nearest value that is there, of the type of the column; `{ ascending: false }` reads the group from the largest value. `quantile(p, { method })` is the same with the name of the method: `'linear'` (the default, interpolated) or `'inverted_cdf'` (a value that is there). It is the ANSI `PERCENTILE_CONT` or `PERCENTILE_DISC ... WITHIN GROUP (ORDER BY ...)`, is of a group and is not given a window, and works on an expression as on a column (`tf.price().times(2).percentile(0.5)`). The GraphQL runner has no percentile.
+
 `.join(separator, orderBy)` on a string attribute joins the values of a group into one text (`STRING_AGG`): `cf.findAll([cf.category(), cf.name().join(', ', [cf.name().ascending()])]).groupBy(cf.category())`. `orderBy` is the order they are joined in; without it the order is not defined. Missing values are skipped.
 
 ### Grouping
@@ -416,7 +450,36 @@ cf.findAll([cf.name(), when(cf.category().eq('Technology')).then('tech').otherwi
 cf.findAll([when(cf.id().lt(2)).then('low').when(cf.id().lt(4)).then('mid').otherwise('high')])
 ```
 
+A `when` can be the filter of a query: `when(cf.category().eq('Technology')).then(true).otherwise(false)` keeps the rows where it is true, and with no `otherwise` the rows where the condition fails are dropped. It is a `CASE` in the `WHERE`.
+
 The object `when(...)` returns has a `then` method, so don't `await` it before calling `.then(value)`. The GraphQL runner does not compute either on the client.
+
+## Vector search
+
+A column of embeddings is a `Vector` property, mapped to a column of type `VECTOR(n)`, where `n` is the number of numbers in each vector:
+
+```
+| embedding | VECTOR(3) |     | Y        | embedding |
+```
+
+It is compared with a vector (an array of numbers of the same length) by a distance, which is a number of the query like any other: it can be selected, rounded, compared and ordered by.
+
+```ts
+const query = [1.0, 0.2, 0.0];    // embedded by the caller: this library compares vectors, it does not make them
+
+cf.embedding().cosineDistance(query);   // 0 for the same direction: 1 - a . b / (|a| |b|)
+cf.embedding().l2Distance(query);       // the Euclidean distance
+cf.embedding().innerProduct(query);     // a . b, a similarity: larger is nearer
+
+// the 5 nearest technology companies, with how near
+const distance = cf.embedding().cosineDistance(query);
+cf.findAll([cf.name(), distance], cf.category().eq('Technology')).nearest(distance, 5);
+
+// the companies within a distance
+cf.findAll([cf.name()], distance.lt(0.3));
+```
+
+`nearest(distance, k)` is the `k` rows with the smallest `cosineDistance` or `l2Distance`, or the largest `innerProduct`, the nearest first. A row with no vector comes after all that have one. It is an exact search: an engine may answer it from an approximate index, but that is for the database to set up. A vector of another length than the column's is refused. The vectors of a query must come from the same embedding model as the column's. DuckDB (a `FLOAT[n]` column) runs these queries, and Databricks (an `ARRAY<FLOAT>` column) is sent arithmetic over the arrays; for Postgres the SQL is pgvector's (`VECTOR(n)`). The GraphQL runner does not compute them.
 
 ## Replacing a missing value
 
