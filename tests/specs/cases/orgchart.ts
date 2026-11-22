@@ -240,6 +240,22 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
       ], skipGraphql: 'The GraphQL finder cannot compute a conditional' },
   },
   {
+    name: 'if_as_a_filter_on_a_related_column_keeps_the_rows_with_no_related_row_out',
+    query: f => f.findAll([f.name()], when(f.manager().name().eq('Alice')).then(true).otherwise(false)).orderBy(f.id().ascending()),
+    expected: { columns: ['Name'], rows: [
+        ['Bob'],
+        ['Carol'],
+      ], skipGraphql: 'The GraphQL finder cannot compute a conditional' },
+  },
+  {
+    name: 'if_as_a_filter_on_a_related_column_with_a_missing_row_taking_otherwise',
+    query: f => f.findAll([f.name()], when(f.manager().name().eq('Alice')).then(false).otherwise(true)).orderBy(f.id().ascending()),
+    expected: { columns: ['Name'], rows: [
+        ['Alice'],
+        ['Dave'],
+      ], skipGraphql: 'The GraphQL finder cannot compute a conditional' },
+  },
+  {
     name: 'manager_name_for_dave',
     query: f => f.findAll([f.name(), f.manager().name()], f.name().eq('Dave')),
     expected: { columns: ['Name', 'Manager Name'], rows: [
@@ -288,18 +304,18 @@ export const ORGCHART_AGGREGATE_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
     name: 'explicit_group_by_is_used_as_given',
     query: f => f.findAll([f.manager().name(), f.id().count()]).groupBy(f.manager().name()).orderBy(f.manager().name().ascending()),
     expected: { columns: ['Manager Name', 'Id Count'], rows: [
+        [null, 1],
         ['Alice', 2],
         ['Bob', 1],
-        [null, 1],
       ], skipGraphql: 'The GraphQL finder has no count() yet' },
   },
   {
     name: 'aggregate_over_a_to_one_association_groups_by_the_plain_columns',
     query: f => f.findAll([f.manager().name(), f.id().count()]).orderBy(f.manager().name().ascending()),
     expected: { columns: ['Manager Name', 'Id Count'], rows: [
+        [null, 1],
         ['Alice', 2],
         ['Bob', 1],
-        [null, 1],
       ], sql: 'GROUP BY t1.name', skipGraphql: 'The GraphQL finder has no count() yet' },
   },
 ];

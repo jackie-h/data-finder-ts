@@ -206,8 +206,8 @@ export const TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'valid_from_week',
-    query: f => f.findAll(null, _AT, [f.validFrom().week()]),
-    expected: { columns: ['Week Valid From'], rows: [
+    query: f => f.findAll(null, _AT, [f.validFrom().weekOfYear()]),
+    expected: { columns: ['Week Of Year Valid From'], rows: [
         [1],
       ] },
   },
@@ -469,6 +469,20 @@ export const TRADE_MULTI_HOP_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
     name: 'ancestor_join_filter_kwargs_apply_at_the_query_time',
     query: f => f.findAll(null, _AT, [f.symbol(), f.account({ name: 'Acme Ltd' }).branch().city()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', null],
+      ], skipGraphql: 'A to-one relationship cannot be filtered on a server: only a list takes a where argument' },
+  },
+  {
+    name: 'a_filter_on_a_milestoned_navigation_applies_at_the_query_time',
+    query: f => f.findAll(null, _BOTH_AT, [f.symbol(), f.account().filter((each: any) => each.name().eq('Acme Ltd')).branch().city()], f.symbol().eq('AAPL')),
+    expected: { columns: ['Symbol', 'Account Branch City'], rows: [
+        ['AAPL', 'London'],
+      ], skipGraphql: 'A to-one relationship cannot be filtered on a server: only a list takes a where argument' },
+  },
+  {
+    name: 'a_filter_on_a_milestoned_navigation_that_no_live_version_holds_leaves_nothing_below_it',
+    query: f => f.findAll(null, _AT, [f.symbol(), f.account().filter((each: any) => each.name().eq('Acme Ltd')).branch().city()], f.symbol().eq('AAPL')),
     expected: { columns: ['Symbol', 'Account Branch City'], rows: [
         ['AAPL', null],
       ], skipGraphql: 'A to-one relationship cannot be filtered on a server: only a list takes a where argument' },

@@ -17,6 +17,15 @@ export const JOIN_CONDITIONS_FIRM_FINDER_SPECS: SpecCase<FirmFinder>[] = [
       ], sql: 'ON (t0.id = t1.firm_id AND t0.flag IS NULL AND t1.flag IS NOT NULL)', skipGraphql: 'The GraphQL finder reads no join conditions' },
   },
   {
+    name: 'a_filter_on_a_navigation_is_anded_with_the_condition_of_its_join',
+    query: f => f.findAll([f.legalName(), f.employees().filter((each: any) => each.firstName().eq('Mary')).firstName()]).orderBy(f.legalName().ascending()),
+    expected: { columns: ['LegalName', 'Employees FirstName'], rows: [
+        ['Alpha', 'Mary'],
+        ['Beta', null],
+        ['Gamma', null],
+      ], sql: 'ON (t0.id = t1.firm_id AND t0.flag IS NULL AND t1.flag IS NOT NULL AND t1.first_name = \'Mary\')', skipGraphql: 'The GraphQL finder reads no join conditions' },
+  },
+  {
     name: 'a_filter_on_a_property_reached_through_a_join_with_a_condition',
     query: f => f.findAll([f.legalName()], f.employees().firstName().eq('Bob')),
     expected: { columns: ['LegalName'], rows: [
@@ -54,8 +63,8 @@ export const JOIN_CONDITIONS_PERSON_FINDER_SPECS: SpecCase<PersonFinder>[] = [
     name: 'a_condition_on_one_hop_of_a_property_mapped_through_another_table',
     query: f => f.findAll([f.id(), f.activeFirms().legalName()]).orderBy(f.id().ascending(), f.activeFirms().legalName().ascending()),
     expected: { columns: ['Id', 'Activefirms LegalName'], rows: [
-        [1, 'Alpha'],
         [1, null],
+        [1, 'Alpha'],
         [2, null],
         [3, null],
         [4, 'Beta'],
