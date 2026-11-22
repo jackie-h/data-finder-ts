@@ -315,6 +315,14 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
     if (operation.window !== undefined) sql += ' ' + windowSpecToString(operation.window, d);
     return sql;
   }
+  if (operation instanceof AggregateOperation
+      && (operation.operator === AggregateOperator.PERCENTILE_CONT || operation.operator === AggregateOperator.PERCENTILE_DISC)) {
+    // ANSI's ordered-set aggregate: the fraction is the argument, and the values it is taken from are ordered in the group. A continuous
+    // percentile interpolates, so it takes the values as floating point
+    let values = sqlOperationToString(operation.element, d);
+    if (operation.operator === AggregateOperator.PERCENTILE_CONT) values = `CAST(${values} AS ${d.doubleType})`;
+    return `${operation.operator}(${operation.percentile}) WITHIN GROUP (ORDER BY ${values} ${operation.fromLargest ? 'DESC' : 'ASC'})`;
+  }
   if (operation instanceof AggregateOperation) {
     const fn = AGGREGATE_SQL_NAMES[operation.operator] ?? operation.operator;
     let sql = fn + '(' + sqlOperationToString(operation.element, d) + ')';
@@ -890,7 +898,7 @@ export function columnType(element: RelationalOperationElement | Attribute): str
   if (element instanceof AggregateOperation) {
     if (element.operator === AggregateOperator.COUNT || element.operator === AggregateOperator.COUNT_DISTINCT) return 'BIGINT';
     if (element.operator === AggregateOperator.STRING_AGG) return 'VARCHAR';
-    if ([AggregateOperator.MIN, AggregateOperator.MAX, AggregateOperator.SUM].includes(element.operator)) return columnType(element.element);
+    if ([AggregateOperator.MIN, AggregateOperator.MAX, AggregateOperator.SUM, AggregateOperator.PERCENTILE_DISC].includes(element.operator)) return columnType(element.element);
     if (element.operator === AggregateOperator.BOOL_AND || element.operator === AggregateOperator.BOOL_OR) return 'BOOLEAN';
     return 'DOUBLE';
   }
@@ -1273,6 +1281,7 @@ class SQLQueryGenerator {
         this._rewriteOperation(op.element), op.operator, op.displayName,
         op.window ? this._rewriteWindowSpec(op.window) : undefined,
         op.separator, op.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column), s.direction)),
+        op.percentile, op.fromLargest,
       );
     }
     if (op instanceof CaseOperation) return new RenderedSql(this._caseSql(op));
@@ -1381,6 +1390,7 @@ class SQLQueryGenerator {
         new TableAliasColumn(colNested.column, ta), col.operator, undefined,
         col.window ? this._rewriteWindowSpec(col.window) : undefined,
         col.separator, col.orderBy.map(s => new SortOperation(this._rewriteOperation(s.column), s.direction)),
+        col.percentile, col.fromLargest,
       );
       this._select.push(new Alias(rewrittenAgg, alias));
     } else if (col instanceof ScalarFunctionOperation) {
