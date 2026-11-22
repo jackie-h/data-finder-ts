@@ -51,7 +51,7 @@ export abstract class CalendarFunctions {
   /** Extract the ISO week number (1–53). */
   week(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.WEEK, 'Week ' + this.functionLabel()); }
   /** Extract the day of the week (0 = Sunday through 6 = Saturday). */
-  dayOfWeek(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.DOW, 'Day Of Week ' + this.functionLabel()); }
+  dayOfWeek(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.ISODOW, 'Day Of Week ' + this.functionLabel()); }
   /** Extract the day of the year (1–366). */
   dayOfYear(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.DOY, 'Day Of Year ' + this.functionLabel()); }
   /** The name of the day of the week: `Monday` ... `Sunday`. */

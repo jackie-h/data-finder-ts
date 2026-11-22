@@ -83,10 +83,10 @@ export const POSITION_DATE_FINDER_SPECS: SpecCase<PositionFinder>[] = [
   },
   {
     name: 'the_number_of_each_day_of_the_week_is_the_iso_number',
-    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2024-03-04T00:00:00Z')).dayOfWeek().alias('2024-03-04'), (constant as any)(new DateOnly('2024-03-05T00:00:00Z')).dayOfWeek().alias('2024-03-05'), (constant as any)(new DateOnly('2024-03-06T00:00:00Z')).dayOfWeek().alias('2024-03-06'), (constant as any)(new DateOnly('2024-03-07T00:00:00Z')).dayOfWeek().alias('2024-03-07'), (constant as any)(new DateOnly('2024-03-08T00:00:00Z')).dayOfWeek().alias('2024-03-08'), (constant as any)(new DateOnly('2024-03-09T00:00:00Z')).dayOfWeek().alias('2024-03-09'), (constant as any)(new DateOnly('2024-03-10T00:00:00Z')).dayOfWeek().alias('2024-03-10')], f.id().eq(1)),
+    query: f => f.findAll([constant(new DateOnly('2024-03-04T00:00:00Z')).dayOfWeek().alias('2024-03-04'), constant(new DateOnly('2024-03-05T00:00:00Z')).dayOfWeek().alias('2024-03-05'), constant(new DateOnly('2024-03-06T00:00:00Z')).dayOfWeek().alias('2024-03-06'), constant(new DateOnly('2024-03-07T00:00:00Z')).dayOfWeek().alias('2024-03-07'), constant(new DateOnly('2024-03-08T00:00:00Z')).dayOfWeek().alias('2024-03-08'), constant(new DateOnly('2024-03-09T00:00:00Z')).dayOfWeek().alias('2024-03-09'), constant(new DateOnly('2024-03-10T00:00:00Z')).dayOfWeek().alias('2024-03-10')], f.id().eq(1)),
     expected: { columns: ['2024-03-04', '2024-03-05', '2024-03-06', '2024-03-07', '2024-03-08', '2024-03-09', '2024-03-10'], rows: [
         [1, 2, 3, 4, 5, 6, 7],
-      ], skipGraphql: 'The GraphQL finder has no date functions beyond the parts of a date', skip: 'day_of_week as the ISO day is not ported yet (data-finder #287)' },
+      ], skipGraphql: 'The GraphQL finder has no date functions beyond the parts of a date' },
   },
   {
     name: 'the_name_of_each_day_of_the_week',
