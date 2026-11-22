@@ -109,10 +109,10 @@ export const COMPANIES_CONSTANT_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'date_constant_parts',
-    query: (f: any) => f.findAll([(constant as any)(_D).year().alias('year'), (constant as any)(_D).month().alias('month'), (constant as any)(_D).day().alias('day'), (constant as any)(_D).quarter().alias('quarter'), (constant as any)(_D).weekOfYear().alias('week'), (constant as any)(_D).dayOfWeek().alias('day_of_week')], _THE_FIRST(f)),
+    query: f => f.findAll([constant(_D).year().alias('year'), constant(_D).month().alias('month'), constant(_D).day().alias('day'), constant(_D).quarter().alias('quarter'), constant(_D).weekOfYear().alias('week'), constant(_D).dayOfWeek().alias('day_of_week')], _THE_FIRST(f)),
     expected: { columns: ['year', 'month', 'day', 'quarter', 'week', 'day_of_week'], rows: [
         [2024, 1, 31, 1, 5, 3],
-      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'week_of_year is not ported yet (data-finder #288)' },
+      ], skipGraphql: 'The GraphQL finder has no scalar functions' },
   },
   {
     name: 'date_constant_moved',
@@ -144,10 +144,10 @@ export const COMPANIES_CONSTANT_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'datetime_constant_parts',
-    query: (f: any) => f.findAll([(constant as any)(_DT).year().alias('year'), (constant as any)(_DT).month().alias('month'), (constant as any)(_DT).day().alias('day'), (constant as any)(_DT).hour().alias('hour'), (constant as any)(_DT).minute().alias('minute'), (constant as any)(_DT).second().alias('second'), (constant as any)(_DT).quarter().alias('quarter'), (constant as any)(_DT).weekOfYear().alias('week'), (constant as any)(_DT).dayOfWeek().alias('day_of_week')], _THE_FIRST(f)),
+    query: f => f.findAll([constant(_DT).year().alias('year'), constant(_DT).month().alias('month'), constant(_DT).day().alias('day'), constant(_DT).hour().alias('hour'), constant(_DT).minute().alias('minute'), constant(_DT).second().alias('second'), constant(_DT).quarter().alias('quarter'), constant(_DT).weekOfYear().alias('week'), constant(_DT).dayOfWeek().alias('day_of_week')], _THE_FIRST(f)),
     expected: { columns: ['year', 'month', 'day', 'hour', 'minute', 'second', 'quarter', 'week', 'day_of_week'], rows: [
         [2016, 8, 10, 8, 55, 30, 3, 32, 3],
-      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'week_of_year is not ported yet (data-finder #288)' },
+      ], skipGraphql: 'The GraphQL finder has no scalar functions' },
   },
   {
     name: 'datetime_constant_moved',

@@ -48,8 +48,8 @@ export abstract class CalendarFunctions {
   day(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.DAY, 'Day ' + this.functionLabel()); }
   /** Extract the quarter (1–4). */
   quarter(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.QUARTER, 'Quarter ' + this.functionLabel()); }
-  /** Extract the ISO week number (1–53). */
-  week(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.WEEK, 'Week ' + this.functionLabel()); }
+  /** Extract the ISO week of the year, 1 to 53, a week starting on a Monday. */
+  weekOfYear(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.WEEK, 'Week Of Year ' + this.functionLabel()); }
   /** Extract the ISO day of the week: Monday is 1 and Sunday is 7. */
   dayOfWeek(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.ISODOW, 'Day Of Week ' + this.functionLabel()); }
   /** Extract the day of the year (1–366). */

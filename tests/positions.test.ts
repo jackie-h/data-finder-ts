@@ -28,8 +28,8 @@ afterAll(() => {
 });
 
 describe('PositionFinder — date functions', () => {
-  it('week() extracts ISO week number', async () => {
-    const rows = await pf.findAll([pf.tradeDate().week()], pf.id().eq(1)).toRows();
+  it('weekOfYear() extracts ISO week number', async () => {
+    const rows = await pf.findAll([pf.tradeDate().weekOfYear()], pf.id().eq(1)).toRows();
     // 2024-03-15 is ISO week 11
     expect(Number(rows[0][0])).toBe(11);
   });

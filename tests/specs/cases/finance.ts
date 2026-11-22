@@ -206,10 +206,10 @@ export const TRADE_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'valid_from_week',
-    query: (f: any) => f.findAll(null, _AT, [f.validFrom().weekOfYear()]),
+    query: f => f.findAll(null, _AT, [f.validFrom().weekOfYear()]),
     expected: { columns: ['Week Of Year Valid From'], rows: [
         [1],
-      ], skip: 'week_of_year is not ported yet (data-finder #288)' },
+      ] },
   },
   {
     name: 'valid_from_day_of_week',
