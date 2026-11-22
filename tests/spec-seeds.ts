@@ -3,10 +3,9 @@
  * the Python project's datafinder_ibis_duckdb/tests/test_specs_*.py, loading the CSVs shipped in
  * `datafinder_examples`.
  */
-import { DuckDBConnection } from '@duckdb/node-api';
-import { loadCsv } from './spec-harness';
+import { loadCsv, type SeedTarget } from './spec-harness';
 
-type Seed = (conn: DuckDBConnection) => Promise<void>;
+type Seed = (conn: SeedTarget) => Promise<void>;
 
 const TRADES_DDL =
   'CREATE TABLE trading.trades (sym VARCHAR, price DOUBLE, is_settled BOOLEAN, account_id INT, in_z TIMESTAMP, out_z TIMESTAMP)';
@@ -16,7 +15,7 @@ const ACCOUNTS_WITH_DESK_DDL =
   'CREATE TABLE ref_data.account_master (ID INT, ACCT_NAME VARCHAR, BRANCH_ID INT, DESK_ID INT, in_z TIMESTAMP, out_z TIMESTAMP)';
 const PRICE_DDL = 'CREATE TABLE ref_data.price (SYM VARCHAR, PRICE DOUBLE, in_z TIMESTAMP, out_z TIMESTAMP)';
 
-async function run(conn: DuckDBConnection, ...statements: string[]): Promise<void> {
+async function run(conn: SeedTarget, ...statements: string[]): Promise<void> {
   for (const sql of statements) await conn.run(sql);
 }
 

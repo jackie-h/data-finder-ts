@@ -22,6 +22,12 @@ dependencies = [
     "duckdb>=1.0,<2",
 ]
 
+[project.optional-dependencies]
+# a local Spark that the Spark Connect specs run against (`npm run spark:server`): PySpark launches it
+spark = [
+    "pyspark==3.5.9",
+]
+
 [project.urls]
 Repository = "https://github.com/jackie-h/data-finder-ts"
 

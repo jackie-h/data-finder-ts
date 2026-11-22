@@ -104,7 +104,10 @@
     "generate:graphql": "uv run python example/generate_graphql_examples.py",
     "generate:specs": "uv run python scripts/generate_spec_tests.py && uv run python scripts/generate_tpch_bih_specs.py",
     "check:dialects": "DIALECT_CORPUS=.dialect-corpus.json vitest run tests/dialects.test.ts && uv run python scripts/validate_dialects.py .dialect-corpus.json",
-    "check:dialects:specs": "rm -rf .spec-sql && SPEC_SQL_DIR=.spec-sql vitest run tests/specs && uv run python scripts/validate_dialects.py --specs .spec-sql"
+    "check:dialects:specs": "rm -rf .spec-sql && SPEC_SQL_DIR=.spec-sql vitest run tests/specs && uv run python scripts/validate_dialects.py --specs .spec-sql",
+    "spark:start": "scripts/spark-connect.sh start",
+    "spark:stop": "scripts/spark-connect.sh stop",
+    "test:spark": "scripts/spark-connect.sh start && SPARK_SPECS=1 vitest run tests/spark; status=$?; scripts/spark-connect.sh stop; exit $status"
   },
   "dependencies": {
     "vite-tsconfig-paths": "^6.1.1"
@@ -113,6 +116,7 @@
     "@duckdb/node-api": "^1.5.3-r.1",
     "@types/node": "^24.13.2",
     "graphql": "^16.14.0",
+    "ts-spark-connector": "^3.5.1",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
