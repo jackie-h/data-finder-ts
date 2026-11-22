@@ -255,8 +255,13 @@ test("e2e: column hover shows the logical property description", () => {
   assert.match(d.ref_data__account_master._, /^Account: Trading account/);
 });
 
-test("e2e: every foreign key is drawn and every association resolved", () => {
-  assert.match(gen.stdout, /22 mappings, 36 foreign keys \(0 associations unresolved\)/);
+test("e2e: every class, mapping and foreign key of the exported data is drawn, and every association resolved", () => {
+  // counted from the JSON the Python loaders wrote, not from the generator: a table or key that goes missing is a mismatch
+  const data = JSON.parse(readFileSync(join(gen.out, "data.json"), "utf8"));
+  const classes = data.models.flatMap(m => m.packages.flatMap(p => p.classes)).length;
+  const foreignKeys = data.mappings.flatMap(m => m.associations.flatMap(a => a.rows)).length;
+  assert.equal(data.mappings.length, config.mappings.length);
+  assert.match(gen.stdout, new RegExp(`^${classes} classes, ${data.mappings.length} mappings, ${foreignKeys} foreign keys \\(0 associations unresolved\\)`));
 });
 
 test("e2e: a join with a condition says so on the foreign key, and the hover has all of it", () => {

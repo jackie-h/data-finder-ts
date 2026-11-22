@@ -7,6 +7,8 @@ import type { CompanyFinder } from '../../generated_examples/companies/CompanyFi
 export const _D = new DateOnly('2024-01-31T00:00:00Z');
 export const _DT = new Date(Date.UTC(2016, 7, 10, 8, 55, 30));
 export const _THE_FIRST = (f: any) => f.id().eq(1);
+export const _DATE_PAIRS = [[new DateOnly('2023-12-31T00:00:00Z'), new DateOnly('2024-01-01T00:00:00Z')], [new DateOnly('2024-02-29T00:00:00Z'), new DateOnly('2025-02-28T00:00:00Z')], [new DateOnly('2024-03-31T00:00:00Z'), new DateOnly('2024-04-01T00:00:00Z')], [new DateOnly('2025-01-06T00:00:00Z'), new DateOnly('2025-01-05T00:00:00Z')], [new DateOnly('2024-06-15T00:00:00Z'), new DateOnly('2024-06-15T00:00:00Z')], [new DateOnly('2024-03-04T00:00:00Z'), new DateOnly('2024-03-10T00:00:00Z')], [new DateOnly('2024-03-11T00:00:00Z'), new DateOnly('2024-03-10T00:00:00Z')], [new DateOnly('2024-03-04T00:00:00Z'), new DateOnly('2024-03-31T00:00:00Z')], [new DateOnly('2024-03-31T00:00:00Z'), new DateOnly('2024-03-04T00:00:00Z')]];
+export const _DATETIME_PAIRS = [[new Date(Date.UTC(2024, 2, 10, 8, 59, 59)), new Date(Date.UTC(2024, 2, 10, 9, 0, 0))], [new Date(Date.UTC(2024, 2, 10, 8, 0, 0)), new Date(Date.UTC(2024, 2, 10, 8, 59, 59))], [new Date(Date.UTC(2023, 11, 31, 23, 59, 59)), new Date(Date.UTC(2024, 0, 1, 0, 0, 0))], [new Date(Date.UTC(2024, 2, 10, 9, 1, 0)), new Date(Date.UTC(2024, 2, 10, 8, 59, 0))], [new Date(Date.UTC(2024, 2, 10, 23, 59, 59)), new Date(Date.UTC(2024, 2, 11, 0, 0, 0))]];
 
 export const COMPANIES_CONSTANT_SPECS: SpecCase<CompanyFinder>[] = [
   {
@@ -107,10 +109,10 @@ export const COMPANIES_CONSTANT_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'date_constant_parts',
-    query: f => f.findAll([constant(_D).year().alias('year'), constant(_D).month().alias('month'), constant(_D).day().alias('day'), constant(_D).quarter().alias('quarter'), constant(_D).week().alias('week'), constant(_D).dayOfWeek().alias('day_of_week')], _THE_FIRST(f)),
+    query: (f: any) => f.findAll([(constant as any)(_D).year().alias('year'), (constant as any)(_D).month().alias('month'), (constant as any)(_D).day().alias('day'), (constant as any)(_D).quarter().alias('quarter'), (constant as any)(_D).weekOfYear().alias('week'), (constant as any)(_D).dayOfWeek().alias('day_of_week')], _THE_FIRST(f)),
     expected: { columns: ['year', 'month', 'day', 'quarter', 'week', 'day_of_week'], rows: [
         [2024, 1, 31, 1, 5, 3],
-      ], skipGraphql: 'The GraphQL finder has no scalar functions' },
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'week_of_year is not ported yet (data-finder #288)' },
   },
   {
     name: 'date_constant_moved',
@@ -142,10 +144,10 @@ export const COMPANIES_CONSTANT_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'datetime_constant_parts',
-    query: f => f.findAll([constant(_DT).year().alias('year'), constant(_DT).month().alias('month'), constant(_DT).day().alias('day'), constant(_DT).hour().alias('hour'), constant(_DT).minute().alias('minute'), constant(_DT).second().alias('second'), constant(_DT).quarter().alias('quarter'), constant(_DT).week().alias('week'), constant(_DT).dayOfWeek().alias('day_of_week')], _THE_FIRST(f)),
+    query: (f: any) => f.findAll([(constant as any)(_DT).year().alias('year'), (constant as any)(_DT).month().alias('month'), (constant as any)(_DT).day().alias('day'), (constant as any)(_DT).hour().alias('hour'), (constant as any)(_DT).minute().alias('minute'), (constant as any)(_DT).second().alias('second'), (constant as any)(_DT).quarter().alias('quarter'), (constant as any)(_DT).weekOfYear().alias('week'), (constant as any)(_DT).dayOfWeek().alias('day_of_week')], _THE_FIRST(f)),
     expected: { columns: ['year', 'month', 'day', 'hour', 'minute', 'second', 'quarter', 'week', 'day_of_week'], rows: [
         [2016, 8, 10, 8, 55, 30, 3, 32, 3],
-      ], skipGraphql: 'The GraphQL finder has no scalar functions' },
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'week_of_year is not ported yet (data-finder #288)' },
   },
   {
     name: 'datetime_constant_moved',
@@ -159,6 +161,118 @@ export const COMPANIES_CONSTANT_SPECS: SpecCase<CompanyFinder>[] = [
     query: f => f.findAll([constant(_DT).diffHours(new Date(Date.UTC(2016, 7, 10, 12, 0, 0))).alias('hours'), constant(_DT).diffMinutes(new Date(Date.UTC(2016, 7, 10, 9, 55, 30))).alias('minutes'), constant(_DT).diffSeconds(new Date(Date.UTC(2016, 7, 10, 8, 56, 0))).alias('seconds'), constant(_DT).diffDays(new Date(Date.UTC(2016, 7, 12, 8, 55, 30))).alias('days')], _THE_FIRST(f)),
     expected: { columns: ['hours', 'minutes', 'seconds', 'days'], rows: [
         [4, 60, 30, 2],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions' },
+  },
+  {
+    name: 'date_difference_counts_the_boundaries_crossed_2023-12-31_to_2024-01-01',
+    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2023-12-31T00:00:00Z')).diffYears(new DateOnly('2024-01-01T00:00:00Z')).alias('years'), (constant as any)(new DateOnly('2023-12-31T00:00:00Z')).diffMonths(new DateOnly('2024-01-01T00:00:00Z')).alias('months'), (constant as any)(new DateOnly('2023-12-31T00:00:00Z')).diffWeeks(new DateOnly('2024-01-01T00:00:00Z')).alias('weeks'), (constant as any)(new DateOnly('2023-12-31T00:00:00Z')).diffDays(new DateOnly('2024-01-01T00:00:00Z')).alias('days')], _THE_FIRST(f)),
+    expected: { columns: ['years', 'months', 'weeks', 'days'], rows: [
+        [1, 1, 1, 1],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'date_difference_counts_the_boundaries_crossed_2024-02-29_to_2025-02-28',
+    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2024-02-29T00:00:00Z')).diffYears(new DateOnly('2025-02-28T00:00:00Z')).alias('years'), (constant as any)(new DateOnly('2024-02-29T00:00:00Z')).diffMonths(new DateOnly('2025-02-28T00:00:00Z')).alias('months'), (constant as any)(new DateOnly('2024-02-29T00:00:00Z')).diffWeeks(new DateOnly('2025-02-28T00:00:00Z')).alias('weeks'), (constant as any)(new DateOnly('2024-02-29T00:00:00Z')).diffDays(new DateOnly('2025-02-28T00:00:00Z')).alias('days')], _THE_FIRST(f)),
+    expected: { columns: ['years', 'months', 'weeks', 'days'], rows: [
+        [1, 12, 52, 365],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'date_difference_counts_the_boundaries_crossed_2024-03-31_to_2024-04-01',
+    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2024-03-31T00:00:00Z')).diffYears(new DateOnly('2024-04-01T00:00:00Z')).alias('years'), (constant as any)(new DateOnly('2024-03-31T00:00:00Z')).diffMonths(new DateOnly('2024-04-01T00:00:00Z')).alias('months'), (constant as any)(new DateOnly('2024-03-31T00:00:00Z')).diffWeeks(new DateOnly('2024-04-01T00:00:00Z')).alias('weeks'), (constant as any)(new DateOnly('2024-03-31T00:00:00Z')).diffDays(new DateOnly('2024-04-01T00:00:00Z')).alias('days')], _THE_FIRST(f)),
+    expected: { columns: ['years', 'months', 'weeks', 'days'], rows: [
+        [0, 1, 1, 1],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'date_difference_counts_the_boundaries_crossed_2025-01-06_to_2025-01-05',
+    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2025-01-06T00:00:00Z')).diffYears(new DateOnly('2025-01-05T00:00:00Z')).alias('years'), (constant as any)(new DateOnly('2025-01-06T00:00:00Z')).diffMonths(new DateOnly('2025-01-05T00:00:00Z')).alias('months'), (constant as any)(new DateOnly('2025-01-06T00:00:00Z')).diffWeeks(new DateOnly('2025-01-05T00:00:00Z')).alias('weeks'), (constant as any)(new DateOnly('2025-01-06T00:00:00Z')).diffDays(new DateOnly('2025-01-05T00:00:00Z')).alias('days')], _THE_FIRST(f)),
+    expected: { columns: ['years', 'months', 'weeks', 'days'], rows: [
+        [0, 0, -1, -1],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'date_difference_counts_the_boundaries_crossed_2024-06-15_to_2024-06-15',
+    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2024-06-15T00:00:00Z')).diffYears(new DateOnly('2024-06-15T00:00:00Z')).alias('years'), (constant as any)(new DateOnly('2024-06-15T00:00:00Z')).diffMonths(new DateOnly('2024-06-15T00:00:00Z')).alias('months'), (constant as any)(new DateOnly('2024-06-15T00:00:00Z')).diffWeeks(new DateOnly('2024-06-15T00:00:00Z')).alias('weeks'), (constant as any)(new DateOnly('2024-06-15T00:00:00Z')).diffDays(new DateOnly('2024-06-15T00:00:00Z')).alias('days')], _THE_FIRST(f)),
+    expected: { columns: ['years', 'months', 'weeks', 'days'], rows: [
+        [0, 0, 0, 0],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'date_difference_counts_the_boundaries_crossed_2024-03-04_to_2024-03-10',
+    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2024-03-04T00:00:00Z')).diffYears(new DateOnly('2024-03-10T00:00:00Z')).alias('years'), (constant as any)(new DateOnly('2024-03-04T00:00:00Z')).diffMonths(new DateOnly('2024-03-10T00:00:00Z')).alias('months'), (constant as any)(new DateOnly('2024-03-04T00:00:00Z')).diffWeeks(new DateOnly('2024-03-10T00:00:00Z')).alias('weeks'), (constant as any)(new DateOnly('2024-03-04T00:00:00Z')).diffDays(new DateOnly('2024-03-10T00:00:00Z')).alias('days')], _THE_FIRST(f)),
+    expected: { columns: ['years', 'months', 'weeks', 'days'], rows: [
+        [0, 0, 0, 6],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'date_difference_counts_the_boundaries_crossed_2024-03-11_to_2024-03-10',
+    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2024-03-11T00:00:00Z')).diffYears(new DateOnly('2024-03-10T00:00:00Z')).alias('years'), (constant as any)(new DateOnly('2024-03-11T00:00:00Z')).diffMonths(new DateOnly('2024-03-10T00:00:00Z')).alias('months'), (constant as any)(new DateOnly('2024-03-11T00:00:00Z')).diffWeeks(new DateOnly('2024-03-10T00:00:00Z')).alias('weeks'), (constant as any)(new DateOnly('2024-03-11T00:00:00Z')).diffDays(new DateOnly('2024-03-10T00:00:00Z')).alias('days')], _THE_FIRST(f)),
+    expected: { columns: ['years', 'months', 'weeks', 'days'], rows: [
+        [0, 0, -1, -1],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'date_difference_counts_the_boundaries_crossed_2024-03-04_to_2024-03-31',
+    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2024-03-04T00:00:00Z')).diffYears(new DateOnly('2024-03-31T00:00:00Z')).alias('years'), (constant as any)(new DateOnly('2024-03-04T00:00:00Z')).diffMonths(new DateOnly('2024-03-31T00:00:00Z')).alias('months'), (constant as any)(new DateOnly('2024-03-04T00:00:00Z')).diffWeeks(new DateOnly('2024-03-31T00:00:00Z')).alias('weeks'), (constant as any)(new DateOnly('2024-03-04T00:00:00Z')).diffDays(new DateOnly('2024-03-31T00:00:00Z')).alias('days')], _THE_FIRST(f)),
+    expected: { columns: ['years', 'months', 'weeks', 'days'], rows: [
+        [0, 0, 3, 27],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'date_difference_counts_the_boundaries_crossed_2024-03-31_to_2024-03-04',
+    query: (f: any) => f.findAll([(constant as any)(new DateOnly('2024-03-31T00:00:00Z')).diffYears(new DateOnly('2024-03-04T00:00:00Z')).alias('years'), (constant as any)(new DateOnly('2024-03-31T00:00:00Z')).diffMonths(new DateOnly('2024-03-04T00:00:00Z')).alias('months'), (constant as any)(new DateOnly('2024-03-31T00:00:00Z')).diffWeeks(new DateOnly('2024-03-04T00:00:00Z')).alias('weeks'), (constant as any)(new DateOnly('2024-03-31T00:00:00Z')).diffDays(new DateOnly('2024-03-04T00:00:00Z')).alias('days')], _THE_FIRST(f)),
+    expected: { columns: ['years', 'months', 'weeks', 'days'], rows: [
+        [0, 0, -3, -27],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'datetime_difference_counts_the_boundaries_crossed_085959_to_10_090000',
+    query: (f: any) => f.findAll([(constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).diffHours(new Date(Date.UTC(2024, 2, 10, 9, 0, 0))).alias('hours'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).diffMinutes(new Date(Date.UTC(2024, 2, 10, 9, 0, 0))).alias('minutes'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).diffSeconds(new Date(Date.UTC(2024, 2, 10, 9, 0, 0))).alias('seconds'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).diffDays(new Date(Date.UTC(2024, 2, 10, 9, 0, 0))).alias('days'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).diffWeeks(new Date(Date.UTC(2024, 2, 10, 9, 0, 0))).alias('weeks')], _THE_FIRST(f)),
+    expected: { columns: ['hours', 'minutes', 'seconds', 'days', 'weeks'], rows: [
+        [1, 1, 1, 0, 0],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'datetime_difference_counts_the_boundaries_crossed_080000_to_10_085959',
+    query: (f: any) => f.findAll([(constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 0, 0))).diffHours(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).alias('hours'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 0, 0))).diffMinutes(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).alias('minutes'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 0, 0))).diffSeconds(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).alias('seconds'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 0, 0))).diffDays(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).alias('days'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 8, 0, 0))).diffWeeks(new Date(Date.UTC(2024, 2, 10, 8, 59, 59))).alias('weeks')], _THE_FIRST(f)),
+    expected: { columns: ['hours', 'minutes', 'seconds', 'days', 'weeks'], rows: [
+        [0, 59, 3599, 0, 0],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'datetime_difference_counts_the_boundaries_crossed_235959_to_01_000000',
+    query: (f: any) => f.findAll([(constant as any)(new Date(Date.UTC(2023, 11, 31, 23, 59, 59))).diffHours(new Date(Date.UTC(2024, 0, 1, 0, 0, 0))).alias('hours'), (constant as any)(new Date(Date.UTC(2023, 11, 31, 23, 59, 59))).diffMinutes(new Date(Date.UTC(2024, 0, 1, 0, 0, 0))).alias('minutes'), (constant as any)(new Date(Date.UTC(2023, 11, 31, 23, 59, 59))).diffSeconds(new Date(Date.UTC(2024, 0, 1, 0, 0, 0))).alias('seconds'), (constant as any)(new Date(Date.UTC(2023, 11, 31, 23, 59, 59))).diffDays(new Date(Date.UTC(2024, 0, 1, 0, 0, 0))).alias('days'), (constant as any)(new Date(Date.UTC(2023, 11, 31, 23, 59, 59))).diffWeeks(new Date(Date.UTC(2024, 0, 1, 0, 0, 0))).alias('weeks')], _THE_FIRST(f)),
+    expected: { columns: ['hours', 'minutes', 'seconds', 'days', 'weeks'], rows: [
+        [1, 1, 1, 1, 1],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'datetime_difference_counts_the_boundaries_crossed_090100_to_10_085900',
+    query: (f: any) => f.findAll([(constant as any)(new Date(Date.UTC(2024, 2, 10, 9, 1, 0))).diffHours(new Date(Date.UTC(2024, 2, 10, 8, 59, 0))).alias('hours'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 9, 1, 0))).diffMinutes(new Date(Date.UTC(2024, 2, 10, 8, 59, 0))).alias('minutes'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 9, 1, 0))).diffSeconds(new Date(Date.UTC(2024, 2, 10, 8, 59, 0))).alias('seconds'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 9, 1, 0))).diffDays(new Date(Date.UTC(2024, 2, 10, 8, 59, 0))).alias('days'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 9, 1, 0))).diffWeeks(new Date(Date.UTC(2024, 2, 10, 8, 59, 0))).alias('weeks')], _THE_FIRST(f)),
+    expected: { columns: ['hours', 'minutes', 'seconds', 'days', 'weeks'], rows: [
+        [-1, -2, -120, 0, 0],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'datetime_difference_counts_the_boundaries_crossed_235959_to_11_000000',
+    query: (f: any) => f.findAll([(constant as any)(new Date(Date.UTC(2024, 2, 10, 23, 59, 59))).diffHours(new Date(Date.UTC(2024, 2, 11, 0, 0, 0))).alias('hours'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 23, 59, 59))).diffMinutes(new Date(Date.UTC(2024, 2, 11, 0, 0, 0))).alias('minutes'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 23, 59, 59))).diffSeconds(new Date(Date.UTC(2024, 2, 11, 0, 0, 0))).alias('seconds'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 23, 59, 59))).diffDays(new Date(Date.UTC(2024, 2, 11, 0, 0, 0))).alias('days'), (constant as any)(new Date(Date.UTC(2024, 2, 10, 23, 59, 59))).diffWeeks(new Date(Date.UTC(2024, 2, 11, 0, 0, 0))).alias('weeks')], _THE_FIRST(f)),
+    expected: { columns: ['hours', 'minutes', 'seconds', 'days', 'weeks'], rows: [
+        [1, 1, 1, 1, 1],
+      ], skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'a_regular_expression_matches_anywhere_in_the_text',
+    query: (f: any) => f.findAll([f.id()], (constant as any)('Customer X Complaints').matches('X.*Compl').and(_THE_FIRST(f))),
+    expected: { columns: ['Id'], rows: [
+        [1],
+      ], sql: '\'Customer X Complaints\' ~ \'X.*Compl\'', skipGraphql: 'The GraphQL finder has no scalar functions', skip: 'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)' },
+  },
+  {
+    name: 'a_regular_expression_that_is_anchored_matches_only_there',
+    query: f => f.findAll([f.id()], constant('abc').matches('^b').not().and(constant('abc').matches('b')).and(_THE_FIRST(f))),
+    expected: { columns: ['Id'], rows: [
+        [1],
       ], skipGraphql: 'The GraphQL finder has no scalar functions' },
   },
   {

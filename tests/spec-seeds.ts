@@ -80,7 +80,7 @@ export const seeds: Record<string, Seed> = {
   },
 
   companies: async conn => {
-    await run(conn, 'CREATE TABLE companies (id INT, name VARCHAR, category VARCHAR)');
+    await run(conn, 'CREATE TABLE companies (id INT, name VARCHAR, category VARCHAR, embedding FLOAT[3])');
     await loadCsv(conn, 'companies', 'companies.csv');
   },
 
@@ -130,6 +130,23 @@ export const seeds: Record<string, Seed> = {
   companies_missing_category: async conn => {
     await run(conn, 'CREATE TABLE companies (id INT, name VARCHAR, category VARCHAR)');
     await loadCsv(conn, 'companies', 'companies_missing_category.csv');
+  },
+
+  places: async conn => {
+    await run(conn, 'CREATE SCHEMA geo',
+      'CREATE TABLE geo.people (id INT, name VARCHAR)',
+      'CREATE TABLE geo.regions (id INT, name VARCHAR)',
+      'CREATE TABLE geo.locations (id INT, place VARCHAR, visits INT, person_id INT, region_id INT)');
+    for (const table of ['people', 'regions', 'locations']) await loadCsv(conn, `geo.${table}`, `places_${table}.csv`);
+  },
+
+  milestoned_union: async conn => {
+    await run(conn, 'CREATE TABLE OrderTable (id INT, prodFk INT)',
+      'CREATE TABLE ProductTableWithBusinessSnapshotMilestoning (id INT, name VARCHAR, type VARCHAR, snapshotDate DATE)',
+      'CREATE TABLE ProductClassificationTableWithBusinessSnapshotMilestoning (type VARCHAR, type_description VARCHAR, snapshotDate DATE)');
+    await loadCsv(conn, 'OrderTable', 'milestoned_union_orders.csv');
+    await loadCsv(conn, 'ProductTableWithBusinessSnapshotMilestoning', 'milestoned_union_products.csv');
+    await loadCsv(conn, 'ProductClassificationTableWithBusinessSnapshotMilestoning', 'milestoned_union_classifications.csv');
   },
 
   join_conditions: async conn => {

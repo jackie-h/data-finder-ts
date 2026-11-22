@@ -23,7 +23,9 @@
     "schema_milestoning_model.md",
     "sql_query_sets_model.md",
     "sql_query_sets_embedded_model.md",
-    "table_milestoning_model.md"
+    "table_milestoning_model.md",
+    "places_model.md",
+    "milestoned_union_model.md"
   ],
   "mappings": [
     "companies_mapping.md",
@@ -47,6 +49,8 @@
     "schema_milestoning_mapping.md",
     "sql_query_sets_mapping.md",
     "sql_query_sets_embedded_mapping.md",
-    "table_milestoning_mapping.md"
+    "table_milestoning_mapping.md",
+    "places_mapping.md",
+    "milestoned_union_mapping.md"
   ]
 }

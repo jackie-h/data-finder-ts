@@ -36,6 +36,8 @@ _MAPPINGS = [
     'table_milestoning_mapping.md',
     'sql_query_sets_mapping.md',
     'sql_query_sets_embedded_mapping.md',
+    'places_mapping.md',
+    'milestoned_union_mapping.md',
     'tpch_bih_mapping.md',
 ]
 
@@ -44,6 +46,9 @@ if __name__ == '__main__':
     for mapping_file in _MAPPINGS:
         mapping_path = os.path.join(_EXAMPLES_DIR, mapping_file)
         mapping = load(mapping_path)
+        # A vector column is not ported yet (data-finder #302): its finder is left out. Delete this with the port.
+        for rcm in mapping.mappings:
+            rcm.property_mappings = [pm for pm in rcm.property_mappings if getattr(pm.property.type, 'name', None) != 'Vector']
         name = mapping_file.replace('.md', '').replace('_mapping', '')
         out_dir = os.path.join(_root, 'tests', 'generated_examples', name)
         os.makedirs(out_dir, exist_ok=True)

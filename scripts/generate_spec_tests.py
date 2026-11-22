@@ -13,6 +13,7 @@ Usage:
     uv run python scripts/generate_spec_tests.py
 """
 import ast
+import copy
 import datetime
 import decimal
 import glob
@@ -58,6 +59,8 @@ SEEDS = {
     'companies_constant_specs': 'companies',
     'processing_snapshot_specs': 'processing_snapshot',
     'joins_through_tables_specs': 'joins_through_tables',
+    'places_specs': 'places',
+    'milestoned_union_specs': 'milestoned_union',
 }
 
 # Python finder/attribute methods whose TypeScript names aren't a plain snake -> camel conversion.
@@ -101,7 +104,24 @@ SKIPPED_MODULES = {
 
 # Expectations of the Python specs for features that are not ported yet, by the pattern their names match. Each is generated
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
+# They are in the order the Python project added them (data-finder after 0.1.22), which is the order to port them in.
 UNPORTED = [
+    (r'^(a_filter_on_a_(milestoned_)?navigation|a_filtered_navigation|two_filters_on_one|filters_with_|the_same_condition_with_another|a_filter_of_a_filtered)',
+     'a filter on a navigation is not ported yet (data-finder #284)'),
+    (r'(percentile|quantile|^median_price)', 'a percentile and a quantile of a group are not ported yet (data-finder #283)'),
+    (r'(a_missing_value_sorts_|sort_can_put_a_missing|a_sort_says_where|a_sort_by_something_that_is_not|^join_full_keeps|^explicit_group_by_is_used|'
+     r'^aggregate_over_a_to_one_association_groups|^a_condition_on_one_hop_of_a_property|^sort_by_an_aggregate_descending|^chained_order_by_(makes|of_three)|'
+     r'^join_per_group_in_an_order)',
+     'where a missing value sorts, and nulls, are not ported yet (data-finder #285)'),
+    (r'(_difference_counts_the_boundaries|^a_regular_expression_matches_anywhere)',
+     'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)'),
+    (r'^the_number_of_each_day_of_the_week', 'day_of_week as the ISO day is not ported yet (data-finder #287)'),
+    (r'(^valid_from_week$|^week_extract$|^(date|datetime)_constant_parts$)', 'week_of_year is not ported yet (data-finder #288)'),
+    (r'^(not_equal_(on_a_function|on_an_expression_matches|on_a_column_of_a_result|between_two|in_a_having)|equal_between_two|not_over_)', 'a != and == that match a missing value are not ported yet (data-finder #291-#297)'),
+    (r'^(a_milestoned_step_reached_through_another|every_column_that_is_read_shares)',
+     'a milestoned step reached through another is not ported yet (data-finder #301)'),
+    (r'^(cosine_distance|l2_distance|inner_product|nearest_|a_distance_is)', 'vector search is not ported yet (data-finder #302)'),
+    (r'^if_as_a_filter', 'a conditional as a filter is not ported yet (data-finder #303)'),
 ]
 
 
@@ -166,6 +186,7 @@ class Translator:
         self.signatures: dict[str, list[str]] = {}   # their parameter names, to give a call's keywords their place
         self.plain: set[str] = set()           # names that are plain values, not expressions (a helper's `quantity: float`)
         self.local_functions: dict[str, tuple[list[str], str | None, list[str]]] = {}   # a helper's own functions: positional, *args, keyword-only
+        self.constants: dict[str, list] = {}   # the lists of a module that its queries go over
         self.callables: set[str] = set()       # a helper's parameters that are functions it calls (a `history`)
         self.used: set[str] = set()            # free functions the translated queries call
         self.model_used: set[str] = set()      # model classes the translated queries use
@@ -240,6 +261,10 @@ class Translator:
 
     def visit_ListComp(self, node: ast.ListComp) -> str:
         (gen,) = node.generators
+        if isinstance(gen.target, ast.Name) and isinstance(gen.iter, ast.Name) and gen.iter.id in self.constants:
+            # over a constant of the module: written out for each value, so what Python does with a value (str(day)) is done here
+            values = self.constants[gen.iter.id]
+            return '[' + ', '.join(self.expr(_Substitute({gen.target.id: v}).visit(copy.deepcopy(node.elt))) for v in values) + ']'
         assert isinstance(gen.target, ast.Name) and not gen.ifs, ast.dump(node)
         return f'{self.expr(gen.iter)}.map({gen.target.id} => {self.expr(node.elt)})'
 
@@ -279,6 +304,8 @@ class Translator:
 
     def visit_Compare(self, node: ast.Compare) -> str:
         assert len(node.ops) == 1
+        if isinstance(node.ops[0], (ast.Is, ast.IsNot)):   # `x is None`, in a helper's own logic
+            return f'({self.expr(node.left)} {"===" if isinstance(node.ops[0], ast.Is) else "!=="} {self.expr(node.comparators[0])})'
         return f'{self.expr(node.left)}.{COMPARE_METHODS[type(node.ops[0])]}({self.expr(node.comparators[0])})'
 
     def visit_BinOp(self, node: ast.BinOp) -> str:
@@ -373,6 +400,8 @@ class Translator:
         if isinstance(func, ast.Name) and func.id == 'constant' and node.args and isinstance(node.args[0], ast.Call) \
                 and getattr(node.args[0].func, 'attr', None) == 'Decimal':   # constant(Decimal("1.5")) is the decimal itself
             return self.expr(node.args[0])
+        if isinstance(func, ast.Name) and func.id == 'str' and len(node.args) == 1:   # the text of a date, as Python writes it
+            return js_str(str(eval(compile(ast.Expression(node.args[0]), '<spec>', 'eval'), {'datetime': datetime})))
         if isinstance(func, ast.Name):
             if func.id not in FREE_FUNCTIONS:
                 raise NotImplementedError(f'a call of {func.id}')
@@ -500,6 +529,96 @@ def kwarg(call: ast.Call, name: str) -> ast.AST:
     return next(k.value for k in call.keywords if k.arg == name)
 
 
+class _Substitute(ast.NodeTransformer):
+    """The names of a comprehension's target replaced by the values of one of its iterations."""
+
+    def __init__(self, values: dict):
+        self.values = values
+
+    def visit_Name(self, node: ast.Name):
+        if node.id in self.values and isinstance(node.ctx, ast.Load):
+            return ast.parse(repr(self.values[node.id]), mode='eval').body
+        return node
+
+    def visit_Lambda(self, node: ast.Lambda):
+        # `lambda f, a=a, b=b: ...`: the parameters a comprehension binds are given by its values instead
+        kept = [(a, d) for a, d in zip(node.args.args, [None] * (len(node.args.args) - len(node.args.defaults)) + node.args.defaults)
+                if a.arg not in self.values]
+        node.args.args = [a for a, _ in kept]
+        node.args.defaults = [d for _, d in kept if d is not None]
+        node.body = self.visit(node.body)
+        return node
+
+
+class _Bind(ast.NodeTransformer):
+    """A factory function's parameters replaced by the arguments it is called with; a parameter that is a lambda is inlined where it is called."""
+
+    def __init__(self, arguments: dict[str, ast.AST]):
+        self.arguments = arguments
+
+    def visit_Call(self, node: ast.Call):
+        if isinstance(node.func, ast.Name) and isinstance(self.arguments.get(node.func.id), ast.Lambda):
+            lam = self.arguments[node.func.id]
+            inner = {a.arg: self.visit(arg) for a, arg in zip(lam.args.args, node.args)}
+            return _Bind(inner).visit(copy.deepcopy(lam.body))
+        return self.generic_visit(node)
+
+    def visit_Name(self, node: ast.Name):
+        if node.id in self.arguments and isinstance(node.ctx, ast.Load):
+            return copy.deepcopy(self.arguments[node.id])
+        return node
+
+
+def _walk_outside_functions(node: ast.AST):
+    yield node
+    for child in ast.iter_child_nodes(node):
+        if not isinstance(child, ast.FunctionDef):
+            yield from _walk_outside_functions(child)
+
+
+def expectation_call_nodes(expectations: ast.AST, tree: ast.Module, module) -> dict[str, ast.Call]:
+    """Each `TestExpectation(...)` of a module by name; one a comprehension makes is made once for each of its iterations,
+    and one a factory function returns once for each call of it."""
+    calls: dict[str, ast.Call] = {}
+    handled: set[int] = set()
+    env = dict(vars(module))
+    factories = {stmt.name: stmt for stmt in tree.body if isinstance(stmt, ast.FunctionDef)
+                 and isinstance(stmt.body[-1], ast.Return) and isinstance(stmt.body[-1].value, ast.Call)
+                 and getattr(stmt.body[-1].value.func, 'id', None) == 'TestExpectation'}
+    assigned = {stmt.targets[0].id: stmt.value for stmt in tree.body
+                if isinstance(stmt, ast.Assign) and isinstance(stmt.targets[0], ast.Name)}
+    nodes: list[ast.AST] = []   # the spec's expectations, and those of a list it names: `*_PERCENTILE_EXPECTATIONS`
+    pending, seen = [expectations], set()
+    while pending:
+        for node in _walk_outside_functions(pending.pop()):
+            nodes.append(node)
+            if isinstance(node, ast.Name) and node.id in assigned and node.id not in seen:
+                seen.add(node.id)
+                pending.append(assigned[node.id])
+    for node in nodes:
+        if isinstance(node, ast.ListComp) and isinstance(node.elt, ast.Call) \
+                and getattr(node.elt.func, 'id', None) == 'TestExpectation':
+            (gen,) = node.generators
+            targets = [gen.target.id] if isinstance(gen.target, ast.Name) else [t.id for t in gen.target.elts]
+            handled.add(id(node.elt))
+            for item in eval(compile(ast.Expression(gen.iter), '<spec>', 'eval'), env):
+                values = dict(zip(targets, item if isinstance(gen.target, ast.Tuple) else [item]))
+                call = _Substitute(values).visit(copy.deepcopy(node.elt))
+                name = eval(compile(ast.Expression(kwarg(node.elt, 'name')), '<spec>', 'eval'), {**env, **values})
+                calls[name] = call
+        elif isinstance(node, ast.Call) and getattr(node.func, 'id', None) in factories:
+            factory = factories[node.func.id]
+            params = [a.arg for a in factory.args.args]
+            arguments = dict(zip(params, node.args)) | {k.arg: k.value for k in node.keywords}
+            call = _Bind(arguments).visit(copy.deepcopy(factory.body[-1].value))
+            calls[ast.literal_eval(kwarg(call, 'name'))] = call
+            handled.add(id(call))
+    for node in nodes:
+        if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'TestExpectation' and id(node) not in handled:
+            calls[ast.literal_eval(kwarg(node, 'name'))] = node
+    return calls
+
+
 def mapping_dir(mapping_file: str) -> str:
     """Directory under tests/generated_examples/ that example/generate_examples.py writes to."""
     return mapping_file.replace('.md', '').replace('_mapping', '')
@@ -509,6 +628,8 @@ def translate_helper(translator: 'Translator', stmt: ast.FunctionDef) -> str:
     """A module-level helper function of a spec module as a TypeScript function."""
     args = ', '.join([f'{a.arg}: any' for a in stmt.args.args] + ([f'...{stmt.args.vararg.arg}: any[]'] if stmt.args.vararg else []))
     lines = []
+    params = {a.arg for a in stmt.args.args}
+    translator.callables |= {n.func.id for n in ast.walk(stmt) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in params}
     for inner in stmt.body:
         if isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Constant):
             continue   # a docstring
@@ -516,6 +637,9 @@ def translate_helper(translator: 'Translator', stmt: ast.FunctionDef) -> str:
             lines.append(f'  {translator.expr(inner.value)};')
         elif isinstance(inner, ast.Assign) and len(inner.targets) == 1 and isinstance(inner.targets[0], ast.Name):
             lines.append(f'  const {inner.targets[0].id} = {translator.expr(inner.value)};')
+        elif isinstance(inner, ast.Assign) and len(inner.targets) == 1 and isinstance(inner.targets[0], ast.Tuple):
+            names = ', '.join(t.id for t in inner.targets[0].elts)
+            lines.append(f'  const [{names}] = {translator.expr(inner.value)};')
         elif isinstance(inner, ast.Return):
             lines.append(f'  return {translator.expr(inner.value)};')
         else:
@@ -533,6 +657,7 @@ def generate_module(module_name: str) -> tuple[str, str]:
     source = open(os.path.join(SPEC_DIR, module_name + '.py')).read()
     tree = ast.parse(source)
     translator = Translator()
+    translator.constants = {k: v for k, v in vars(module).items() if k.startswith('_') and isinstance(v, list)}
 
     # Module-level constants used by the queries (_AT = "2023-12-01 12:00:00", ...)
     consts = []
@@ -549,7 +674,7 @@ def generate_module(module_name: str) -> tuple[str, str]:
                     consts.append(f'export const {name} = ({params}) => {translator.expr(stmt.value.body)};')
                 else:
                     consts.append(f'export const {stmt.targets[0].id} = {translator.expr(stmt.value)};')
-            except NotImplementedError as error:
+            except (NotImplementedError, AssertionError, ValueError) as error:
                 failed[stmt.targets[0].id] = str(error)
 
     # Module-level helper functions (def _name(f): ...) that a query calls; their statements are translated too.
@@ -560,7 +685,7 @@ def generate_module(module_name: str) -> tuple[str, str]:
         if isinstance(stmt, ast.FunctionDef) and stmt.name in translator.helpers:
             try:
                 consts.append(translate_helper(translator, stmt))
-            except NotImplementedError as error:
+            except (NotImplementedError, AssertionError, ValueError) as error:
                 failed[stmt.name] = str(error)
 
     specs = finder_spec_nodes(tree)
@@ -589,24 +714,24 @@ def generate_module(module_name: str) -> tuple[str, str]:
                 imports[spec.finder_name] = path
             else:
                 side_effects.add(path)   # registers the finder so reverse associations resolve
-        expectation_calls = {
-            ast.literal_eval(kwarg(c, 'name')): c
-            for c in ast.walk(kwarg(spec_call, 'expectations'))
-            if isinstance(c, ast.Call) and getattr(c.func, 'id', None) == 'TestExpectation'
-        }
+        expectation_calls = expectation_call_nodes(kwarg(spec_call, 'expectations'), tree, module)
         cases = []
         for exp in spec.expectations:
             reason = unported_reason(exp.name)
-            if reason is not None:
-                cases.append(f"  {{\n    name: {js_str(exp.name)},\n    query: () => {{ throw new Error({js_str(reason)}); }},\n"
-                             f"    expected: {{ columns: [], rows: [], skip: {js_str(reason)} }},\n  }},\n")
-                continue
-            lam = kwarg(expectation_calls[exp.name], 'query')
-            assert isinstance(lam, (ast.Lambda, ast.Name)), ast.dump(lam)
-            query = translator.expr(lam.body) if isinstance(lam, ast.Lambda) else f'{lam.id}(f)'   # or a helper
-            broken = [name for name in failed if re.search(rf'\b{re.escape(name)}\b', query)]
-            if broken:
-                raise NotImplementedError(f"{exp.name} uses {broken[0]}, which could not be translated: {failed[broken[0]]}")
+            try:
+                lam = kwarg(expectation_calls[exp.name], 'query')
+                assert isinstance(lam, (ast.Lambda, ast.Name)), ast.dump(lam)
+                query = translator.expr(lam.body) if isinstance(lam, ast.Lambda) else f'{lam.id}(f)'   # or a helper
+                broken = [name for name in failed if re.search(rf'\b{re.escape(name)}\b', query)]
+                if broken:
+                    raise NotImplementedError(f"{exp.name} uses {broken[0]}, which could not be translated: {failed[broken[0]]}")
+            except (NotImplementedError, AssertionError, KeyError, ValueError) as error:
+                # not translated yet: the case stays, and fails, until the query can be written
+                print(f'!!! {module_name}.{exp.name}: not translated: {type(error).__name__} {str(error)[:150]}')
+                query = f"{{ throw new Error({js_str('not translated from Python: ' + str(error)[:200])}); }}"
+                query = f'(() => {query})()'
+            if reason is not None:   # a method the port does not have yet would not compile on a constant either
+                query = re.sub(r'\bconstant\(', '(constant as any)(', query)
             labels = COLUMN_LABELS.get(exp.name, {})
             columns = [labels.get(c, c) for c in exp.expected_columns]
             fields = [f"columns: [{', '.join(js_str(c) for c in columns)}]",
@@ -619,8 +744,10 @@ def generate_module(module_name: str) -> tuple[str, str]:
                 fields.append(f"skipGraphql: {js_str(exp.skip_backends['graphql'])}")
             if getattr(exp, 'approximate', False):
                 fields.append('approximate: true')
+            if reason is not None:   # the whole test is ported and skipped, so the port only has to delete the skip
+                fields.append(f'skip: {js_str(reason)}')
             cases.append(
-                f"  {{\n    name: {js_str(exp.name)},\n    query: f => {query},\n"
+                f"  {{\n    name: {js_str(exp.name)},\n    query: {'(f: any)' if reason is not None else 'f'} => {query},\n"
                 f"    expected: {{ {', '.join(fields)} }},\n  }},\n"
             )
         case_blocks.append(f"export const {var_name}: SpecCase<{spec.finder_name}>[] = [\n" + ''.join(cases) + '];\n')
