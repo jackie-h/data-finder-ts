@@ -101,9 +101,17 @@ class Join {
     readonly kind: JoinKind,
     readonly target: TableAlias,
     readonly condition: string,
-    readonly filterOp?: RelationalOperationElement,
+    readonly filterSql?: string,
   ) {}
 }
+
+/** The key of the join that a node has for what the query reads outside its WHERE, where the node is joined twice. */
+class ProjectionJoin {
+  constructor(readonly node: JoinTreeNodeOperation) {}
+}
+
+/** What a join's table alias is kept under: its node, or, for the second join of a node that is joined twice, that node's projection join. */
+type JoinKey = JoinTreeNodeOperation | ProjectionJoin;
 
 function sqlFormatDatetime(value: Date): string {
   const pad = (n: number, w = 2) => String(n).padStart(w, '0');
@@ -1093,7 +1101,10 @@ class SQLQueryGenerator {
   private _offset?: number;
   private _tableAliasIncr: number;
   private _tableAliasesByTable = new Map<unknown, TableAlias>();
-  private _addedJoinIds = new Set<JoinTreeNodeOperation>();
+  private _addedJoinIds = new Set<JoinKey>();
+  private _splitNodes = new Set<JoinTreeNodeOperation>();   // nodes joined once for the WHERE and once for everything else
+  private _projectionKeys = new Map<JoinTreeNodeOperation, ProjectionJoin>();
+  private _readingWhere = false;
   private _rootTable?: Relation;
   private _elidableNodes = new Set<JoinTreeNodeOperation>();
   private _joinFilters: ReadonlyMap<JoinTreeNodeOperation, Operation> = new Map();
@@ -1116,8 +1127,17 @@ class SQLQueryGenerator {
       this._queryJoinTargets.add(target);
       this._join.push(new Join(join.kind, target, this.buildFilter(join.operation)));
     }
+    const asked = askedWithDates(query);
+    this._splitNodes = new Set(this._splitMilestonedJoins(query, asked));
+    this._readingWhere = true;   // the joins of the WHERE come first, as the query's filter is read before its columns
+    try {
+      for (const node of this._splitNodes) this._addJoin(node);
+    } finally { this._readingWhere = false; }
     this.processSelect([...query.columns]);
-    this._where = this.buildFilter(this._guarded(askedWithDates(query)));
+    this._readingWhere = true;
+    try {
+      this._where = this.buildFilter(this._guarded(asked));
+    } finally { this._readingWhere = false; }
     const groupByJoins = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
     for (const expr of query.groupBy) {
       this._collectRequiredJoins(expr, groupByJoins);
@@ -1183,7 +1203,7 @@ class SQLQueryGenerator {
 
   private _attrToColString(attr: Attribute): string {
     const { column, parent } = this._resolve(attr);
-    const ta = this._tableAliasForTable(column.ownerRelation, parent);
+    const ta = this._tableAliasForTable(column.ownerRelation, this._joinTargetKey(parent));
     return ta.name + '.' + column.name;
   }
 
@@ -1320,7 +1340,7 @@ class SQLQueryGenerator {
   private _rewriteOperation(op: RelationalOperationElement): RelationalOperationElement {
     if (op instanceof Attribute || op instanceof ColumnWithJoin) {
       const { column, parent } = this._resolve(op);
-      return new TableAliasColumn(column, this._tableAliasForTable(column.ownerRelation, parent));
+      return new TableAliasColumn(column, this._tableAliasForTable(column.ownerRelation, this._joinTargetKey(parent)));
     }
     if (op instanceof Column) {
       const ta = this._tableAliasForTable(op.ownerRelation);
@@ -1403,7 +1423,7 @@ class SQLQueryGenerator {
       const { column, parent: node } = this._resolve(col);
       let ta: TableAlias;
       if (node !== undefined) {
-        ta = this._tableAliasForTable(column.ownerRelation, node);
+        ta = this._tableAliasForTable(column.ownerRelation, this._joinTargetKey(node));
       } else {
         ta = this._tableAliasForTable(column.ownerRelation);
         this._from.add(ta);
@@ -1430,7 +1450,7 @@ class SQLQueryGenerator {
       const node = colNested.parent;
       let ta: TableAlias;
       if (node !== undefined) {
-        ta = this._tableAliasForTable(colNested.column.ownerRelation, node);
+        ta = this._tableAliasForTable(colNested.column.ownerRelation, this._joinTargetKey(node));
       } else {
         ta = this._tableAliasForTable(colNested.column.ownerRelation);
         this._from.add(ta);
@@ -1461,7 +1481,7 @@ class SQLQueryGenerator {
       const node = colNested.parent;
       let ta: TableAlias;
       if (node !== undefined) {
-        ta = this._tableAliasForTable(colNested.column.ownerRelation, node);
+        ta = this._tableAliasForTable(colNested.column.ownerRelation, this._joinTargetKey(node));
       } else {
         ta = this._tableAliasForTable(colNested.column.ownerRelation);
         this._from.add(ta);
@@ -1494,10 +1514,65 @@ class SQLQueryGenerator {
     }
   }
 
+  /**
+   * The key a node's table alias is kept under: always the node, so the alias in the select matches the alias registered in `_addJoin`. A
+   * node that is joined twice is keyed by itself where the WHERE reads it, and by another where anything else does.
+   */
+  private _joinTargetKey(node: JoinTreeNodeOperation): JoinKey;
+  private _joinTargetKey(node: JoinTreeNodeOperation | undefined): JoinKey | undefined;
+  private _joinTargetKey(node: JoinTreeNodeOperation | undefined): JoinKey | undefined {
+    if (node !== undefined && this._splitNodes.has(node) && !this._readingWhere) {
+      let key = this._projectionKeys.get(node);
+      if (key === undefined) { key = new ProjectionJoin(node); this._projectionKeys.set(node, key); }
+      return key;
+    }
+    return node;
+  }
+
+  /**
+   * The steps that are joined once for the WHERE and once for the rest of the query, as Legend joins them.
+   *
+   * A to-one milestoned step reached through another milestoned step, whose columns the WHERE reads and the select (or a group by, an
+   * order or a having) reads too, is two independent joins: the filter holds for one row of the table and the column is read from another.
+   * Where the table has several rows for the key, as the sets of a union do, the rows of the query are each of the one multiplied by each
+   * of the other. The step it is reached through, and any step that is to-many, not milestoned, or reached through none, stays one join that
+   * both read: for a to-many step the filter and the values read are of the same row, as a query over its rows means.
+   */
+  private _splitMilestonedJoins(query: QuerySpecification, asked: RelationalOperationElement): JoinTreeNodeOperation[] {
+    const nodesOf = (...expressions: (RelationalOperationElement | undefined)[]): Set<JoinTreeNodeOperation> => {
+      const nodes = new Set<JoinTreeNodeOperation>();
+      for (const expression of expressions) {
+        walkRefs(expression, ref => { const parent = ref instanceof Attribute ? ref.parent() : ref.parent; if (parent !== undefined) nodes.add(parent); });
+      }
+      return nodes;
+    };
+    const inWhere = nodesOf(asked);
+    if (inWhere.size === 0) return [];
+    const ordered = query instanceof OrderedQuerySpecification ? query : undefined;
+    const read = nodesOf(...query.columns, ...query.groupBy, ...(ordered?.orderBy ?? []).map(sort => sort.column), query.having);
+    const isMilestonedStep = (node: JoinTreeNodeOperation): boolean => milestoningColumnsOf(node.join.table) !== undefined;
+    const split = new Set<JoinTreeNodeOperation>();
+    for (const node of inWhere) {
+      if (!read.has(node) || this._elidableNodes.has(node) || node.many || !isMilestonedStep(node)) continue;
+      let ancestor = node.parent;
+      while (ancestor !== undefined && !isMilestonedStep(ancestor)) ancestor = ancestor.parent;
+      if (ancestor !== undefined) split.add(node);
+    }
+    // a step that is read through a step that is joined twice is joined with that one
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const node of read) {
+        if (!split.has(node) && node.parent !== undefined && split.has(node.parent) && !this._elidableNodes.has(node)) { split.add(node); grew = true; }
+      }
+    }
+    return [...split];
+  }
+
   private _addJoin(node: JoinTreeNodeOperation): void {
-    if (this._addedJoinIds.has(node)) return;
+    const key = this._joinTargetKey(node);
+    if (this._addedJoinIds.has(key)) return;
     if (node.parent !== undefined) this._addJoin(node.parent);
-    this._addedJoinIds.add(node);
+    this._addedJoinIds.add(key);
 
     const join = node.join;
     if (node.parent === undefined) {
@@ -1505,13 +1580,14 @@ class SQLQueryGenerator {
       if (source === undefined) throw new Error(`Join '${join.name}' reads nothing of what it is joined from`);
       this._from.add(this._tableAliasForTable(source.ownerRelation));
     }
-    const targetAlias = this._tableAliasForTable(join.target, node);
+    const targetAlias = this._tableAliasForTable(join.target, key);
     // a sub-select carries the step's filter itself, so it is not repeated in the ON clause
     const queryFilter = targetAlias.relation instanceof OrderedQuerySpecification ? undefined : this._joinFilters.get(node);
     const filterOp = join.filter !== undefined && queryFilter !== undefined
       ? new LogicalOperation(join.filter as Operation, LogicalOperator.AND, queryFilter)
       : join.filter ?? queryFilter;
-    this._join.push(new Join(join.kind, targetAlias, this.buildFilter(this._sided(join.operation, node)), filterOp));
+    const condition = this.buildFilter(this._sided(join.operation, node));
+    this._join.push(new Join(join.kind, targetAlias, condition, filterOp === undefined ? undefined : this.buildFilter(filterOp)));
   }
 
   /**
@@ -1520,7 +1596,7 @@ class SQLQueryGenerator {
    */
   private _sided(op: RelationalOperationElement, node: JoinTreeNodeOperation): RelationalOperationElement {
     const aliasOf = (column: Column): TableAliasColumn =>
-      new TableAliasColumn(column, this._tableAliasForTable(column.ownerRelation, node.join.isTarget(column) ? node : node.parent));
+      new TableAliasColumn(column, this._tableAliasForTable(column.ownerRelation, this._joinTargetKey(node.join.isTarget(column) ? node : node.parent)));
     const side = (o: RelationalOperationElement): RelationalOperationElement => {
       if (o instanceof Column) return aliasOf(o);
       if (o instanceof ComparisonOperation) return new ComparisonOperation(side(o.left), o.operator, side(o.right));
@@ -1601,7 +1677,7 @@ class SQLQueryGenerator {
       const { column, parent: node } = this._resolve(op);
       let ta: TableAlias;
       if (node !== undefined) {
-        ta = this._tableAliasForTable(column.ownerRelation, node);
+        ta = this._tableAliasForTable(column.ownerRelation, this._joinTargetKey(node));
         this._addJoin(node);
       } else {
         ta = this._tableAliasForTable(column.ownerRelation);
@@ -1617,13 +1693,13 @@ class SQLQueryGenerator {
   }
 
   /** The alias a relation is read under: one per join node, and one per table (by its qualified name) outside a join. */
-  private _tableAliasForTable(table: Relation, key?: JoinTreeNodeOperation): TableAlias {
+  private _tableAliasForTable(table: Relation, key?: JoinKey): TableAlias {
     if (!(table instanceof NamedRelation)) throw new TypeError('A relation read by name needs a name: ' + table.constructor.name);
     const cacheKey = key ?? table.qualifiedName;
     if (this._tableAliasesByTable.has(cacheKey)) {
       return this._tableAliasesByTable.get(cacheKey)!;
     }
-    const subSelect = key instanceof JoinTreeNodeOperation ? this._subSelects.get(key) : undefined;
+    const subSelect = key instanceof JoinTreeNodeOperation ? this._subSelects.get(key) : key instanceof ProjectionJoin ? this._subSelects.get(key.node) : undefined;
     // a relation read under a name (a result used as a table): the relation itself is what is written
     const ta = new TableAlias(subSelect ?? (table instanceof TableAlias ? table.relation : table), 't' + this._tableAliasIncr++);
     this._tableAliasesByTable.set(cacheKey, ta);
@@ -1670,7 +1746,7 @@ class SQLQueryGenerator {
   buildQueryString(): string {
     const joins = this._join.map(j =>
       ' ' + JOIN_WORDS[j.kind] + ' JOIN ' + this._relationSql(j.target) + ' AS ' + j.target.name +
-      ' ON (' + j.condition + (j.filterOp ? ' AND ' + this.buildFilter(j.filterOp) : '') + ')',
+      ' ON (' + j.condition + (j.filterSql ? ' AND ' + j.filterSql : '') + ')',
     );
 
     return (this._distinct ? 'SELECT DISTINCT ' : 'SELECT ') + this._select.map(ca => sqlOperationToString(ca, this._dialect)).join(',') +
