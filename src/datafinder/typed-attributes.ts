@@ -170,7 +170,7 @@ export abstract class NumericAttribute<A extends AggregateOperation = AggregateO
     const operator = sample(ddof) ? AggregateOperator.VAR_SAMP : AggregateOperator.VAR_POP;
     return new DoubleAggregateOperation(this.cwj(), operator, 'Var ' + this.displayName());
   }
-  /** `percentile` as numpy and pandas name it: `'linear'` interpolates, `'inverted_cdf'` is a value that is there. `quantile(0.5)` is the median. */
+  /** The same as `percentile`, with the `method` of the quantile: `'linear'` interpolates, `'inverted_cdf'` is a value that is there. `quantile(0.5)` is the median. */
   quantile(p: number, { method = 'linear' }: { method?: QuantileMethod } = {}): A | DoubleAggregateOperation {
     return quantileOperation(this.cwj(), p, method, 'Quantile ' + this.displayName(), this.aggregateKind());
   }

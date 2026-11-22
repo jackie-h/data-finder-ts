@@ -14,7 +14,7 @@ describe('percentile and quantile', () => {
   });
 
   it('a quantile is linear or inverted_cdf', () => {
-    // @ts-expect-error numpy's other methods cannot be written in SQL
+    // @ts-expect-error the other methods cannot be written in SQL
     expect(() => price.quantile(0.5, { method: 'nearest' })).toThrow('inverted_cdf');
   });
 
