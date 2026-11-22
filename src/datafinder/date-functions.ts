@@ -50,7 +50,7 @@ export abstract class CalendarFunctions {
   quarter(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.QUARTER, 'Quarter ' + this.functionLabel()); }
   /** Extract the ISO week number (1–53). */
   week(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.WEEK, 'Week ' + this.functionLabel()); }
-  /** Extract the day of the week (0 = Sunday through 6 = Saturday). */
+  /** Extract the ISO day of the week: Monday is 1 and Sunday is 7. */
   dayOfWeek(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.ISODOW, 'Day Of Week ' + this.functionLabel()); }
   /** Extract the day of the year (1–366). */
   dayOfYear(): DateExtractOperation { return new DateExtractOperation(this.functionInput(), DatePart.DOY, 'Day Of Year ' + this.functionLabel()); }
