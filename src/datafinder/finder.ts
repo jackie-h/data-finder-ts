@@ -1,4 +1,5 @@
 import {
+  ColumnWithJoin, RelationalOperationElement,
   ExistsOperation, NotExistsOperation, JoinTreeNodeOperation, JoinOperation, Column, Table, TableAlias, LogicalOperation, LogicalOperator,
   Operation, Relation, JoinKind,
 } from '../model/relational';
@@ -97,4 +98,46 @@ export function viaJoins(
     node = new JoinTreeNodeOperation(keysJoin('', table, source, target, JoinKind.LEFT, condition), node, false, true, businessDate, processingDatetime);
   }
   return node;
+}
+
+const identities = new WeakMap<object, number>();
+let identityCount = 0;
+/** A number for an object that is only equal to itself. */
+function identityOf(value: object): number {
+  const known = identities.get(value);
+  if (known !== undefined) return known;
+  identities.set(value, ++identityCount);
+  return identityCount;
+}
+
+/**
+ * What a condition says, apart from the objects that say it, so two conditions that say the same compare equal: the same operations over the
+ * same columns of the same tables and the same values. A column of `own`, the navigation the condition is on, is "own" whichever copy of the
+ * navigation it was written on; a column of any other step is that step, so a condition that reads another step is the same only as one that
+ * reads that very step.
+ */
+function structureOf(value: unknown, own: JoinTreeNodeOperation, depth = 0): unknown {
+  if (value instanceof ColumnWithJoin) {
+    const relation = value.column.ownerRelation;
+    return ['column', value.column.name, relation.constructor.name, (relation as { name?: string }).name ?? null,
+      value.parent === own ? 'own' : value.parent === undefined ? null : identityOf(value.parent), structureOf(value.embedded, own, depth + 1)];
+  }
+  if (value === undefined || value === null) return null;
+  if (value instanceof Date) return ['date', value.getTime()];
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return [typeof value, String(value)];
+  if (Array.isArray(value)) return value.map(each => structureOf(each, own, depth + 1));
+  if (value instanceof RelationalOperationElement && depth < 16) {
+    return [value.constructor.name, Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1)).map(([name, each]) => [name, structureOf(each, own, depth + 1)])];
+  }
+  return typeof value === 'object' ? ['object', identityOf(value)] : null;
+}
+
+/** The text of what the conditions say, to tell whether a navigation has been filtered by them before. */
+export function conditionsKey(conditions: readonly Operation[], own: JoinTreeNodeOperation): string {
+  return JSON.stringify(conditions.map(each => structureOf(each, own)));
+}
+
+/** The conditions all held: they are ANDed. */
+export function allOf(conditions: readonly Operation[]): Operation {
+  return conditions.reduce((left, right) => new LogicalOperation(left, LogicalOperator.AND, right));
 }

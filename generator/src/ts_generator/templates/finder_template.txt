@@ -13,7 +13,7 @@ import {
   convertDate, convertProcessingDate, FinderResult,
 } from '@datafinder/runner';
 import { ExistsOperation, NotExistsOperation } from '@model/relational';
-import { displayPrefix, keysJoin, viaJoins, type JoinCondition, type NavigationDates } from '@datafinder/finder';
+import { allOf, conditionsKey, displayPrefix, keysJoin, viaJoins, type JoinCondition, type NavigationDates } from '@datafinder/finder';
 import type { Attribute } from '@datafinder/attribute';
 import { EmbeddedAttributes, embeddedUnder } from '@datafinder/embedded';
 import { titleCase } from '@datafinder/naming';
@@ -185,6 +185,10 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   };
 
   private readonly _node: JoinTreeNodeOperation;
+  /** The same navigation, built again with a join of its own: what a filter of it is made from. */
+  private readonly _rebuild: () => {{rcm.clazz.name}}RelatedFinder;
+  private _filters: Array<(each: {{rcm.clazz.name}}RelatedFinder) => Operation> = [];
+  private readonly _filtered = new Map<string, {{rcm.clazz.name}}RelatedFinder>();
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
   private readonly _{{to_ts_name(rpm.property)}}: {{rpm.property.type.name}}Attribute;
@@ -213,6 +217,7 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
       dates?.businessDate == null ? null : convertDate(dates.businessDate),
       dates?.processingTime == null ? null : convertProcessingDate(dates.processingTime),
     );
+    this._rebuild = () => new {{rcm.clazz.name}}RelatedFinder(relationName, source, target, many, optional, parentJoin, embedded, filter, dates, condition, conditionReverse);
 {% for rpm in rcm.property_mappings %}
 {% if is_primitive(rpm.property) %}
     this._{{to_ts_name(rpm.property)}} = new {{rpm.property.type.name}}Attribute(displayPrefix(relationName, parentJoin) + ' {{display_name(rpm.property)}}', '{{rpm.target.name}}', '{{rpm.target.type}}', {{owner_code(rpm.target.table)}}, this._node, embedded?.['{{rpm.property.id}}'], {{ 'true' if rpm.target.nullable else 'false' }}, {{ 'true' if rpm.property.multiplicity.lower == 0 else 'false' }});
@@ -270,6 +275,27 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   }
 
 {% endfor %}
+  /**
+   * A copy of this navigation that reaches only the rows `condition` holds for, as Legend's `locations->filter(f | $f.place in [...])`.
+   * `condition` is a function of the copy, and says what its rows must be from the attributes of the copy.
+   *
+   * The condition is in the `ON` of the join of the navigation, not in the `WHERE`, so a row of the query that has none that holds is
+   * still there, with null for what the navigation reads. A filter with the condition of one already made on this navigation is that
+   * filtered navigation, so the columns read from the two are read from one join; a condition that says something else, or says the
+   * same another way (the values of an `isIn` in another order), is a join of its own. A filter of a filtered navigation holds both.
+   */
+  filter(condition: (each: {{rcm.clazz.name}}RelatedFinder) => Operation): {{rcm.clazz.name}}RelatedFinder {
+    const filtered = this._rebuild();
+    filtered._filters = [...this._filters, condition];
+    const held = filtered._filters.map(each => each(filtered));
+    const key = conditionsKey(held, filtered._node);
+    const known = this._filtered.get(key);
+    if (known !== undefined) return known;
+    filtered._node.join.filter = allOf(held);
+    this._filtered.set(key, filtered);
+    return filtered;
+  }
+
   /** Filter to rows that have a matching {{rcm.clazz.name}} through this join. */
   exists(): ExistsOperation {
     return new ExistsOperation(this._node);

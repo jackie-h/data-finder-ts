@@ -18,12 +18,12 @@ export const JOIN_CONDITIONS_FIRM_FINDER_SPECS: SpecCase<FirmFinder>[] = [
   },
   {
     name: 'a_filter_on_a_navigation_is_anded_with_the_condition_of_its_join',
-    query: (f: any) => f.findAll([f.legalName(), f.employees().filter((each: any) => each.firstName().eq('Mary')).firstName()]).orderBy(f.legalName().ascending()),
+    query: f => f.findAll([f.legalName(), f.employees().filter((each: any) => each.firstName().eq('Mary')).firstName()]).orderBy(f.legalName().ascending()),
     expected: { columns: ['LegalName', 'Employees FirstName'], rows: [
         ['Alpha', 'Mary'],
         ['Beta', null],
         ['Gamma', null],
-      ], sql: 'ON (t0.id = t1.firm_id AND t0.flag IS NULL AND t1.flag IS NOT NULL AND t1.first_name = \'Mary\')', skipGraphql: 'The GraphQL finder reads no join conditions', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], sql: 'ON (t0.id = t1.firm_id AND t0.flag IS NULL AND t1.flag IS NOT NULL AND t1.first_name = \'Mary\')', skipGraphql: 'The GraphQL finder reads no join conditions' },
   },
   {
     name: 'a_filter_on_a_property_reached_through_a_join_with_a_condition',
