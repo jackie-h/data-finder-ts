@@ -106,8 +106,6 @@ SKIPPED_MODULES = {
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 # They are in the order the Python project added them (data-finder after 0.1.22), which is the order to port them in.
 UNPORTED = [
-    (r'^(a_filter_on_a_(milestoned_)?navigation|a_filtered_navigation|two_filters_on_one|filters_with_|the_same_condition_with_another|a_filter_of_a_filtered)',
-     'a filter on a navigation is not ported yet (data-finder #284)'),
     (r'(a_missing_value_sorts_|sort_can_put_a_missing|a_sort_says_where|a_sort_by_something_that_is_not|^join_full_keeps|^explicit_group_by_is_used|'
      r'^aggregate_over_a_to_one_association_groups|^a_condition_on_one_hop_of_a_property|^sort_by_an_aggregate_descending|^chained_order_by_(makes|of_three)|'
      r'^join_per_group_in_an_order)',
