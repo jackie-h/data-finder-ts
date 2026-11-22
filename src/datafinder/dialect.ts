@@ -58,23 +58,24 @@ export const POSTGRES: SqlDialect = {
   dayOfWeek: expression => `EXTRACT(DOW FROM ${expression})`,
   isoDayOfWeek: expression => `EXTRACT(ISODOW FROM ${expression})`,
   dateDiff(unit, from, to) {
-    // the number of `unit` from `from` to `to`: boundaries crossed for a year, quarter, month, day, hour, minute or second (a day is a
-    // change of date, an hour a change of hour), and whole weeks for a week, as DuckDB's DATE_DIFF counts them, in standard operators and
-    // EXTRACT, DATE_TRUNC and CAST, which Postgres and the other databases all have, where DATE_DIFF is DuckDB's own
-    if (unit === DatePart.YEAR || unit === DatePart.QUARTER || unit === DatePart.MONTH) {
+    // the number of `unit` boundaries from `from` to `to` (a year is a change of year, a day a change of date, a week the start of a week, on a
+    // Monday, an hour a change of hour), as DuckDB's DATE_DIFF counts them for all but a week, in standard operators and EXTRACT, DATE_TRUNC
+    // and CAST, which Postgres and the other databases all have, where DATE_DIFF is DuckDB's own
+    if (unit === DatePart.YEAR || unit === DatePart.MONTH) {
       const a = `CAST(${from} AS DATE)`;
       const b = `CAST(${to} AS DATE)`;
       const years = `(EXTRACT(YEAR FROM ${b}) - EXTRACT(YEAR FROM ${a}))`;
       if (unit === DatePart.YEAR) return years;
-      const [perYear, part] = unit === DatePart.QUARTER ? [4, 'QUARTER'] : [12, 'MONTH'];
-      return `(${years} * ${perYear} + EXTRACT(${part} FROM ${b}) - EXTRACT(${part} FROM ${a}))`;
+      return `(${years} * 12 + EXTRACT(MONTH FROM ${b}) - EXTRACT(MONTH FROM ${a}))`;
     }
-    const days = `(CAST(${to} AS DATE) - CAST(${from} AS DATE))`;
-    if (unit === DatePart.DAY) return days;
-    if (unit === DatePart.WEEK) return `CAST(SIGN(${days}) * FLOOR(ABS(${days}) / 7.0) AS BIGINT)`;   // whole weeks, as a week is 7 days
+    if (unit === DatePart.DAY) return `(CAST(${to} AS DATE) - CAST(${from} AS DATE))`;
+    if (unit === DatePart.WEEK) {   // the Mondays between: the days from the Monday of one week to the Monday of the other, in weeks
+      const monday = (date: string) => `CAST(DATE_TRUNC('week', CAST(${date} AS DATE)) AS DATE)`;
+      return `CAST((${monday(to)} - ${monday(from)}) / 7 AS BIGINT)`;
+    }
     const seconds = SECONDS_PER[unit];
     if (seconds === undefined) {
-      throw new Error(`A difference between dates is counted in years, quarters, months, weeks, days, hours, minutes or seconds, not ${unit}`);
+      throw new Error(`A difference between dates is counted in years, months, weeks, days, hours, minutes or seconds, not ${unit}`);
     }
     const part = unit.toLowerCase();
     return `CAST(EXTRACT(EPOCH FROM (DATE_TRUNC('${part}', CAST(${to} AS TIMESTAMP)) - DATE_TRUNC('${part}', CAST(${from} AS TIMESTAMP)))) / ${seconds} AS BIGINT)`;

@@ -106,8 +106,6 @@ SKIPPED_MODULES = {
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 # They are in the order the Python project added them (data-finder after 0.1.22), which is the order to port them in.
 UNPORTED = [
-    (r'(_difference_counts_the_boundaries|^a_regular_expression_matches_anywhere)',
-     'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)'),
     (r'^the_number_of_each_day_of_the_week', 'day_of_week as the ISO day is not ported yet (data-finder #287)'),
     (r'(^valid_from_week$|^week_extract$|^(date|datetime)_constant_parts$)', 'week_of_year is not ported yet (data-finder #288)'),
     (r'^(not_equal_(on_a_function|on_an_expression_matches|on_a_column_of_a_result|between_two|in_a_having)|equal_between_two|not_over_)', 'a != and == that match a missing value are not ported yet (data-finder #291-#297)'),
