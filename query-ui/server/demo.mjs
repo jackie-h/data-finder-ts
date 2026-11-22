@@ -8,7 +8,7 @@ const ROOT = new URL('../..', import.meta.url).pathname;
 
 const SCHEMA = [
   ['CREATE SCHEMA hr', 'CREATE TABLE hr.employees (id INT, name VARCHAR, manager_id INT)', 'hr.employees', 'employees.csv'],
-  ['CREATE TABLE companies (id INT, name VARCHAR, category VARCHAR)', 'companies', 'companies.csv'],
+  ['CREATE TABLE companies (id INT, name VARCHAR, category VARCHAR, embedding FLOAT[3])', 'companies', 'companies.csv'],
   ['CREATE SCHEMA trading', 'CREATE SCHEMA ref_data',
     'CREATE TABLE ref_data.account_master (ID INT, ACCT_NAME VARCHAR, BRANCH_ID INT, DESK_ID INT, in_z TIMESTAMP, out_z TIMESTAMP)',
     'ref_data.account_master', 'finance_accounts.csv'],

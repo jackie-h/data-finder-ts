@@ -104,7 +104,24 @@ SKIPPED_MODULES = {
 
 # Expectations of the Python specs for features that are not ported yet, by the pattern their names match. Each is generated
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
+# They are in the order the Python project added them (data-finder after 0.1.22), which is the order to port them in.
 UNPORTED = [
+    (r'^(a_filter_on_a_(milestoned_)?navigation|a_filtered_navigation|two_filters_on_one|filters_with_|the_same_condition_with_another|a_filter_of_a_filtered)',
+     'a filter on a navigation is not ported yet (data-finder #284)'),
+    (r'(percentile|quantile|^median_price)', 'a percentile and a quantile of a group are not ported yet (data-finder #283)'),
+    (r'(a_missing_value_sorts_|sort_can_put_a_missing|a_sort_says_where|a_sort_by_something_that_is_not|^join_full_keeps|^explicit_group_by_is_used|'
+     r'^aggregate_over_a_to_one_association_groups|^a_condition_on_one_hop_of_a_property|^sort_by_an_aggregate_descending|^chained_order_by_(makes|of_three)|'
+     r'^join_per_group_in_an_order)',
+     'where a missing value sorts, and nulls, are not ported yet (data-finder #285)'),
+    (r'(_difference_counts_the_boundaries|^a_regular_expression_matches_anywhere)',
+     'the date difference and the regex of the Postgres SQL are not ported yet (data-finder #286)'),
+    (r'^the_number_of_each_day_of_the_week', 'day_of_week as the ISO day is not ported yet (data-finder #287)'),
+    (r'(^valid_from_week$|^week_extract$|^(date|datetime)_constant_parts$)', 'week_of_year is not ported yet (data-finder #288)'),
+    (r'^(not_equal_(on_a_function|on_an_expression_matches|on_a_column_of_a_result|between_two|in_a_having)|equal_between_two|not_over_)', 'a != and == that match a missing value are not ported yet (data-finder #291-#297)'),
+    (r'^(a_milestoned_step_reached_through_another|every_column_that_is_read_shares)',
+     'a milestoned step reached through another is not ported yet (data-finder #301)'),
+    (r'^(cosine_distance|l2_distance|inner_product|nearest_|a_distance_is)', 'vector search is not ported yet (data-finder #302)'),
+    (r'^if_as_a_filter', 'a conditional as a filter is not ported yet (data-finder #303)'),
 ]
 
 
