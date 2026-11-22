@@ -595,37 +595,37 @@ export const COMPANY_FINDER_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'if_as_a_filter_keeps_the_rows_where_it_is_true',
-    query: (f: any) => f.findAll([f.name()], when(f.category().eq('Technology')).then(true).otherwise(false)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], when(f.category().eq('Technology')).then(true).otherwise(false)).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Corp'],
         ['Beta Corp'],
-      ], sql: 'WHERE CASE WHEN t0.category = \'Technology\' THEN TRUE ELSE FALSE END', skipGraphql: 'The GraphQL finder cannot compute a conditional', skip: 'a conditional as a filter is not ported yet (data-finder #303)' },
+      ], sql: 'WHERE CASE WHEN t0.category = \'Technology\' THEN TRUE ELSE FALSE END', skipGraphql: 'The GraphQL finder cannot compute a conditional' },
   },
   {
     name: 'if_as_a_filter_with_the_values_the_other_way_round',
-    query: (f: any) => f.findAll([f.name()], when(f.category().eq('Technology')).then(false).otherwise(true)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], when(f.category().eq('Technology')).then(false).otherwise(true)).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Industries'],
         ['Gamma LLC'],
         ['Delta Ltd'],
-      ], skipGraphql: 'The GraphQL finder cannot compute a conditional', skip: 'a conditional as a filter is not ported yet (data-finder #303)' },
+      ], skipGraphql: 'The GraphQL finder cannot compute a conditional' },
   },
   {
     name: 'if_as_a_filter_without_otherwise_drops_the_rows_where_the_condition_fails',
-    query: (f: any) => f.findAll([f.name()], when(f.category().eq('Finance')).then(true)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], when(f.category().eq('Finance')).then(true)).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Gamma LLC'],
         ['Delta Ltd'],
-      ], skipGraphql: 'The GraphQL finder cannot compute a conditional', skip: 'a conditional as a filter is not ported yet (data-finder #303)' },
+      ], skipGraphql: 'The GraphQL finder cannot compute a conditional' },
   },
   {
     name: 'if_as_a_filter_on_a_condition_over_a_column_of_the_row',
-    query: (f: any) => f.findAll([f.name()], when(f.name().startsWith('Acme')).then(f.id().gt(1)).otherwise(f.id().gt(3))).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], when(f.name().startsWith('Acme')).then(f.id().gt(1)).otherwise(f.id().gt(3))).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Acme Industries'],
         ['Gamma LLC'],
         ['Delta Ltd'],
-      ], skipGraphql: 'The GraphQL finder cannot compute a conditional', skip: 'a conditional as a filter is not ported yet (data-finder #303)' },
+      ], skipGraphql: 'The GraphQL finder cannot compute a conditional' },
   },
   {
     name: 'count_all',

@@ -1673,8 +1673,8 @@ class SQLQueryGenerator {
     if (op instanceof ConstantOperation) return constantValueString(op, this._dialect);
     if (op instanceof ScalarFunctionOperation || op instanceof ArithmeticOperation || op instanceof IntervalOperation
         || op instanceof ConcatOperation || op instanceof DateTruncOperation || op instanceof DateExtractOperation || op instanceof DateArithmeticOperation
-        || op instanceof DateDiffOperation || op instanceof AggregateOperation || op instanceof CountAllOperation) {
-      // an expression compared in a filter needs its columns' joins, then is written as in a select list
+        || op instanceof DateDiffOperation || op instanceof AggregateOperation || op instanceof CountAllOperation || op instanceof CaseOperation) {
+      // an expression compared in a filter, or a conditional that is the filter, needs its columns' joins, then is written as in a select list
       const required = new Map<JoinTreeNodeOperation, JoinTreeNodeOperation>();
       this._collectRequiredJoins(op, required);
       for (const node of required.values()) this._addJoin(node);

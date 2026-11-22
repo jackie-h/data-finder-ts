@@ -106,7 +106,6 @@ SKIPPED_MODULES = {
 # as a skipped test that says why, so a gap shows in the test report. A feature's port deletes its line.
 # They are in the order the Python project added them (data-finder after 0.1.22), which is the order to port them in.
 UNPORTED = [
-    (r'^if_as_a_filter', 'a conditional as a filter is not ported yet (data-finder #303)'),
 ]
 
 
