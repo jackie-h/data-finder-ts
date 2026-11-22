@@ -718,10 +718,6 @@ def generate_module(module_name: str) -> tuple[str, str]:
         cases = []
         for exp in spec.expectations:
             reason = unported_reason(exp.name)
-            if reason is not None:
-                cases.append(f"  {{\n    name: {js_str(exp.name)},\n    query: () => {{ throw new Error({js_str(reason)}); }},\n"
-                             f"    expected: {{ columns: [], rows: [], skip: {js_str(reason)} }},\n  }},\n")
-                continue
             try:
                 lam = kwarg(expectation_calls[exp.name], 'query')
                 assert isinstance(lam, (ast.Lambda, ast.Name)), ast.dump(lam)
@@ -734,6 +730,8 @@ def generate_module(module_name: str) -> tuple[str, str]:
                 print(f'!!! {module_name}.{exp.name}: not translated: {type(error).__name__} {str(error)[:150]}')
                 query = f"{{ throw new Error({js_str('not translated from Python: ' + str(error)[:200])}); }}"
                 query = f'(() => {query})()'
+            if reason is not None:   # a method the port does not have yet would not compile on a constant either
+                query = re.sub(r'\bconstant\(', '(constant as any)(', query)
             labels = COLUMN_LABELS.get(exp.name, {})
             columns = [labels.get(c, c) for c in exp.expected_columns]
             fields = [f"columns: [{', '.join(js_str(c) for c in columns)}]",
@@ -746,8 +744,10 @@ def generate_module(module_name: str) -> tuple[str, str]:
                 fields.append(f"skipGraphql: {js_str(exp.skip_backends['graphql'])}")
             if getattr(exp, 'approximate', False):
                 fields.append('approximate: true')
+            if reason is not None:   # the whole test is ported and skipped, so the port only has to delete the skip
+                fields.append(f'skip: {js_str(reason)}')
             cases.append(
-                f"  {{\n    name: {js_str(exp.name)},\n    query: f => {query},\n"
+                f"  {{\n    name: {js_str(exp.name)},\n    query: {'(f: any)' if reason is not None else 'f'} => {query},\n"
                 f"    expected: {{ {', '.join(fields)} }},\n  }},\n"
             )
         case_blocks.append(f"export const {var_name}: SpecCase<{spec.finder_name}>[] = [\n" + ''.join(cases) + '];\n')

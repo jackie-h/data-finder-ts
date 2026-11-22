@@ -18,8 +18,12 @@ export const JOIN_CONDITIONS_FIRM_FINDER_SPECS: SpecCase<FirmFinder>[] = [
   },
   {
     name: 'a_filter_on_a_navigation_is_anded_with_the_condition_of_its_join',
-    query: () => { throw new Error('a filter on a navigation is not ported yet (data-finder #284)'); },
-    expected: { columns: [], rows: [], skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+    query: (f: any) => f.findAll([f.legalName(), f.employees().filter((each: any) => each.firstName().eq('Mary')).firstName()]).orderBy(f.legalName().ascending()),
+    expected: { columns: ['LegalName', 'Employees FirstName'], rows: [
+        ['Alpha', 'Mary'],
+        ['Beta', null],
+        ['Gamma', null],
+      ], sql: 'ON (t0.id = t1.firm_id AND t0.flag IS NULL AND t1.flag IS NOT NULL AND t1.first_name = \'Mary\')', skipGraphql: 'The GraphQL finder reads no join conditions', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
   },
   {
     name: 'a_filter_on_a_property_reached_through_a_join_with_a_condition',
@@ -57,8 +61,16 @@ export const JOIN_CONDITIONS_PERSON_FINDER_SPECS: SpecCase<PersonFinder>[] = [
   },
   {
     name: 'a_condition_on_one_hop_of_a_property_mapped_through_another_table',
-    query: () => { throw new Error('where a missing value sorts, and nulls, are not ported yet (data-finder #285)'); },
-    expected: { columns: [], rows: [], skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
+    query: (f: any) => f.findAll([f.id(), f.activeFirms().legalName()]).orderBy(f.id().ascending(), f.activeFirms().legalName().ascending()),
+    expected: { columns: ['Id', 'Activefirms LegalName'], rows: [
+        [1, null],
+        [1, 'Alpha'],
+        [2, null],
+        [3, null],
+        [4, 'Beta'],
+        [5, null],
+        [6, null],
+      ], sql: 'ON (t0.id = t2.person_id) LEFT OUTER JOIN org.firms AS t1 ON (t2.firm_id = t1.id AND t2.active = 1)', skipGraphql: 'The GraphQL finder reads no join conditions', skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
   },
 ];
 
