@@ -241,19 +241,19 @@ export const ORGCHART_FINDER_SPECS: SpecCase<EmployeeFinder>[] = [
   },
   {
     name: 'if_as_a_filter_on_a_related_column_keeps_the_rows_with_no_related_row_out',
-    query: (f: any) => f.findAll([f.name()], when(f.manager().name().eq('Alice')).then(true).otherwise(false)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], when(f.manager().name().eq('Alice')).then(true).otherwise(false)).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Bob'],
         ['Carol'],
-      ], skipGraphql: 'The GraphQL finder cannot compute a conditional', skip: 'a conditional as a filter is not ported yet (data-finder #303)' },
+      ], skipGraphql: 'The GraphQL finder cannot compute a conditional' },
   },
   {
     name: 'if_as_a_filter_on_a_related_column_with_a_missing_row_taking_otherwise',
-    query: (f: any) => f.findAll([f.name()], when(f.manager().name().eq('Alice')).then(false).otherwise(true)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.name()], when(f.manager().name().eq('Alice')).then(false).otherwise(true)).orderBy(f.id().ascending()),
     expected: { columns: ['Name'], rows: [
         ['Alice'],
         ['Dave'],
-      ], skipGraphql: 'The GraphQL finder cannot compute a conditional', skip: 'a conditional as a filter is not ported yet (data-finder #303)' },
+      ], skipGraphql: 'The GraphQL finder cannot compute a conditional' },
   },
   {
     name: 'manager_name_for_dave',
