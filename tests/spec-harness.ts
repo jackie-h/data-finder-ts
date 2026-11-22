@@ -24,8 +24,15 @@ export function examplePath(file: string): string {
   return path.join(_examplesDir, file);
 }
 
+/** What the seeds of the specs load their tables through: a DuckDB connection, or a target that loads a CSV its own way (Spark). */
+export interface SeedTarget {
+  run(sql: string): Promise<unknown>;
+  loadCsv?(table: string, path: string): Promise<void>;
+}
+
 /** Load a shipped CSV into an existing table, as the Python tests do with read_csv_auto. */
-export async function loadCsv(conn: DuckDBConnection, table: string, file: string): Promise<void> {
+export async function loadCsv(conn: SeedTarget, table: string, file: string): Promise<void> {
+  if (conn.loadCsv !== undefined) return conn.loadCsv(table, examplePath(file));
   await conn.run(`INSERT INTO ${table} SELECT * FROM read_csv_auto('${examplePath(file)}')`);
 }
 
@@ -51,7 +58,7 @@ export interface Expectation {
 }
 
 /** The backend an expectation runs against: SQL is only checked for `duckdb`. */
-export type Backend = 'duckdb' | 'graphql';
+export type Backend = 'duckdb' | 'graphql' | 'spark';
 
 /** What a runner reports about the last query it ran. */
 export interface ColumnReporter {

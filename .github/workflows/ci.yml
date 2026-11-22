@@ -41,7 +41,7 @@ jobs:
       - name: Check spec tests are up to date with the Python specs
         run: |
           npm run generate:specs
-          git diff --exit-code tests/specs
+          git diff --exit-code tests/specs tests/spark
 
       - name: Type-check TypeScript
         run: npm run build

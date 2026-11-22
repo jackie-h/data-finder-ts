@@ -63,6 +63,10 @@ SEEDS = {
     'milestoned_union_specs': 'milestoned_union',
 }
 
+# The spec modules that also run against Spark (tests/spark/, `npm run test:spark`), as the Python project runs them: each is run against
+# the tables of its seed. The other modules need tables or finders that the Spark harness does not load.
+SPARK_MODULES = {'companies_specs', 'companies_constant_specs', 'positions_specs', 'finance_group_by_specs'}
+
 # Python finder/attribute methods whose TypeScript names aren't a plain snake -> camel conversion.
 METHOD_NAMES = {
     'find_all': 'findAll',
@@ -631,7 +635,7 @@ def translate_helper(translator: 'Translator', stmt: ast.FunctionDef) -> str:
     return f'export function {stmt.name}({args}) {{\n' + '\n'.join(lines) + '\n}'
 
 
-def generate_module(module_name: str) -> tuple[str, str]:
+def generate_module(module_name: str) -> tuple[str, str, str | None]:
     """The TypeScript source of a spec module: (the cases, the DuckDB test that runs them).
 
     The cases are kept apart from the test so that the GraphQL specs (tests/graphql-specs.test.ts) can run the
@@ -826,7 +830,42 @@ afterAll(() => {{
 }});
 """
     test_src = '\n'.join(header) + '\n' + setup + '\n' + '\n'.join(test_blocks)
-    return cases_src, test_src
+    return cases_src, test_src, spark_test(module_name, banner, imports, side_effects, groups) if module_name in SPARK_MODULES else None
+
+
+def spark_test(module_name: str, banner: str, imports: dict[str, str], side_effects: set[str], groups: list[tuple[str, str]]) -> str:
+    """The test that runs the cases of a module against Spark over Spark Connect: the same cases, on the same data, with no SQL checked (the
+    fragments are of the Postgres SQL, which is not what Spark is sent)."""
+    paths = lambda path: path   # tests/spark/ is beside tests/specs/, so a path of the one is the other's   # noqa: E731
+    header = [
+        banner,
+        "import { describe, it, beforeAll, afterAll } from 'vitest';",
+        "import { SparkSeedTarget, registerSpark, sparkSession, type SparkRunner } from '../spark-runner';",
+        "import { runExpectation } from '../spec-harness';",
+        "import { seeds } from '../spec-seeds';",
+    ]
+    header += [f"import {{ {name} }} from '{paths(path)}';" for name, path in sorted(imports.items())]
+    header += [f"import '{paths(path)}';" for path in sorted(side_effects - set(imports.values()))]
+    header += [f"import {{ {', '.join(sorted(var for var, _ in groups))} }} from '../specs/cases/{case_module_name(module_name)}';"]
+    blocks = ''.join(
+        f"describe({js_str(var)}, () => {{\n  const f = new {finder}();\n\n"
+        f"  for (const c of {var}) {{\n"
+        f"    (c.expected.skip === undefined ? it : it.skip)(c.name, () => runExpectation(c.query(f), runner, c.expected, 'spark'));\n  }}\n}});\n\n"
+        for var, finder in groups)
+    setup = f"""
+const session = sparkSession();
+let runner: SparkRunner;
+
+beforeAll(async () => {{
+  runner = registerSpark(session);
+  await seeds.{SEEDS[module_name]}(new SparkSeedTarget(session));
+}});
+
+afterAll(async () => {{
+  await session.close();
+}});
+"""
+    return '\n'.join(header) + '\n' + setup + '\n' + blocks
 
 
 def case_module_name(module_name: str) -> str:
@@ -840,10 +879,12 @@ def main() -> None:
         if module_name in SKIPPED_MODULES:
             print(f'... skipped {module_name}: {SKIPPED_MODULES[module_name]}')
             continue
-        cases_src, test_src = generate_module(module_name)
+        cases_src, test_src, spark_src = generate_module(module_name)
         name = case_module_name(module_name)
-        for out, src in ((os.path.join(OUT_DIR, 'cases', name + '.ts'), cases_src),
-                         (os.path.join(OUT_DIR, name + '.test.ts'), test_src)):
+        outputs = [(os.path.join(OUT_DIR, 'cases', name + '.ts'), cases_src), (os.path.join(OUT_DIR, name + '.test.ts'), test_src)]
+        if spark_src is not None:
+            outputs.append((os.path.join(ROOT, 'tests', 'spark', name + '.test.ts'), spark_src))
+        for out, src in outputs:
             with open(out, 'w') as f:
                 f.write(src)
             print(f'... wrote {os.path.relpath(out, ROOT)}')
