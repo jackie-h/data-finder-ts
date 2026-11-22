@@ -31,6 +31,7 @@ import {
   DecimalAggregateOperation,
   DateAggregateOperation,
   UntypedAggregateOperation,
+  VectorValue,
 } from '../model/relational';
 
 /** What a function result gives its own functions: it is their input, and their label is its own name. */
@@ -105,9 +106,49 @@ export function integerFunction(
 }
 
 export function doubleFunction(
-  element: RelationalOperationElement, func: ScalarFunction, label: string, secondArg?: number,
+  element: RelationalOperationElement, func: ScalarFunction, label: string, secondArg?: number, extraArgs: (string | number | boolean | VectorValue)[] = [],
 ): DoubleFunctionOperation {
-  return new DoubleFunctionOperation(element, func, label, secondArg);
+  return new DoubleFunctionOperation(element, func, label, secondArg, extraArgs);
+}
+
+/**
+ * Functions of a vector, a column of embeddings. Each compares the column with a vector of the same length and gives a number, which is then
+ * an ordinary number of the query: it can be selected, compared, ordered by or grouped on.
+ */
+export abstract class VectorFunctions {
+  /** @internal The expression the function applies to. */
+  abstract functionInput(): RelationalOperationElement;
+  /** @internal What a function of this is labelled after. */
+  abstract functionLabel(): string;
+  /** The number of numbers in each vector of the column, or undefined if the column's type does not say. */
+  abstract dimension(): number | undefined;
+
+  private compare(func: ScalarFunction, label: string, vector: Iterable<number> | VectorValue): DoubleFunctionOperation {
+    const value = vector instanceof VectorValue ? vector : new VectorValue(vector);
+    const dimension = this.dimension();
+    if (dimension !== undefined && value.length !== dimension) {
+      throw new Error(`${this.functionLabel()} has ${dimension} numbers in a vector, and the one given has ${value.length}`);
+    }
+    return doubleFunction(this.functionInput(), func, `${label} ${this.functionLabel()}`, undefined, [value]);
+  }
+
+  /**
+   * The cosine distance to `vector`: 0 for the same direction, 1 for a right angle, 2 for opposite directions (1 minus the cosine
+   * similarity). The nearest rows have the smallest distance.
+   */
+  cosineDistance(vector: Iterable<number> | VectorValue): DoubleFunctionOperation {
+    return this.compare(ScalarFunction.COSINE_DISTANCE, 'Cosine Distance', vector);
+  }
+
+  /** The Euclidean distance to `vector`. The nearest rows have the smallest distance. */
+  l2Distance(vector: Iterable<number> | VectorValue): DoubleFunctionOperation {
+    return this.compare(ScalarFunction.L2_DISTANCE, 'L2 Distance', vector);
+  }
+
+  /** The inner (dot) product with `vector`. It is a similarity, so the nearest rows have the largest value. */
+  innerProduct(vector: Iterable<number> | VectorValue): DoubleFunctionOperation {
+    return this.compare(ScalarFunction.INNER_PRODUCT, 'Inner Product', vector);
+  }
 }
 
 /** Functions of text. */

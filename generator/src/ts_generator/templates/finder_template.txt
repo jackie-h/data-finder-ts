@@ -178,7 +178,7 @@ export class {{rcm.clazz.name}}RelatedFinder extends {{rcm.clazz.name}}RelatedFi
   /** Property id -> [column, type, table] for the filters accepted by related-finder accessors. */
   private static readonly _filterColumns: Record<string, [string, string, Relation]> = {
 {% for rpm in rcm.property_mappings %}
-{% if is_primitive(rpm.property) %}
+{% if is_primitive(rpm.property) and rpm.property.type.name != 'Vector' %}
     '{{rpm.property.id}}': ['{{rpm.target.name}}', '{{rpm.target.type}}', {{owner_code(rpm.target.table)}}],
 {% endif %}
 {% endfor %}

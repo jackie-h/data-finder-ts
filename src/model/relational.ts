@@ -76,6 +76,9 @@ export enum ScalarFunction {
   ATAN2 = 'ATAN2',
   EXP = 'EXP',
   LOG = 'LOG',
+  COSINE_DISTANCE = 'COSINE_DISTANCE',
+  L2_DISTANCE = 'L2_DISTANCE',
+  INNER_PRODUCT = 'INNER_PRODUCT',
 }
 
 export enum DatePart {
@@ -425,6 +428,23 @@ export class WindowFunctionOperation extends UnaryOperation implements Sortable 
   }
 }
 
+/** The vector that a vector column is compared with: finite numbers, in order. It is made from any array of numbers. */
+export class VectorValue {
+  readonly values: readonly number[];
+
+  constructor(values: Iterable<number>) {
+    const numbers = [...values].map(Number);
+    if (numbers.length === 0) throw new Error('A vector has at least one number');
+    if (!numbers.every(Number.isFinite)) throw new Error('The numbers of a vector are finite: not NaN or infinity');
+    this.values = numbers;
+  }
+
+  get length(): number { return this.values.length; }
+}
+
+/** The functions that compare a vector column with a vector: the nearest rows have the smallest distance, or the largest inner product. */
+export const VECTOR_METRICS: ReadonlySet<ScalarFunction> = new Set([ScalarFunction.COSINE_DISTANCE, ScalarFunction.L2_DISTANCE, ScalarFunction.INNER_PRODUCT]);
+
 export class ScalarFunctionOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
   ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
@@ -437,7 +457,7 @@ export class ScalarFunctionOperation extends UnaryOperation implements Sortable 
     readonly func: ScalarFunction,
     readonly displayName?: string,
     readonly secondArg?: number,
-    readonly extraArgs: (string | number | boolean)[] = [],
+    readonly extraArgs: (string | number | boolean | VectorValue)[] = [],
     /** The type the result is cast to, where the database's function gives another: an integer power is a `BIGINT`. */
     readonly cast?: string,
   ) { super(element); }
