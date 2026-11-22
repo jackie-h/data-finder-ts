@@ -77,73 +77,73 @@ export function _full_join_of_two_accounts_to_the_trades_over_350(f: any) {
 export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   {
     name: 'median_price_per_account',
-    query: (f: any) => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.5)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.5)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Percentile Price'], rows: [
         ['Alpha Fund', 150.0],
         ['Beta Fund', 350.0],
         ['Gamma Fund', 500.0],
-      ], sql: 'PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY CAST(', skipGraphql: 'The GraphQL finder has no percentile', skip: 'a percentile and a quantile of a group are not ported yet (data-finder #283)' },
+      ], sql: 'PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY CAST(', skipGraphql: 'The GraphQL finder has no percentile' },
   },
   {
     name: 'percentile_price_interpolates_between_the_values',
-    query: (f: any) => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.25)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.25)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Percentile Price'], rows: [
         ['Alpha Fund', 125.0],
         ['Beta Fund', 325.0],
         ['Gamma Fund', 500.0],
-      ], sql: 'PERCENTILE_CONT(0.25)', skipGraphql: 'The GraphQL finder has no percentile', skip: 'a percentile and a quantile of a group are not ported yet (data-finder #283)' },
+      ], sql: 'PERCENTILE_CONT(0.25)', skipGraphql: 'The GraphQL finder has no percentile' },
   },
   {
     name: 'discrete_percentile_price_is_a_value_that_is_there',
-    query: (f: any) => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.5, { continuous: false })]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.5, { continuous: false })]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Percentile Price'], rows: [
         ['Alpha Fund', 100.0],
         ['Beta Fund', 300.0],
         ['Gamma Fund', 500.0],
-      ], sql: 'PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY ', skipGraphql: 'The GraphQL finder has no percentile', skip: 'a percentile and a quantile of a group are not ported yet (data-finder #283)' },
+      ], sql: 'PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY ', skipGraphql: 'The GraphQL finder has no percentile' },
   },
   {
     name: 'percentile_price_from_the_largest_value',
-    query: (f: any) => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.25, { ascending: false })]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().percentile(0.25, { ascending: false })]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Percentile Price'], rows: [
         ['Alpha Fund', 175.0],
         ['Beta Fund', 375.0],
         ['Gamma Fund', 500.0],
-      ], sql: 'AS DOUBLE PRECISION) DESC)', skipGraphql: 'The GraphQL finder has no percentile', skip: 'a percentile and a quantile of a group are not ported yet (data-finder #283)' },
+      ], sql: 'AS DOUBLE PRECISION) DESC)', skipGraphql: 'The GraphQL finder has no percentile' },
   },
   {
     name: 'quantile_price_is_the_percentile_as_numpy_names_it',
-    query: (f: any) => f.findAll(null, _AT, [f.account().name(), f.price().quantile(0.9)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().quantile(0.9)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Quantile Price'], rows: [
         ['Alpha Fund', 190.0],
         ['Beta Fund', 390.0],
         ['Gamma Fund', 500.0],
-      ], sql: 'PERCENTILE_CONT(0.9)', skipGraphql: 'The GraphQL finder has no percentile', skip: 'a percentile and a quantile of a group are not ported yet (data-finder #283)' },
+      ], sql: 'PERCENTILE_CONT(0.9)', skipGraphql: 'The GraphQL finder has no percentile' },
   },
   {
     name: 'quantile_price_by_inverted_cdf_is_a_value_that_is_there',
-    query: (f: any) => f.findAll(null, _AT, [f.account().name(), f.price().quantile(0.9, { method: 'inverted_cdf' })]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().quantile(0.9, { method: 'inverted_cdf' })]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Quantile Price'], rows: [
         ['Alpha Fund', 200.0],
         ['Beta Fund', 400.0],
         ['Gamma Fund', 500.0],
-      ], sql: 'PERCENTILE_DISC(0.9)', skipGraphql: 'The GraphQL finder has no percentile', skip: 'a percentile and a quantile of a group are not ported yet (data-finder #283)' },
+      ], sql: 'PERCENTILE_DISC(0.9)', skipGraphql: 'The GraphQL finder has no percentile' },
   },
   {
     name: 'percentile_of_an_expression',
-    query: (f: any) => f.findAll(null, _AT, [f.account().name(), f.price().times(2).percentile(0.5)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
+    query: f => f.findAll(null, _AT, [f.account().name(), f.price().times(2).percentile(0.5)]).groupBy(f.account().name()).orderBy(f.account().name().ascending()),
     expected: { columns: ['Account Name', 'Percentile Expression'], rows: [
         ['Alpha Fund', 300.0],
         ['Beta Fund', 700.0],
         ['Gamma Fund', 1000.0],
-      ], sql: 'PERCENTILE_CONT(0.5)', skipGraphql: 'The GraphQL finder has no percentile', skip: 'a percentile and a quantile of a group are not ported yet (data-finder #283)' },
+      ], sql: 'PERCENTILE_CONT(0.5)', skipGraphql: 'The GraphQL finder has no percentile' },
   },
   {
     name: 'median_price_of_all_the_trades',
-    query: (f: any) => f.findAll(null, _AT, [f.price().percentile(0.5).alias('median'), f.price().percentile(0.9, { continuous: false }).alias('p90')]),
+    query: f => f.findAll(null, _AT, [f.price().percentile(0.5).alias('median'), f.price().percentile(0.9, { continuous: false }).alias('p90')]),
     expected: { columns: ['median', 'p90'], rows: [
         [300.0, 500.0],
-      ], skipGraphql: 'The GraphQL finder has no percentile', skip: 'a percentile and a quantile of a group are not ported yet (data-finder #283)' },
+      ], skipGraphql: 'The GraphQL finder has no percentile' },
   },
   {
     name: 'average_price_per_account',

@@ -23,6 +23,9 @@ import {
   DecimalConstantOperation,
   AggregateOperation,
   AggregateConstructor,
+  QuantileMethod,
+  percentileOperation,
+  quantileOperation,
   IntegerAggregateOperation,
   DoubleAggregateOperation,
   DecimalAggregateOperation,
@@ -166,6 +169,17 @@ export abstract class NumericAttribute<A extends AggregateOperation = AggregateO
   var(ddof = 1): DoubleAggregateOperation {
     const operator = sample(ddof) ? AggregateOperator.VAR_SAMP : AggregateOperator.VAR_POP;
     return new DoubleAggregateOperation(this.cwj(), operator, 'Var ' + this.displayName());
+  }
+  /** `percentile` as numpy and pandas name it: `'linear'` interpolates, `'inverted_cdf'` is a value that is there. `quantile(0.5)` is the median. */
+  quantile(p: number, { method = 'linear' }: { method?: QuantileMethod } = {}): A | DoubleAggregateOperation {
+    return quantileOperation(this.cwj(), p, method, 'Quantile ' + this.displayName(), this.aggregateKind());
+  }
+  /**
+   * The value that the fraction `p` (between 0 and 1) of the group falls below: `percentile(0.5)` is the median. It interpolates, so it is
+   * a double, unless `{ continuous: false }` is given, which gives the nearest value that is there. `{ ascending: false }` reads from the largest value.
+   */
+  percentile(p: number, { ascending = true, continuous = true }: { ascending?: boolean; continuous?: boolean } = {}): A | DoubleAggregateOperation {
+    return percentileOperation(this.cwj(), p, ascending, continuous, 'Percentile ' + this.displayName(), this.aggregateKind());
   }
 }
 
