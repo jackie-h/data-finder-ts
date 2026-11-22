@@ -180,7 +180,7 @@ export abstract class Attribute implements Aliasable {
   }
 
   /**
-   * Assign a rank to each row within the ordered window, following pandas `Series.rank` conventions.
+   * Assign a rank to each row within the ordered window.
    *
    * `method` controls tie-breaking (default `'min'`):
    * - `'min'`   — tied rows share the lowest rank; the next rank skips.
@@ -215,7 +215,6 @@ export abstract class Attribute implements Aliasable {
   /**
    * Split rows into `buckets` equal-sized quantile bins ordered by `orderBy`.
    * Each row receives a bucket number from 1 (lowest) to `buckets` (highest).
-   * Named after `pandas.qcut`.
    */
   qcut(buckets: number, opts: {
     partitionBy?: Attribute | ColumnWithJoin | (Attribute | ColumnWithJoin)[];
@@ -227,7 +226,7 @@ export abstract class Attribute implements Aliasable {
 
   /**
    * Return the value of this attribute from `periods` rows earlier (positive) or later (negative)
-   * within the ordered window, following `pandas.Series.shift`.
+   * within the ordered window.
    * Rows with no neighbour at the given offset return `null` (or `fillValue` if provided).
    */
   shift(periods = 1, opts: {
