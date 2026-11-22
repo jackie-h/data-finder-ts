@@ -99,10 +99,10 @@ describe('what differs', () => {
     expect(sql('databricks', name.join('|'))).not.toContain('WITHIN GROUP');
   });
 
-  it('day of the week is 0 = Sunday everywhere', () => {
-    expect(sql('postgres', day.dayOfWeek())).toContain('EXTRACT(DOW FROM t0.day)');
-    expect(sql('duckdb', day.dayOfWeek())).toContain('EXTRACT(DOW FROM t0.day)');
-    expect(sql('databricks', day.dayOfWeek())).toContain('(DAYOFWEEK(t0.day) - 1)');
+  it('day of the week is the ISO day, Monday is 1 and Sunday is 7, everywhere', () => {
+    expect(sql('postgres', day.dayOfWeek())).toContain('EXTRACT(ISODOW FROM t0.day)');
+    expect(sql('duckdb', day.dayOfWeek())).toContain('EXTRACT(ISODOW FROM t0.day)');
+    expect(sql('databricks', day.dayOfWeek())).toContain('EXTRACT(DAYOFWEEK_ISO FROM t0.day)');
   });
 
   it('other parts of a date are extracted the same way', () => {
@@ -124,7 +124,7 @@ describe('what differs', () => {
 
   it('a difference in anything else is refused', () => {
     expect(() => POSTGRES.dateDiff(DatePart.MICROSECOND, 'a', 'b')).toThrow(/not MICROSECOND/);
-    expect(() => POSTGRES.dateDiff(DatePart.DOW, 'a', 'b')).toThrow(/not DOW/);
+    expect(() => POSTGRES.dateDiff(DatePart.ISODOW, 'a', 'b')).toThrow(/not ISODOW/);
     expect(() => POSTGRES.dateDiff(DatePart.QUARTER, 'a', 'b')).toThrow(/not QUARTER/);
   });
 
@@ -187,6 +187,6 @@ describe('an interval is written in the units ANSI has', () => {
   });
 
   it('a quarter, a day of the week and a day of the year are not a length of time', () => {
-    for (const unit of [DatePart.QUARTER, DatePart.DOW, DatePart.DOY]) expect(() => intervalString(1, unit)).toThrow(/not counted in/);
+    for (const unit of [DatePart.QUARTER, DatePart.ISODOW, DatePart.DOY]) expect(() => intervalString(1, unit)).toThrow(/not counted in/);
   });
 });

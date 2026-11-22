@@ -277,7 +277,7 @@ export function intervalString(n: number, unit: DatePart): string {
     const sign = n < 0 ? '-' : '';
     const whole = Math.trunc(Math.abs(n) / 1_000_000);
     return `INTERVAL '${sign}${whole}.${String(Math.abs(n) % 1_000_000).padStart(6, '0')}' SECOND`;
-  } else if (unit === DatePart.QUARTER || unit === DatePart.DOW || unit === DatePart.DOY) {
+  } else if (unit === DatePart.QUARTER || unit === DatePart.ISODOW || unit === DatePart.DOY) {
     throw new Error(`A length of time is not counted in ${unit}`);
   }
   return `INTERVAL '${n}' ${unit}`;
@@ -347,7 +347,7 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
   }
   if (operation instanceof DateExtractOperation) {
     const element = sqlOperationToString(operation.element, d);
-    return operation.part === DatePart.DOW ? d.dayOfWeek(element) : 'EXTRACT(' + operation.part + ' FROM ' + element + ')';
+    return operation.part === DatePart.ISODOW ? d.isoDayOfWeek(element) : 'EXTRACT(' + operation.part + ' FROM ' + element + ')';
   }
   if (operation instanceof RecentDayOfWeekOperation) {
     const date = 'CAST(' + sqlOperationToString(operation.element, d) + ' AS DATE)';

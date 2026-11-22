@@ -87,7 +87,7 @@ export enum DatePart {
   SECOND = 'SECOND',
   QUARTER = 'QUARTER',
   WEEK = 'WEEK',
-  DOW = 'DOW',
+  ISODOW = 'ISODOW',
   DOY = 'DOY',
   MICROSECOND = 'MICROSECOND',
 }

@@ -21,9 +21,6 @@ export interface SqlDialect {
   /** The type a float constant is cast to, so it comes back as a double and not a decimal. */
   readonly doubleType: string;
 
-  /** The day of the week of a date or timestamp, 0 = Sunday through 6 = Saturday. */
-  dayOfWeek(expression: string): string;
-
   /** The ISO day of the week of a date or timestamp, 1 = Monday through 7 = Sunday. */
   isoDayOfWeek(expression: string): string;
 
@@ -55,7 +52,6 @@ export const POSTGRES: SqlDialect = {
   quoteIdentifier: doubleQuoted,
   stringLiteral: quoted,
   doubleType: 'DOUBLE PRECISION',
-  dayOfWeek: expression => `EXTRACT(DOW FROM ${expression})`,
   isoDayOfWeek: expression => `EXTRACT(ISODOW FROM ${expression})`,
   dateDiff(unit, from, to) {
     // the number of `unit` boundaries from `from` to `to` (a year is a change of year, a day a change of date, a week the start of a week, on a
@@ -100,8 +96,6 @@ export const DATABRICKS: SqlDialect = {
   // 'it''s' as the two literals 'it' and 's' and joins them, losing the quote. A quote is escaped with a backslash.
   stringLiteral: value => "'" + value.replaceAll('\\', '\\\\').replaceAll("'", "\\'") + "'",
   doubleType: 'DOUBLE',
-  // DAYOFWEEK is 1 = Sunday through 7 = Saturday
-  dayOfWeek: expression => `(DAYOFWEEK(${expression}) - 1)`,
   isoDayOfWeek: expression => `EXTRACT(DAYOFWEEK_ISO FROM ${expression})`,
   // Databricks' own DATEDIFF counts the boundaries crossed too, in the units the shared form is written in terms of
   dateDiff: (unit, from, to) => `DATEDIFF(${unit}, ${from}, ${to})`,

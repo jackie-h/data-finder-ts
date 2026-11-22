@@ -427,11 +427,11 @@ describe('DateAttribute extract operations (SQL)', () => {
     expect(sql).toContain('QUARTER');
   });
 
-  it('dayOfWeek() → EXTRACT(DOW FROM ...)', async () => {
+  it('dayOfWeek() → EXTRACT(ISODOW FROM ...)', async () => {
     const { ContractualPositionFinder } = await import('./generated_examples/finance/ContractualPositionFinder');
     const cpf = new ContractualPositionFinder();
     const sql = cpf.findAll(null, null, [cpf.businessDate().dayOfWeek()]).toSql();
-    expect(sql).toContain('DOW');
+    expect(sql).toContain('ISODOW');
   });
 });
 
