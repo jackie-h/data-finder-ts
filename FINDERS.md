@@ -88,11 +88,11 @@ The SQL the generator writes is Postgres, which is ANSI SQL wherever ANSI has th
 |---|---|---|---|
 | a result column's name | `"Name"` | `"Name"` | `` `Name` `` |
 | a quote or backslash in a string | `'it''s'` | `'it''s'` | `'it\'s'` (a doubled quote would be lost, and `\` starts an escape) |
-| join a group's values | `STRING_AGG(x, ',' ORDER BY …)` | same | `LISTAGG(x, ',') WITHIN GROUP (ORDER BY …)` |
-| ISO day of the week (Monday is 1) | `EXTRACT(ISODOW FROM x)` | same | `EXTRACT(DAYOFWEEK_ISO FROM x)` |
+| join a group's values | `STRING_AGG(x, ',' ORDER BY …)` | same | `ARRAY_JOIN(TRANSFORM(ARRAY_SORT(COLLECT_LIST(…), comparator), …), ',')`: Spark 3.5 has no `LISTAGG` |
+| ISO day of the week (Monday is 1) | `EXTRACT(ISODOW FROM x)` | same | `EXTRACT(DOW_ISO FROM x)` |
 | a distance of a vector | pgvector's `COSINE_DISTANCE(x, CAST(ARRAY[…] AS VECTOR(n)))` | `ARRAY_COSINE_DISTANCE` over a `FLOAT[n]`, cast to a double | arithmetic over `ARRAY<FLOAT>` |
-| `diffDays` and the others | `EXTRACT`, `DATE_TRUNC` and `CAST` | same | `DATEDIFF(DAY, a, b)` |
-| a regular expression | `x ~ p` | `REGEXP_MATCHES(x, p)` | `RLIKE` |
+| `diffDays` and the others | `EXTRACT`, `DATE_TRUNC` and `CAST` | same | the same, with `DATEDIFF(DAY, ...)` for days (a date minus a date is an interval in Spark) and `UNIX_SECONDS` for hours, minutes and seconds |
+| a regular expression | `x ~ p` | `REGEXP_MATCHES(x, p)` | `REGEXP_LIKE(x, p)` |
 | a selected float | `CAST(1.5 AS DOUBLE PRECISION)` | `CAST(1.5 AS DOUBLE)` | `CAST(1.5 AS DOUBLE)` |
 
 Every sort says where a missing value goes, `NULLS FIRST` or `NULLS LAST`, in every dialect (see [Sorting](#sorting)), so the same query gives the same order everywhere. `npm run check:dialects` parses the SQL the finders write in each dialect with sqlglot and lists where it differs from what sqlglot would write; a parse is weak evidence, though, since sqlglot accepts constructs a database does not. The dates in a difference are counted the same way in every dialect.

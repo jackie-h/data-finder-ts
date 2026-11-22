@@ -40,7 +40,7 @@ describe('matching a regular expression', () => {
   it('is written as the dialect writes it', () => {
     expect(sql(name, name.matches('Customer.*Complaints'), 'duckdb')).toContain("REGEXP_MATCHES(t0.N, 'Customer.*Complaints')");
     expect(sql(name, name.matches('Customer.*Complaints'))).toContain("t0.N ~ 'Customer.*Complaints'");
-    expect(sql(name, name.matches('Customer.*Complaints'), 'databricks')).toContain("(t0.N RLIKE 'Customer.*Complaints')");
+    expect(sql(name, name.matches('Customer.*Complaints'), 'databricks')).toContain("REGEXP_LIKE(t0.N, 'Customer.*Complaints')");
   });
 
   it('can be negated', () => {

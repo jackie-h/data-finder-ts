@@ -4,6 +4,7 @@
  * The specs in tests/specs/ are generated from those Python specs by scripts/generate_spec_tests.py.
  */
 import { execFileSync } from 'node:child_process';
+import { appendFileSync, mkdirSync } from 'node:fs';
 import * as path from 'node:path';
 import { expect } from 'vitest';
 import { DuckDBConnection } from '@duckdb/node-api';
@@ -83,6 +84,24 @@ function normalize(value: unknown): unknown {
   return value;
 }
 
+/**
+ * With `SPEC_SQL_DIR` set, each spec the harness runs adds the SQL of its query, in Postgres and in Databricks, to a file there, for
+ * `npm run check:dialects:specs` to compare with what the Python project writes for Databricks.
+ */
+function recordSql(result: FinderResult | ViewResult): void {
+  const dir = process.env.SPEC_SQL_DIR;
+  if (dir === undefined) return;
+  mkdirSync(dir, { recursive: true });
+  const label = expect.getState().currentTestName ?? 'a spec';
+  let line: Record<string, string>;
+  try {
+    line = { label, postgres: result.toSql('postgres'), databricks: result.toSql('databricks') };
+  } catch (error) {
+    line = { label, error: String(error) };
+  }
+  appendFileSync(path.join(dir, `${process.pid}.jsonl`), JSON.stringify(line) + '\n');
+}
+
 /** Equivalent of TestExpectation.run: SQL fragments, then column names, then values. */
 export async function runExpectation(
   result: FinderResult | ViewResult,
@@ -91,6 +110,7 @@ export async function runExpectation(
   backend: Backend = 'duckdb',
 ): Promise<void> {
   if (backend === 'duckdb') {
+    recordSql(result);
     // the fragments are of the SQL the finder writes, which is Postgres: each database it is translated for spells a few things its own way
     const sql = result.toSql('postgres');
     if (expected.sql !== undefined) expect(sql).toContain(expected.sql);

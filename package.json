@@ -103,7 +103,8 @@
     "generate:examples": "uv run python example/generate_examples.py",
     "generate:graphql": "uv run python example/generate_graphql_examples.py",
     "generate:specs": "uv run python scripts/generate_spec_tests.py && uv run python scripts/generate_tpch_bih_specs.py",
-    "check:dialects": "DIALECT_CORPUS=.dialect-corpus.json vitest run tests/dialects.test.ts && uv run python scripts/validate_dialects.py .dialect-corpus.json"
+    "check:dialects": "DIALECT_CORPUS=.dialect-corpus.json vitest run tests/dialects.test.ts && uv run python scripts/validate_dialects.py .dialect-corpus.json",
+    "check:dialects:specs": "rm -rf .spec-sql && SPEC_SQL_DIR=.spec-sql vitest run tests/specs && uv run python scripts/validate_dialects.py --specs .spec-sql"
   },
   "dependencies": {
     "vite-tsconfig-paths": "^6.1.1"
