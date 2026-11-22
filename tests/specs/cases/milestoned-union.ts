@@ -75,7 +75,7 @@ export const MILESTONED_UNION_ORDER_FINDER_SPECS: SpecCase<OrderFinder>[] = [
   },
   {
     name: 'a_milestoned_step_reached_through_another_is_two_joins_when_it_is_filtered_and_read',
-    query: (f: any) => _over_the_product(f, (f: any, p: any) => [[p.classification().type()], p.classification().description().eq(_STOCK_DESCRIPTION)]),
+    query: f => _over_the_product(f, (f: any, p: any) => [[p.classification().type()], p.classification().description().eq(_STOCK_DESCRIPTION)]),
     expected: { columns: ['Product Classification Type'], rows: [
         ['STOCK'],
         ['STOCK'],
@@ -93,11 +93,11 @@ export const MILESTONED_UNION_ORDER_FINDER_SPECS: SpecCase<OrderFinder>[] = [
         ['STOCK'],
         ['STOCK'],
         ['STOCK'],
-      ], skip: 'a milestoned step reached through another is not ported yet (data-finder #301)' },
+      ] },
   },
   {
     name: 'every_column_that_is_read_shares_the_join_of_the_step_that_is_not_the_filter',
-    query: (f: any) => _over_the_product(f, (f: any, p: any) => [[p.classification().type(), p.classification().description()], p.classification().description().eq(_STOCK_DESCRIPTION)]),
+    query: f => _over_the_product(f, (f: any, p: any) => [[p.classification().type(), p.classification().description()], p.classification().description().eq(_STOCK_DESCRIPTION)]),
     expected: { columns: ['Product Classification Type', 'Product Classification Description'], rows: [
         ['STOCK', 'STOCK DESC-V2'],
         ['STOCK', 'STOCK DESC-V2'],
@@ -115,7 +115,7 @@ export const MILESTONED_UNION_ORDER_FINDER_SPECS: SpecCase<OrderFinder>[] = [
         ['STOCK', 'STOCK DESC-V2'],
         ['STOCK', 'STOCK DESC-V2'],
         ['STOCK', 'STOCK DESC-V2'],
-      ], skip: 'a milestoned step reached through another is not ported yet (data-finder #301)' },
+      ] },
   },
   {
     name: 'a_step_made_by_another_call_is_another_step_with_joins_of_its_own',
