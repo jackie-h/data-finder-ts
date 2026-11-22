@@ -17,3 +17,4 @@ tests/generated_examples/
 tests/generated_graphql/
 .dialect-corpus.json
 tests/.tpch-bih-data/
+.spec-sql/

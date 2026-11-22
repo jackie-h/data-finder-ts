@@ -319,7 +319,8 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
     let sql = d.stringAgg(
       sqlOperationToString(operation.element, d),
       d.stringLiteral(operation.separator ?? ''),
-      operation.orderBy.map(s => sqlOperationToString(s.column, d) + sortSuffix(s)),
+      operation.orderBy.map(s => ({ expression: sqlOperationToString(s.column, d), descending: s.direction === SortDirection.DESC, nullsFirst: s.nullsFirst })),
+      operation.window !== undefined,
     );
     if (operation.window !== undefined) sql += ' ' + windowSpecToString(operation.window, d);
     return sql;
@@ -375,7 +376,7 @@ function sqlOperationToString(operation: RelationalOperationElement, d: SqlDiale
   }
   if (operation instanceof DateArithmeticOperation) {
     const op = operation.isAdd ? '+' : '-';
-    return sqlOperationToString(operation.element, d) + ' ' + op + ' ' + intervalString(operation.n, operation.unit);
+    return d.dateArithmetic(sqlOperationToString(operation.element, d), op, intervalString(operation.n, operation.unit));
   }
   if (operation instanceof DateDiffOperation) {
     const other = operation.other instanceof RelationalOperationElement
@@ -1101,7 +1102,7 @@ class SQLQueryGenerator {
   private _join: Join[] = [];
   private _groupByParts: string[] = [];
   private _having = '';
-  private _orderByParts: string[] = [];
+  private _orderByParts: { expression: string; suffix: string }[] = [];
   private _where = '';
   private _limit?: number;
   private _distinct = false;
@@ -1161,9 +1162,7 @@ class SQLQueryGenerator {
       // HAVING filters the grouped result, which Legend does not guard: it is a filter on projected columns
       this._having = this.buildFilter(this._guarded(query.having, false));
     }
-    this._orderByParts = (ordered?.orderBy ?? []).map(s =>
-      this._sortExpression(s.column) + sortSuffix(s),
-    );
+    this._orderByParts = (ordered?.orderBy ?? []).map(s => ({ expression: this._sortExpression(s.column), suffix: sortSuffix(s) }));
     this._limit = ordered?.limit;
     this._distinct = query.distinct;
     this._offset = ordered?.offset;
@@ -1778,7 +1777,13 @@ class SQLQueryGenerator {
     return this._having.length > 0 ? ' HAVING ' + this._having : '';
   }
   private _buildOrderBy(): string {
-    return this._orderByParts.length > 0 ? ' ORDER BY ' + this._orderByParts.join(', ') : '';
+    if (this._orderByParts.length === 0) return '';
+    // a SELECT DISTINCT is ordered by the names it selects the columns under, where the database needs that
+    const shown = new Map<string, string>();
+    if (this._distinct && this._dialect.distinctOrderedByName) {
+      for (const ca of this._select) if (ca instanceof Alias) shown.set(sqlOperationToString(ca.element, this._dialect), this._dialect.quoteIdentifier(ca.name));
+    }
+    return ' ORDER BY ' + this._orderByParts.map(part => (shown.get(part.expression) ?? part.expression) + part.suffix).join(', ');
   }
   private _buildOffset(): string {
     return this._offset !== undefined ? ' OFFSET ' + this._offset : '';

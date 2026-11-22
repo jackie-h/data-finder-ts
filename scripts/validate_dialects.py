@@ -56,5 +56,49 @@ def report_differences(corpus: dict[str, dict[str, str]]) -> None:
             print(f"  - {label}\n      ours   : {ours}\n      sqlglot: {theirs}")
 
 
+def spark_databricks():
+    """Databricks as the Python project writes it: sqlglot's, changed as Spark is (``datafinder_spark.spark_sql``), reading Postgres with pgvector."""
+    from sqlglot.dialects.databricks import Databricks
+    from sqlglot.generators.databricks import DatabricksGenerator
+    from datafinder_spark.spark_sql import SparkFixes, spark_transforms
+
+    class SparkDatabricks(Databricks):
+        class Generator(SparkFixes, DatabricksGenerator):
+            TRANSFORMS = spark_transforms(DatabricksGenerator.TRANSFORMS)
+
+    return SparkDatabricks
+
+
+def compare_specs(directory: str) -> int:
+    """The Databricks SQL of every spec, against what the Python project writes for Databricks from our Postgres SQL (with its Spark fixes).
+
+    Both are read as Databricks and written again as sqlglot writes it, so that spacing and brackets do not count as a difference."""
+    import glob
+    from datafinder.pgvector_dialect import PgVector
+
+    target = spark_databricks()
+    cases: dict[str, tuple[str, str]] = {}
+    for path in glob.glob(f"{directory}/*.jsonl"):
+        for line in open(path):
+            record = json.loads(line)
+            if 'postgres' in record:
+                cases[record['label']] = (record['postgres'], record['databricks'])
+    differing = []
+    for label, (postgres, ours) in sorted(cases.items()):
+        try:
+            theirs = sqlglot.transpile(postgres, read=PgVector, write=target)[0]
+            ours_normal = sqlglot.parse_one(ours, read='databricks').sql(dialect='databricks')
+            theirs_normal = sqlglot.parse_one(theirs, read='databricks').sql(dialect='databricks')
+        except Exception as e:
+            differing.append((label, 'could not compare', str(e).splitlines()[0]))
+            continue
+        if ours_normal != theirs_normal:
+            differing.append((label, ours_normal, theirs_normal))
+    print(f"{len(differing)} of {len(cases)} spec queries differ from the Databricks SQL of the Python project")
+    for label, ours, theirs in differing:
+        print(f"  - {label}\n      ours  : {ours}\n      python: {theirs}")
+    return 1 if differing else 0
+
+
 if __name__ == '__main__':
-    sys.exit(main(sys.argv[1]))
+    sys.exit(compare_specs(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[1] == '--specs' else main(sys.argv[1]))

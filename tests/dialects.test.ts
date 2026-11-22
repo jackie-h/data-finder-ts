@@ -80,7 +80,10 @@ describe('null order', () => {
   it('applies inside a window and a string aggregate too', () => {
     const windowed = price.rank({ orderBy: price.descending() });
     expect(sql('databricks', windowed)).toContain('ORDER BY t0.price DESC NULLS LAST)');
-    expect(sql('databricks', name.join(',', [name.ascending()]))).toContain('WITHIN GROUP (ORDER BY t0.name ASC NULLS FIRST)');
+    // Spark 3.5 has no LISTAGG: the values are collected, sorted with a comparator that says where a missing key goes, and joined
+    const joined = sql('databricks', name.join(',', [name.ascending({ nulls: 'last' })]));
+    expect(joined).toContain('ARRAY_JOIN(TRANSFORM(ARRAY_SORT(COLLECT_LIST(');
+    expect(joined).toContain('WHEN l.k0 IS NULL THEN 1 WHEN r.k0 IS NULL THEN -1');
   });
 });
 
@@ -94,15 +97,16 @@ describe('what differs', () => {
   it('string aggregate', () => {
     expect(sql('postgres', name.join(', ', [name.ascending()]))).toContain("STRING_AGG(t0.name, ', ' ORDER BY t0.name ASC NULLS FIRST)");
     expect(sql('duckdb', name.join(', ', [name.ascending()]))).toContain("STRING_AGG(t0.name, ', ' ORDER BY t0.name ASC NULLS FIRST)");
-    expect(sql('databricks', name.join(', ', [name.ascending()]))).toContain("LISTAGG(t0.name, ', ') WITHIN GROUP (ORDER BY t0.name ASC NULLS FIRST)");
-    expect(sql('databricks', name.join('|'))).toContain("LISTAGG(t0.name, '|')");
-    expect(sql('databricks', name.join('|'))).not.toContain('WITHIN GROUP');
+    expect(sql('databricks', name.join(', ', [name.ascending()]))).toContain("COLLECT_LIST(CASE WHEN t0.name IS NOT NULL THEN STRUCT(t0.name AS v, t0.name AS k0) END)");
+    expect(sql('databricks', name.join(', '))).toContain("ARRAY_JOIN(COLLECT_LIST(t0.name), ', ')");
+    expect(sql('databricks', name.join('|'))).toContain("ARRAY_JOIN(COLLECT_LIST(t0.name), '|')");
+    expect(sql('databricks', name.join('|'))).not.toContain('LISTAGG');
   });
 
   it('day of the week is the ISO day, Monday is 1 and Sunday is 7, everywhere', () => {
     expect(sql('postgres', day.dayOfWeek())).toContain('EXTRACT(ISODOW FROM t0.day)');
     expect(sql('duckdb', day.dayOfWeek())).toContain('EXTRACT(ISODOW FROM t0.day)');
-    expect(sql('databricks', day.dayOfWeek())).toContain('EXTRACT(DAYOFWEEK_ISO FROM t0.day)');
+    expect(sql('databricks', day.dayOfWeek())).toContain('EXTRACT(DOW_ISO FROM t0.day)');
   });
 
   it('other parts of a date are extracted the same way', () => {
@@ -111,9 +115,9 @@ describe('what differs', () => {
 
   it('date difference', () => {
     const days = day.diffDays(new Date('2024-01-01'));
-    // the SQL is Postgres SQL, which DuckDB runs as it is; Databricks has a DATEDIFF that counts the same boundaries
+    // the SQL is Postgres SQL, which DuckDB runs as it is; in Spark a date minus a date is an interval, so Databricks counts the days with DATEDIFF
     expect(sql('duckdb', days)).toContain("(CAST('2024-01-01 00:00:00' AS DATE) - CAST(t0.day AS DATE))");
-    expect(sql('databricks', days)).toContain("DATEDIFF(DAY, t0.day, '2024-01-01 00:00:00')");
+    expect(sql('databricks', days)).toContain("(DATEDIFF(DAY, CAST(t0.day AS DATE), CAST('2024-01-01 00:00:00' AS DATE)))");
     expect(sql('postgres', days)).toContain("(CAST('2024-01-01 00:00:00' AS DATE) - CAST(t0.day AS DATE))");
   });
 

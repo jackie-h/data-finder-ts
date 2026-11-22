@@ -9,6 +9,13 @@ import { DatePart, ScalarFunction, SortDirection, SortOperation, VectorValue } f
 
 export type DialectName = 'postgres' | 'duckdb' | 'databricks';
 
+/** What a joined group is ordered by: the SQL of the key, and which way, and where a missing value goes. */
+export interface StringAggKey {
+  readonly expression: string;
+  readonly descending: boolean;
+  readonly nullsFirst: boolean;
+}
+
 export interface SqlDialect {
   readonly name: DialectName;
 
@@ -33,8 +40,20 @@ export interface SqlDialect {
   /** The distance (or the inner product) between the vector column `column` and `vector`, which is written as a literal. */
   vectorDistance(metric: ScalarFunction, column: string, vector: VectorValue): string;
 
-  /** The values of a group joined with `separator` (an SQL literal), in the order given (each with its direction). */
-  stringAgg(expression: string, separator: string, orderBy: string[]): string;
+  /**
+   * A date or timestamp moved by an interval, `element + interval` or `element - interval`: in Spark a date moved by an interval is a date,
+   * and in Postgres it is a timestamp, so Databricks makes it a timestamp first.
+   */
+  dateArithmetic(element: string, operator: '+' | '-', interval: string): string;
+
+  /**
+   * The values of a group joined with `separator` (an SQL literal), in the order given. `windowed` is that the aggregate is over a window,
+   * not a group.
+   */
+  stringAgg(expression: string, separator: string, orderBy: StringAggKey[], windowed: boolean): string;
+
+  /** Whether a `SELECT DISTINCT` is ordered by the names of the columns it selects, as Databricks needs once the columns are aliased. */
+  readonly distinctOrderedByName: boolean;
 }
 
 const doubleQuoted = (name: string): string => '"' + name.replaceAll('"', '""') + '"';
@@ -49,6 +68,8 @@ const SECONDS_PER: Partial<Record<DatePart, number>> = { [DatePart.HOUR]: 3600, 
 export function sortSuffix(sort: SortOperation): string {
   return (sort.direction === SortDirection.ASC ? ' ASC' : ' DESC') + (sort.nullsFirst ? ' NULLS FIRST' : ' NULLS LAST');
 }
+
+const keySql = (key: StringAggKey): string => `${key.expression}${key.descending ? ' DESC' : ' ASC'}${key.nullsFirst ? ' NULLS FIRST' : ' NULLS LAST'}`;
 
 const number = (value: number): string => (Number.isInteger(value) && Math.abs(value) < 1e21 ? value.toFixed(1) : String(value));
 
@@ -91,8 +112,10 @@ export const POSTGRES: SqlDialect = {
   regexMatches: (expression, pattern) => `${expression} ~ ${pattern}`,
   // pgvector's functions of that name
   vectorDistance: (metric, column, vector) => `${PGVECTOR_FUNCTIONS[metric]}(${column}, ${pgvectorLiteral(vector)})`,
+  dateArithmetic: (element, operator, interval) => `${element} ${operator} ${interval}`,
   stringAgg: (expression, separator, orderBy) =>
-    `STRING_AGG(${expression}, ${separator}${orderBy.length > 0 ? ' ORDER BY ' + orderBy.join(', ') : ''})`,
+    `STRING_AGG(${expression}, ${separator}${orderBy.length > 0 ? ' ORDER BY ' + orderBy.map(keySql).join(', ') : ''})`,
+  distinctOrderedByName: false,
 };
 
 export const DUCKDB: SqlDialect = {
@@ -116,11 +139,33 @@ export const DATABRICKS: SqlDialect = {
   // 'it''s' as the two literals 'it' and 's' and joins them, losing the quote. A quote is escaped with a backslash.
   stringLiteral: value => "'" + value.replaceAll('\\', '\\\\').replaceAll("'", "\\'") + "'",
   doubleType: 'DOUBLE',
-  isoDayOfWeek: expression => `EXTRACT(DAYOFWEEK_ISO FROM ${expression})`,
-  // Databricks' own DATEDIFF counts the boundaries crossed too, in the units the shared form is written in terms of
-  dateDiff: (unit, from, to) => `DATEDIFF(${unit}, ${from}, ${to})`,
-  // RLIKE searches anywhere in the text
-  regexMatches: (expression, pattern) => `(${expression} RLIKE ${pattern})`,
+  // Spark spells the ISO day of the week DOW_ISO
+  isoDayOfWeek: expression => `EXTRACT(DOW_ISO FROM ${expression})`,
+  // the Postgres forms, where Spark does what Postgres does not: the days between two dates are DATEDIFF (a date minus a date is an interval in
+  // Spark), and the seconds between two timestamps are UNIX_SECONDS (a timestamp minus a timestamp is an interval, which EXTRACT(EPOCH) cannot read)
+  dateDiff(unit, from, to) {
+    if (unit === DatePart.YEAR || unit === DatePart.MONTH) return POSTGRES.dateDiff(unit, from, to);
+    const days = (a: string, b: string) => `DATEDIFF(DAY, CAST(${a} AS DATE), CAST(${b} AS DATE))`;
+    if (unit === DatePart.DAY) return `(${days(from, to)})`;
+    if (unit === DatePart.WEEK) {   // the days from the Monday of one week to the Monday of the other, in weeks
+      const monday = (date: string) => `DATE_TRUNC('week', CAST(${date} AS DATE))`;
+      return `CAST((${days(monday(from), monday(to))}) / 7 AS BIGINT)`;
+    }
+    const seconds = SECONDS_PER[unit];
+    if (seconds === undefined) {
+      throw new Error(`A difference between dates is counted in years, months, weeks, days, hours, minutes or seconds, not ${unit}`);
+    }
+    const part = unit.toLowerCase();
+    const epoch = (time: string) => `UNIX_SECONDS(DATE_TRUNC('${part}', CAST(${time} AS TIMESTAMP)))`;
+    return `CAST((${epoch(to)} - ${epoch(from)}) / ${seconds} AS BIGINT)`;
+  },
+  // a date moved by an interval is a date in Spark, and a timestamp in Postgres
+  dateArithmetic: (element, operator, interval) =>
+    `${/^(CAST\(.* AS TIMESTAMP\)|TIMESTAMP '[^']*')$/.test(element) ? element : `CAST(${element} AS TIMESTAMP)`} ${operator} ${interval}`,
+  // REGEXP_LIKE searches anywhere in the text
+  regexMatches: (expression, pattern) => `REGEXP_LIKE(${expression}, ${pattern})`,
+  // Spark orders a SELECT DISTINCT by the names it selects the columns under
+  distinctOrderedByName: true,
   // Spark 3.5 has no vector functions: a distance is computed over the arrays (a VECTOR(n) is an ARRAY<FLOAT>)
   vectorDistance(metric, column, vector) {
     const literal = `CAST(ARRAY(${vector.values.map(number).join(', ')}) AS ARRAY<FLOAT>)`;
@@ -131,8 +176,24 @@ export const DATABRICKS: SqlDialect = {
     }
     return `(1 - ${dot(column, literal)} / (SQRT(${dot(column, column)}) * SQRT(${dot(literal, literal)})))`;
   },
-  stringAgg: (expression, separator, orderBy) =>
-    `LISTAGG(${expression}, ${separator})${orderBy.length > 0 ? ' WITHIN GROUP (ORDER BY ' + orderBy.join(', ') + ')' : ''}`,
+  // Spark 3.5 has no LISTAGG (4.0 has): the values are collected, sorted by the keys with a comparator, and joined. A null value is left out, as
+  // STRING_AGG leaves it, and a null key is ordered as the sort says. Over a window it is the aggregate of Databricks.
+  stringAgg(expression, separator, orderBy, windowed) {
+    if (windowed) {
+      return `LISTAGG(${expression}, ${separator})${orderBy.length > 0 ? ' WITHIN GROUP (ORDER BY ' + orderBy.map(keySql).join(', ') + ')' : ''}`;
+    }
+    if (orderBy.length === 0) return `ARRAY_JOIN(COLLECT_LIST(${expression}), ${separator})`;
+    const fields = [`${expression} AS v`, ...orderBy.map((key, i) => `${key.expression} AS k${i}`)].join(', ');
+    const comparisons = orderBy.map((key, i) => {
+      const [before, after] = key.descending ? ['1', '-1'] : ['-1', '1'];
+      const [first, last] = key.nullsFirst ? ['-1', '1'] : ['1', '-1'];
+      const [l, r] = [`l.k${i}`, `r.k${i}`];
+      return `NULLIF(CASE WHEN ${l} IS NULL AND ${r} IS NULL THEN 0 WHEN ${l} IS NULL THEN ${first} WHEN ${r} IS NULL THEN ${last} `
+        + `WHEN ${l} < ${r} THEN ${before} WHEN ${l} > ${r} THEN ${after} ELSE 0 END, 0)`;
+    });
+    return `ARRAY_JOIN(TRANSFORM(ARRAY_SORT(COLLECT_LIST(CASE WHEN ${expression} IS NOT NULL THEN STRUCT(${fields}) END), `
+      + `(l, r) -> COALESCE(${comparisons.join(', ')}, 0)), s -> s.v), ${separator})`;
+  },
 };
 
 const DIALECTS: Record<DialectName, SqlDialect> = { postgres: POSTGRES, duckdb: DUCKDB, databricks: DATABRICKS };
