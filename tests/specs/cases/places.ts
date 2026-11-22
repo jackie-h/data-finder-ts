@@ -46,13 +46,13 @@ export function _filter_below_a_navigation(f: any) {
 export const PLACES_PERSON_FINDER_SPECS: SpecCase<PersonFinder>[] = [
   {
     name: 'a_filter_on_a_navigation_keeps_every_person',
-    query: (f: any) => _filter_keeps_every_person(f),
+    query: f => _filter_keeps_every_person(f),
     expected: { columns: ['Name', 'Locations Place'], rows: [
         ['Ann', 'Hoboken'],
         ['Ann', 'New York'],
         ['Bob', null],
         ['Cy', 'New York'],
-      ], sql: 'ON (t0.id = t1.person_id AND t1.place IN (\'Hoboken\', \'New York\'))', unexpectedSql: 'WHERE', skipGraphql: 'The GraphQL finder reads no filters of a navigation', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], sql: 'ON (t0.id = t1.person_id AND t1.place IN (\'Hoboken\', \'New York\'))', unexpectedSql: 'WHERE', skipGraphql: 'The GraphQL finder reads no filters of a navigation' },
   },
   {
     name: 'the_same_condition_in_the_query_drops_the_person_with_no_location',
@@ -65,37 +65,37 @@ export const PLACES_PERSON_FINDER_SPECS: SpecCase<PersonFinder>[] = [
   },
   {
     name: 'a_filtered_navigation_that_two_columns_read_is_one_join',
-    query: (f: any) => _one_filtered_navigation_read_twice(f),
+    query: f => _one_filtered_navigation_read_twice(f),
     expected: { columns: ['Name', 'Locations Place', 'Locations Visits'], rows: [
         ['Ann', 'Hoboken', 3],
         ['Ann', 'New York', 5],
         ['Bob', null, null],
         ['Cy', 'New York', 1],
-      ], unexpectedSql: 't2', skipGraphql: 'The GraphQL finder reads no filters of a navigation', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], unexpectedSql: 't2', skipGraphql: 'The GraphQL finder reads no filters of a navigation' },
   },
   {
     name: 'two_filters_on_one_navigation_are_two_joins',
-    query: (f: any) => _two_filters_on_one_navigation(f),
+    query: f => _two_filters_on_one_navigation(f),
     expected: { columns: ['Name', 'Locations Place', 'Locations Visits'], rows: [
         ['Ann', 'New York', 3],
         ['Ann', 'New York', 5],
         ['Bob', null, null],
         ['Cy', 'New York', 1],
-      ], sql: 't1.place = \'New York\'', skipGraphql: 'The GraphQL finder reads no filters of a navigation', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], sql: 't1.place = \'New York\'', skipGraphql: 'The GraphQL finder reads no filters of a navigation' },
   },
   {
     name: 'filters_with_equal_conditions_are_one_join_when_each_is_written_out',
-    query: (f: any) => _equal_filters_written_twice(f),
+    query: f => _equal_filters_written_twice(f),
     expected: { columns: ['Name', 'Locations Place', 'Locations Visits'], rows: [
         ['Ann', 'Hoboken', 3],
         ['Ann', 'New York', 5],
         ['Bob', null, null],
         ['Cy', 'New York', 1],
-      ], sql: 'ON (t0.id = t1.person_id AND t1.place IN (\'Hoboken\', \'New York\'))', unexpectedSql: 't2', skipGraphql: 'The GraphQL finder reads no filters of a navigation', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], sql: 'ON (t0.id = t1.person_id AND t1.place IN (\'Hoboken\', \'New York\'))', unexpectedSql: 't2', skipGraphql: 'The GraphQL finder reads no filters of a navigation' },
   },
   {
     name: 'filters_with_different_conditions_are_different_joins_even_for_the_same_values',
-    query: (f: any) => _same_values_in_another_order(f),
+    query: f => _same_values_in_another_order(f),
     expected: { columns: ['Name', 'Locations Place', 'Locations Visits'], rows: [
         ['Ann', 'Hoboken', 3],
         ['Ann', 'Hoboken', 5],
@@ -103,50 +103,50 @@ export const PLACES_PERSON_FINDER_SPECS: SpecCase<PersonFinder>[] = [
         ['Ann', 'New York', 5],
         ['Bob', null, null],
         ['Cy', 'New York', 1],
-      ], sql: 'LEFT OUTER JOIN geo.locations AS t2 ON (t0.id = t2.person_id AND t2.place IN (\'New York\', \'Hoboken\'))', skipGraphql: 'The GraphQL finder reads no filters of a navigation', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], sql: 'LEFT OUTER JOIN geo.locations AS t2 ON (t0.id = t2.person_id AND t2.place IN (\'New York\', \'Hoboken\'))', skipGraphql: 'The GraphQL finder reads no filters of a navigation' },
   },
   {
     name: 'the_same_condition_with_another_value_is_a_join_of_its_own',
-    query: (f: any) => _same_condition_with_another_value(f),
+    query: f => _same_condition_with_another_value(f),
     expected: { columns: ['Name', 'Locations Place', 'Locations Visits'], rows: [
         ['Ann', 'New York', 2],
         ['Bob', null, 4],
         ['Cy', 'New York', null],
-      ], sql: 't2.place = \'Boston\'', skipGraphql: 'The GraphQL finder reads no filters of a navigation', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], sql: 't2.place = \'Boston\'', skipGraphql: 'The GraphQL finder reads no filters of a navigation' },
   },
   {
     name: 'a_filter_of_a_filtered_navigation_holds_both_conditions',
-    query: (f: any) => _filter_of_a_filter(f),
+    query: f => _filter_of_a_filter(f),
     expected: { columns: ['Name', 'Locations Place', 'Locations Visits'], rows: [
         ['Ann', 'New York', 5],
         ['Bob', null, null],
         ['Cy', null, null],
-      ], sql: 'ON (t0.id = t1.person_id AND t1.place IN (\'Hoboken\', \'New York\') AND t1.visits > 3)', skipGraphql: 'The GraphQL finder reads no filters of a navigation', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], sql: 'ON (t0.id = t1.person_id AND t1.place IN (\'Hoboken\', \'New York\') AND t1.visits > 3)', skipGraphql: 'The GraphQL finder reads no filters of a navigation' },
   },
   {
     name: 'a_filter_on_a_navigation_below_another',
-    query: (f: any) => _filter_below_a_navigation(f),
+    query: f => _filter_below_a_navigation(f),
     expected: { columns: ['Name', 'Locations Place', 'Locations Region Name'], rows: [
         ['Ann', 'Boston', 'East'],
         ['Ann', 'Hoboken', 'East'],
         ['Ann', 'New York', 'East'],
         ['Bob', 'Boston', 'East'],
         ['Cy', 'New York', null],
-      ], skipGraphql: 'The GraphQL finder reads no filters of a navigation', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], skipGraphql: 'The GraphQL finder reads no filters of a navigation' },
   },
 ];
 
 export const PLACES_LOCATION_FINDER_SPECS: SpecCase<LocationFinder>[] = [
   {
     name: 'a_filter_on_a_navigation_to_one_leaves_the_others_without_it',
-    query: (f: any) => f.findAll([f.id(), f.person().filter((each: any) => each.name().eq('Ann')).name()]).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.person().filter((each: any) => each.name().eq('Ann')).name()]).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'Person Name'], rows: [
         [1, 'Ann'],
         [2, 'Ann'],
         [3, 'Ann'],
         [4, null],
         [5, null],
-      ], skipGraphql: 'The GraphQL finder reads no filters of a navigation', skip: 'a filter on a navigation is not ported yet (data-finder #284)' },
+      ], skipGraphql: 'The GraphQL finder reads no filters of a navigation' },
   },
 ];
 

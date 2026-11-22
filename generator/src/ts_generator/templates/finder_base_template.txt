@@ -49,6 +49,8 @@ export abstract class {{rcm.clazz.name}}RelatedFinderBase {
 {% for source_rcm, rpm, assoc, reverse_name in reverse_assocs %}
   abstract {{reverse_name}}(filter?: {{source_rcm.clazz.name}}Filter, dates?: NavigationDates): {{source_rcm.clazz.name}}RelatedFinderBase;
 {% endfor %}
+  /** A copy of this navigation that reaches only the rows `condition` holds for; the condition is in the ON of its join. */
+  abstract filter(condition: (each: {{rcm.clazz.name}}RelatedFinderBase) => Operation): {{rcm.clazz.name}}RelatedFinderBase;
   /** Filter to rows that have a matching {{rcm.clazz.name}} through this join. */
   abstract exists(): ExistsOperation;
   /** Filter to rows that have no matching {{rcm.clazz.name}} through this join. */
