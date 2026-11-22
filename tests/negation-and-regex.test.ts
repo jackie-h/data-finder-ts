@@ -12,7 +12,8 @@ describe('negating a condition', () => {
   it('writes NOT around the condition', () => {
     const name = new StringAttribute('N', 'N', 'VARCHAR', new Table('t', []));
     expect(sql(name, name.startsWith('MEDIUM POLISHED').not())).toContain("NOT (t0.N LIKE 'MEDIUM POLISHED%')");
-    expect(sql(name, name.eq('x').and(name.ne('y')).not())).toContain("NOT (t0.N = 'x' AND t0.N <> 'y')");
+    // a NOT over an equality is the other equality, so a missing value is different, and a NOT over AND or OR is pushed in
+    expect(sql(name, name.eq('x').and(name.ne('y')).not())).toContain("WHERE t0.N <> 'x' OR t0.N IS NULL OR t0.N = 'y'");
   });
 
   it('negating a negation is the condition again', () => {

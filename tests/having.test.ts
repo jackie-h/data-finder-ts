@@ -18,7 +18,7 @@ describe('having', () => {
   it('conditions are anded and calls accumulate', () => {
     const result = new FinderResult(null, null, [s, a.sum()], table, new NoOperation()).groupBy(s);
     const sql = result.having(a.sum().gt(3), s.ne('x')).having(a.max().lt(9)).toSql();
-    expect(sql.endsWith("HAVING SUM(t0.a) > 3 AND t0.s <> 'x' AND MAX(t0.a) < 9")).toBe(true);
+    expect(sql.endsWith("HAVING SUM(t0.a) > 3 AND (t0.s <> 'x' OR t0.s IS NULL) AND MAX(t0.a) < 9")).toBe(true);
   });
 
   it('string tests on a joined text', () => {

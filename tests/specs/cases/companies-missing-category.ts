@@ -25,58 +25,58 @@ export const COMPANIES_MISSING_CATEGORY_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'not_equal_on_a_function_matches_a_missing_value',
-    query: (f: any) => f.findAll([f.id()], f.category().toUpperCase().ne('FINANCE')).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().toUpperCase().ne('FINANCE')).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
         [4],
         [5],
-      ], sql: 'UPPER(t0.category) <> \'FINANCE\' OR UPPER(t0.category) IS NULL', skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ], sql: 'UPPER(t0.category) <> \'FINANCE\' OR UPPER(t0.category) IS NULL' },
   },
   {
     name: 'not_equal_on_an_expression_matches_a_missing_value',
-    query: (f: any) => f.findAll([f.id()], f.category().length().ne(7)).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().length().ne(7)).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
         [4],
         [5],
-      ], sql: 'LENGTH(t0.category) <> 7 OR LENGTH(t0.category) IS NULL', skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ], sql: 'LENGTH(t0.category) <> 7 OR LENGTH(t0.category) IS NULL' },
   },
   {
     name: 'not_equal_on_a_column_of_a_result_matches_a_missing_value',
-    query: (f: any) => f.findAll([f.id(), f.category().alias('category')]).filter((r: any) => r.category.ne('Finance')).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id(), f.category().alias('category')]).filter((r: any) => r.category.ne('Finance')).orderBy(f.id().ascending()),
     expected: { columns: ['Id', 'category'], rows: [
         [1, 'Technology'],
         [2, null],
         [4, null],
         [5, null],
-      ], skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ] },
   },
   {
     name: 'not_equal_between_two_columns_matches_a_missing_value',
-    query: (f: any) => f.findAll([f.id()], f.category().ne(f.name())).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().ne(f.name())).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
         [3],
         [4],
-      ], sql: 't0.category <> t0.name OR (t0.category IS NULL AND t0.name IS NOT NULL) OR (t0.category IS NOT NULL AND t0.name IS NULL)', skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ], sql: 't0.category <> t0.name OR (t0.category IS NULL AND t0.name IS NOT NULL) OR (t0.category IS NOT NULL AND t0.name IS NULL)' },
   },
   {
     name: 'not_equal_in_a_having_matches_a_missing_value',
-    query: (f: any) => f.findAll([f.category(), f.id().sum().alias('total')]).groupBy(f.category()).having(f.category().ne('Finance')).orderBy(f.id().sum().ascending()),
+    query: f => f.findAll([f.category(), f.id().sum().alias('total')]).groupBy(f.category()).having(f.category().ne('Finance')).orderBy(f.id().sum().ascending()),
     expected: { columns: ['Category', 'total'], rows: [
         ['Technology', 1],
         [null, 11],
-      ], sql: 'HAVING t0.category <> \'Finance\' OR t0.category IS NULL', skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ], sql: 'HAVING t0.category <> \'Finance\' OR t0.category IS NULL' },
   },
   {
     name: 'equal_between_two_columns_matches_two_missing_values',
-    query: (f: any) => f.findAll([f.id()], f.category().eq(f.name())).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().eq(f.name())).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [5],
-      ], sql: 't0.category = t0.name OR (t0.category IS NULL AND t0.name IS NULL)', skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ], sql: 't0.category = t0.name OR (t0.category IS NULL AND t0.name IS NULL)' },
   },
   {
     name: 'less_than_does_not_match_a_missing_value',
@@ -117,54 +117,54 @@ export const COMPANIES_MISSING_CATEGORY_SPECS: SpecCase<CompanyFinder>[] = [
   },
   {
     name: 'not_over_an_equality_matches_a_missing_value',
-    query: (f: any) => f.findAll([f.id()], f.category().eq('Finance').not()).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().eq('Finance').not()).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
         [4],
         [5],
-      ], sql: '<> \'Finance\' OR t0.category IS NULL', skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ], sql: '<> \'Finance\' OR t0.category IS NULL' },
   },
   {
     name: 'not_over_a_not_equal_does_not_match_a_missing_value',
-    query: (f: any) => f.findAll([f.id()], f.category().ne('Finance').not()).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().ne('Finance').not()).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [3],
-      ], skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ] },
   },
   {
     name: 'not_over_an_equality_of_two_columns_does_not_match_two_missing_values',
-    query: (f: any) => f.findAll([f.id()], f.category().eq(f.name()).not()).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().eq(f.name()).not()).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
         [3],
         [4],
-      ], skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ] },
   },
   {
     name: 'not_over_a_not_equal_of_two_columns_matches_two_missing_values',
-    query: (f: any) => f.findAll([f.id()], f.category().ne(f.name()).not()).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().ne(f.name()).not()).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [5],
-      ], skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ] },
   },
   {
     name: 'not_over_an_and_is_pushed_in_to_each_side',
-    query: (f: any) => f.findAll([f.id()], f.category().eq('Finance').and(f.id().lt(5)).not()).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().eq('Finance').and(f.id().lt(5)).not()).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
         [2],
         [4],
         [5],
-      ], skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ] },
   },
   {
     name: 'not_over_an_ordering_does_not_match_a_missing_value',
-    query: (f: any) => f.findAll([f.id()], f.category().length().lt(8).not()).orderBy(f.id().ascending()),
+    query: f => f.findAll([f.id()], f.category().length().lt(8).not()).orderBy(f.id().ascending()),
     expected: { columns: ['Id'], rows: [
         [1],
-      ], skip: 'a != and == that match a missing value are not ported yet (data-finder #291-#297)' },
+      ] },
   },
   {
     name: 'equal_does_not_match_a_missing_value',

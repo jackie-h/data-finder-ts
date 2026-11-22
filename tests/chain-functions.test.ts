@@ -58,7 +58,7 @@ describe('comparing an expression', () => {
   it('compares with a value', () => {
     expect(where(name.toUpperCase().eq('ACME CORP'))).toBe("UPPER(t0.name) = 'ACME CORP'");
     expect(where(name.length().gt(10))).toBe('LENGTH(t0.name) > 10');
-    expect(where(name.toLowerCase().ne('acme corp'))).toBe("LOWER(t0.name) <> 'acme corp'");
+    expect(where(name.toLowerCase().ne('acme corp'))).toBe("LOWER(t0.name) <> 'acme corp' OR LOWER(t0.name) IS NULL");   // a missing value is different
     expect(where(name.length().lte(3))).toBe('LENGTH(t0.name) <= 3');
     expect(where(name.length().gte(3))).toBe('LENGTH(t0.name) >= 3');
     expect(where(name.length().lt(3))).toBe('LENGTH(t0.name) < 3');

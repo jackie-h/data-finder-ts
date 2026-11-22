@@ -1132,7 +1132,7 @@ class SQLQueryGenerator {
       this._collectRequiredJoins(query.having, havingJoins);
       for (const node of havingJoins.values()) this._addJoin(node);
       // HAVING filters the grouped result, which Legend does not guard: it is a filter on projected columns
-      this._having = this.buildFilter(query.having);
+      this._having = this.buildFilter(this._guarded(query.having, false));
     }
     this._orderByParts = (ordered?.orderBy ?? []).map(s =>
       this._sortExpression(s.column) + sortSuffix(s),
@@ -1233,24 +1233,74 @@ class SQLQueryGenerator {
   /**
    * The condition with an explicit `IS NOT NULL` before each ordering or pattern comparison on a value that can be
    * missing, as Legend writes it for what a query asks of a class. The guard changes no row. A `<>` of a column and a value
-   * also matches a missing value, as Legend writes it for any column: `<> x OR IS NULL`. It is not added to a
-   * join's own filter (its milestoning dates and property values) or to HAVING, which are not that, so they are
-   * never passed through here.
+   * also matches a missing value, for any column or expression: `<> x OR IS NULL`, and one of two columns that is missing matches the
+   * other that is not. An `=` of two columns that can be missing also matches when both are. It is not added to a join's own filter
+   * (its milestoning dates and property values), which is not that, so it is never passed through here. HAVING gets the `<>`
+   * alternative only (`guard` false): its own ordering comparisons are left as written.
    */
-  private _guarded(op: RelationalOperationElement): RelationalOperationElement {
+  private _guarded(op: RelationalOperationElement, guard = true): RelationalOperationElement {
     if (op instanceof LogicalOperation) {
-      return new LogicalOperation(this._guarded(op.left), op.operator, this._guarded(op.right));
+      return new LogicalOperation(this._guarded(op.left, guard), op.operator, this._guarded(op.right, guard));
     }
-    if (op instanceof ComparisonOperation && GUARDED_COMPARISONS.has(op.operator) && op.left instanceof ColumnWithJoin
+    if (op instanceof NotOperation) {
+      const negated = this._negated(op.element);
+      return negated === null ? op : this._guarded(negated, guard);
+    }
+    if (guard && op instanceof ComparisonOperation && GUARDED_COMPARISONS.has(op.operator) && op.left instanceof ColumnWithJoin
       && this._resolveOptional(op.left)) {
       return new LogicalOperation(new IsNotNullOperation(op.left), LogicalOperator.AND, op);
     }
-    if (op instanceof ComparisonOperation && op.operator === ComparisonOperator.NOT_EQUAL && op.left instanceof ColumnWithJoin
-      && op.right instanceof ConstantOperation) {
-      // a missing value is different from any value, as Legend writes it: <> x OR is null
+    if (op instanceof ComparisonOperation && op.operator === ComparisonOperator.NOT_EQUAL
+      && !(op.left instanceof ConstantOperation) && op.right instanceof ConstantOperation) {
+      // a missing value is different from any value, as Legend writes it: <> x OR is null, for a column and for a function or other
+      // expression of one, whose value is missing when a column it reads is
       return new LogicalOperation(op, LogicalOperator.OR, new IsNullOperation(op.left));
     }
+    if (op instanceof ComparisonOperation && op.operator === ComparisonOperator.NOT_EQUAL
+      && !(op.left instanceof ConstantOperation) && !(op.right instanceof ConstantOperation)) {
+      // two values are different when one is missing and the other is not, as well as when they differ
+      const oneMissing = new LogicalOperation(
+        new LogicalOperation(new IsNullOperation(op.left), LogicalOperator.AND, new IsNotNullOperation(op.right)),
+        LogicalOperator.OR,
+        new LogicalOperation(new IsNotNullOperation(op.left), LogicalOperator.AND, new IsNullOperation(op.right)));
+      return new LogicalOperation(op, LogicalOperator.OR, oneMissing);
+    }
+    if (op instanceof ComparisonOperation && op.operator === ComparisonOperator.EQUAL
+      && !(op.left instanceof ConstantOperation) && !(op.right instanceof ConstantOperation)
+      && this._mayBeMissing(op.left) && this._mayBeMissing(op.right)) {
+      // two missing values are the same: a = b OR both are missing, as IS NOT DISTINCT FROM is
+      return new LogicalOperation(op, LogicalOperator.OR, new LogicalOperation(new IsNullOperation(op.left), LogicalOperator.AND, new IsNullOperation(op.right)));
+    }
     return op;
+  }
+
+  /**
+   * `NOT op` as a condition with no NOT, when it can be, or null. `NOT (a = b)` is `a <> b`, so that a missing value is different, as the
+   * `<>` says; `NOT (a <> b)` is `a = b`, and a NOT over AND or OR is pushed in to what they join. A NOT over an ordering or a pattern is
+   * left as it is: a missing value is not less than anything, and not greater either.
+   */
+  private _negated(op: RelationalOperationElement): RelationalOperationElement | null {
+    if (op instanceof ComparisonOperation && (op.operator === ComparisonOperator.EQUAL || op.operator === ComparisonOperator.NOT_EQUAL)) {
+      return new ComparisonOperation(op.left, op.operator === ComparisonOperator.EQUAL ? ComparisonOperator.NOT_EQUAL : ComparisonOperator.EQUAL, op.right);
+    }
+    if (op instanceof NotOperation) return op.element;
+    if (op instanceof LogicalOperation) {
+      const left = this._negated(op.left);
+      const right = this._negated(op.right);
+      if (left === null && right === null) return null;
+      return new LogicalOperation(left ?? new NotOperation(op.left), op.operator === LogicalOperator.AND ? LogicalOperator.OR : LogicalOperator.AND,
+        right ?? new NotOperation(op.right));
+    }
+    return null;
+  }
+
+  /** Whether `op` can be missing: a column that is nullable, or read through a join that can leave it out, can; a count cannot; anything else is taken to. */
+  private _mayBeMissing(op: RelationalOperationElement): boolean {
+    if (op instanceof CountAllOperation
+      || (op instanceof AggregateOperation && (op.operator === AggregateOperator.COUNT || op.operator === AggregateOperator.COUNT_DISTINCT))) {
+      return false;
+    }
+    return op instanceof ColumnWithJoin ? this._resolve(op).column.nullable || this._resolveOptional(op) : true;
   }
 
   /** Whether the value `op` reads can be missing, in the join or embedded form that is used for it. */
