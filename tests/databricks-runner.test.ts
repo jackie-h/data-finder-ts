@@ -62,7 +62,7 @@ describe('what it sends', () => {
     });
     expect(post.body!.statement).toBe(query().toSql('databricks'));
     expect(post.body!.statement).toContain('AS `Company`');
-    expect(post.body!.statement).toContain('ORDER BY t0.name DESC NULLS FIRST');
+    expect(post.body!.statement).toContain('ORDER BY t0.name DESC NULLS LAST');
   });
 
   it('sends the HAVING of a grouped query', async () => {

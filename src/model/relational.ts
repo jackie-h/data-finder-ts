@@ -164,10 +164,10 @@ export abstract class ConstantOperation extends RelationalOperationElement imple
   alias(name: string): Alias { return new Alias(this, name); }
 
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   /** @internal The expression a function of this constant applies to: the constant itself. */
   functionInput(): RelationalOperationElement { return this; }
@@ -325,10 +325,10 @@ export class WindowSpecification {
 
 export class AggregateOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   constructor(
     element: RelationalOperationElement,
@@ -405,10 +405,10 @@ export enum WindowFunction {
 
 export class WindowFunctionOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   constructor(
     element: RelationalOperationElement | null,
@@ -427,10 +427,10 @@ export class WindowFunctionOperation extends UnaryOperation implements Sortable 
 
 export class ScalarFunctionOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   constructor(
     element: RelationalOperationElement,
@@ -448,10 +448,10 @@ export class ScalarFunctionOperation extends UnaryOperation implements Sortable 
 
 export class DateExtractOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   constructor(
     element: RelationalOperationElement,
@@ -471,10 +471,10 @@ export class DateTruncOperation extends UnaryOperation implements Sortable {
   ) { super(element); }
 
   /** Sort by this expression, earliest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, latest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   comparisonOperand(): RelationalOperationElement { return this; }
 }
@@ -488,10 +488,10 @@ export class RecentDayOfWeekOperation extends DateTruncOperation {
 
 export class DateArithmeticOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   constructor(
     element: RelationalOperationElement,
@@ -506,10 +506,10 @@ export class DateArithmeticOperation extends UnaryOperation implements Sortable 
 
 export class DateDiffOperation extends UnaryOperation implements Sortable {
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   constructor(
     element: RelationalOperationElement,
@@ -913,12 +913,37 @@ export class ColumnWithJoin extends RelationalOperationElement {
   }
 }
 
+/** Where a missing value goes in a sort: `'first'` or `'last'`. */
+export type NullsPlacement = 'first' | 'last';
+
+/** What a sort can be told besides its direction. */
+export interface SortOptions {
+  /** Where a missing value goes. By default it is the smallest value: first when sorting ascending and last when sorting descending. */
+  nulls?: NullsPlacement;
+}
+
+/**
+ * Whether a missing value comes first. By default a missing value is the smallest value, as in Legend's databases: first when sorting
+ * ascending and last when sorting descending. `nulls` is `'first'` or `'last'` to say otherwise.
+ */
+export function nullsFirst(direction: SortDirection, nulls?: NullsPlacement): boolean {
+  if (nulls === undefined) return direction === SortDirection.ASC;
+  if (nulls !== 'first' && nulls !== 'last') throw new Error(`nulls is 'first' or 'last', not '${String(nulls)}'`);
+  return nulls === 'first';
+}
+
 export class SortOperation {
+  readonly nullsFirst: boolean;
+
   constructor(
     /** What the rows are ordered by: a column, or an expression such as an aggregate. */
     readonly column: RelationalOperationElement,
     readonly direction: SortDirection,
-  ) {}
+    /** Whether a missing value comes first; by default as a missing value is the smallest value. */
+    nullsFirst?: boolean,
+  ) {
+    this.nullsFirst = nullsFirst ?? direction === SortDirection.ASC;
+  }
 }
 
 export class CountAllOperation extends RelationalOperationElement implements Aliasable, Sortable {
@@ -926,10 +951,10 @@ export class CountAllOperation extends RelationalOperationElement implements Ali
   alias(name: string): Alias { return new Alias(this, name); }
 
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   constructor(readonly table: string) { super(); }
 
@@ -947,10 +972,10 @@ export class Alias extends RelationalOperationElement implements Aliasable, Sort
   alias(name: string): Alias { return new Alias(this.element, name); }
 
   /** Sorts by the column the alias names. */
-  ascending(): SortOperation { return new SortOperation(this.element, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this.element, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sorts by the column the alias names. */
-  descending(): SortOperation { return new SortOperation(this.element, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this.element, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 }
 
 /** `CASE WHEN condition THEN then ELSE fallback END`; without a `fallback` the value is NULL. */
@@ -1466,10 +1491,10 @@ export class ArithmeticOperation<K extends NumberKind = NumberKind> extends Bina
   ) { super(left, right); }
 
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   arithmeticOperand(): RelationalOperationElement { return this; }
   comparisonOperand(): RelationalOperationElement { return this; }
@@ -1521,10 +1546,10 @@ export class ConcatOperation extends Operation implements Sortable {
   concat(...more: ConcatPart[]): ConcatOperation { return concat(this, ...more); }
 
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   comparisonOperand(): RelationalOperationElement { return this; }
 }
@@ -1699,10 +1724,10 @@ export class IntervalOperation extends BinaryOperation implements Sortable {
   }
 
   /** Sort by this expression, smallest first. */
-  ascending(): SortOperation { return new SortOperation(this, SortDirection.ASC); }
+  ascending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.ASC, nullsFirst(SortDirection.ASC, options?.nulls)); }
 
   /** Sort by this expression, largest first. */
-  descending(): SortOperation { return new SortOperation(this, SortDirection.DESC); }
+  descending(options?: SortOptions): SortOperation { return new SortOperation(this, SortDirection.DESC, nullsFirst(SortDirection.DESC, options?.nulls)); }
 
   comparisonOperand(): RelationalOperationElement { return this; }
   aggregateKind(): AggregateConstructor<IntervalAggregateOperation> { return IntervalAggregateOperation; }

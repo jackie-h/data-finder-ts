@@ -218,7 +218,7 @@ describe('toView', () => {
     const view = query([symbol(), price().rank({ method: 'first', orderBy: price().ascending() })]).toView('v', 'reporting');
     expect(view.columnNames()).toEqual(['symbol', 'row_number', 'in_z', 'out_z']);
     expect(view.groupBy).toEqual([]);
-    expect(view.toSql()).toContain('ROW_NUMBER() OVER (ORDER BY t0.price ASC)');
+    expect(view.toSql()).toContain('ROW_NUMBER() OVER (ORDER BY t0.price ASC NULLS FIRST)');
   });
 
   it.each([
@@ -422,7 +422,7 @@ describe('a view created in DuckDB', () => {
     expect(sql).toContain('GROUP BY');
     await conn.run(sql);
     // AAPL and GOOG share a validity and an account version, so they total together; IBM is its own group
-    expect(await rows('SELECT account_name, total_price FROM reporting.account_totals ORDER BY total_price DESC')).toEqual([['Acme Old', 30], ['Acme New', 5]]);
+    expect(await rows('SELECT account_name, total_price FROM reporting.account_totals ORDER BY total_price DESC NULLS LAST')).toEqual([['Acme Old', 30], ['Acme New', 5]]);
     expect((await rows('DESCRIBE reporting.account_totals')).map(c => c[0])).toEqual(['account_name', 'total_price', 'in_z', 'out_z']);
   });
 

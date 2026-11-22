@@ -284,12 +284,12 @@ export const TRADE_GROUP_BY_FINDER_SPECS: SpecCase<TradeFinder>[] = [
   },
   {
     name: 'join_full_keeps_the_rows_of_both_that_find_no_match',
-    query: (f: any) => _full_join_of_two_accounts_to_the_trades_over_350(f),
+    query: f => _full_join_of_two_accounts_to_the_trades_over_350(f),
     expected: { columns: ['total_account', 'dear_sym'], rows: [
         [null, 'GS'],
         ['Alpha Fund', null],
         ['Beta Fund', 'TSLA'],
-      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet', skip: 'where a missing value sorts, and nulls, are not ported yet (data-finder #285)' },
+      ], skipGraphql: 'The GraphQL finder cannot read a query as a relation yet' },
   },
 ];
 

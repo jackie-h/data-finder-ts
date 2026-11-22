@@ -16,22 +16,22 @@ const table = new Table('t', [new Column('category', 'VARCHAR', new Table('t', [
 describe('the SQL', () => {
   it('orders by an aggregate', () => {
     const sql = toSql(null, null, [key, n.count()], table, new NoOperation(), [n.count().descending(), key.ascending()], [key]);
-    expect(sql.endsWith('GROUP BY t0.category ORDER BY COUNT(t0.id) DESC, t0.category ASC')).toBe(true);
+    expect(sql.endsWith('GROUP BY t0.category ORDER BY COUNT(t0.id) DESC NULLS LAST, t0.category ASC NULLS FIRST')).toBe(true);
   });
 
   it('orders by a sum', () => {
     const sql = toSql(null, null, [n.sum()], table, new NoOperation(), [n.sum().ascending()]);
-    expect(sql.endsWith('ORDER BY SUM(t0.id) ASC')).toBe(true);
+    expect(sql.endsWith('ORDER BY SUM(t0.id) ASC NULLS FIRST')).toBe(true);
   });
 
   it('orders by a function of a column', () => {
     const sql = toSql(null, null, [key], table, new NoOperation(), [key.toUpperCase().descending()]);
-    expect(sql.endsWith('ORDER BY UPPER(t0.category) DESC')).toBe(true);
+    expect(sql.endsWith('ORDER BY UPPER(t0.category) DESC NULLS LAST')).toBe(true);
   });
 
   it('an alias sorts by the column it names', () => {
     const sql = toSql(null, null, [n.sum().alias('Total')], table, new NoOperation(), [n.sum().alias('Total').ascending()]);
-    expect(sql.endsWith('ORDER BY SUM(t0.id) ASC')).toBe(true);
+    expect(sql.endsWith('ORDER BY SUM(t0.id) ASC NULLS FIRST')).toBe(true);
   });
 });
 
@@ -71,7 +71,7 @@ describe('against DuckDB', () => {
   it('an aggregate descending then a column', async () => {
     const query = f.findAll([f.category(), f.id().count()]).groupBy(f.category())
       .orderBy(f.id().count().descending(), f.category().ascending());
-    expect(query.toSql()).toContain('ORDER BY COUNT(t0.id) DESC, t0.category ASC');
+    expect(query.toSql()).toContain('ORDER BY COUNT(t0.id) DESC NULLS LAST, t0.category ASC NULLS FIRST');
     expect(plain(await query.toRows())).toEqual([['Finance', 2], ['Technology', 2], ['Manufacturing', 1]]);
   });
 

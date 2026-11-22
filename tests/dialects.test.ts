@@ -12,10 +12,10 @@ import { seeds } from './spec-seeds';
 import { CompanyFinder } from './generated_examples/companies/CompanyFinder';
 import { CORPUS, DIALECTS } from './dialect-corpus';
 import { constant } from '../src/datafinder';
-import { DATABRICKS, DUCKDB, POSTGRES, dialectOf } from '../src/datafinder/dialect';
+import { DATABRICKS, DUCKDB, POSTGRES, dialectOf, sortSuffix } from '../src/datafinder/dialect';
 import { toSql } from '../src/datafinder/sql-generator';
 import { DateAttribute, DoubleAttribute, StringAttribute } from '../src/datafinder/typed-attributes';
-import { Column, DatePart, NoOperation, SortDirection, Table } from '../src/model/relational';
+import { Column, DatePart, NoOperation, SortOperation, Table } from '../src/model/relational';
 
 const name = new StringAttribute('Name', 'name', 'VARCHAR', new Table('t', []));
 const price = new DoubleAttribute('Price', 'price', 'DOUBLE', new Table('t', []));
@@ -63,21 +63,24 @@ describe('a backslash in a LIKE pattern', () => {
 });
 
 describe('null order', () => {
-  it('is spelled out where the database differs from Postgres, so a sort is the same everywhere', () => {
-    const asc = [name.ascending()];
-    const desc = [name.descending()];
-    expect(sql('postgres', name, asc)).toMatch(/ORDER BY t0\.name ASC$/);
-    expect(sql('postgres', name, desc)).toMatch(/ORDER BY t0\.name DESC$/);
-    expect(sql('duckdb', name, asc)).toMatch(/ORDER BY t0\.name ASC$/);
-    expect(sql('duckdb', name, desc)).toMatch(/ORDER BY t0\.name DESC NULLS FIRST$/);
-    expect(sql('databricks', name, asc)).toMatch(/ORDER BY t0\.name ASC NULLS LAST$/);
-    expect(sql('databricks', name, desc)).toMatch(/ORDER BY t0\.name DESC NULLS FIRST$/);
+  it('is spelled out on every sort, whatever the database, so a sort is the same everywhere', () => {
+    // a missing value is the smallest value: first when ascending and last when descending
+    for (const dialect of ['postgres', 'duckdb', 'databricks'] as const) {
+      expect(sql(dialect, name, [name.ascending()]), dialect).toMatch(/ORDER BY t0\.name ASC NULLS FIRST$/);
+      expect(sql(dialect, name, [name.descending()]), dialect).toMatch(/ORDER BY t0\.name DESC NULLS LAST$/);
+    }
+  });
+
+  it('nulls says otherwise', () => {
+    expect(sql('postgres', name, [name.ascending({ nulls: 'last' })])).toMatch(/ORDER BY t0\.name ASC NULLS LAST$/);
+    expect(sql('postgres', name, [name.descending({ nulls: 'first' })])).toMatch(/ORDER BY t0\.name DESC NULLS FIRST$/);
+    expect(() => name.ascending({ nulls: 'middle' as never })).toThrow("nulls is 'first' or 'last'");
   });
 
   it('applies inside a window and a string aggregate too', () => {
     const windowed = price.rank({ orderBy: price.descending() });
-    expect(sql('databricks', windowed)).toContain('ORDER BY t0.price DESC NULLS FIRST)');
-    expect(sql('databricks', name.join(',', [name.ascending()]))).toContain('WITHIN GROUP (ORDER BY t0.name ASC NULLS LAST)');
+    expect(sql('databricks', windowed)).toContain('ORDER BY t0.price DESC NULLS LAST)');
+    expect(sql('databricks', name.join(',', [name.ascending()]))).toContain('WITHIN GROUP (ORDER BY t0.name ASC NULLS FIRST)');
   });
 });
 
@@ -89,9 +92,9 @@ describe('what differs', () => {
   });
 
   it('string aggregate', () => {
-    expect(sql('postgres', name.join(', ', [name.ascending()]))).toContain("STRING_AGG(t0.name, ', ' ORDER BY t0.name ASC)");
-    expect(sql('duckdb', name.join(', ', [name.ascending()]))).toContain("STRING_AGG(t0.name, ', ' ORDER BY t0.name ASC)");
-    expect(sql('databricks', name.join(', ', [name.ascending()]))).toContain("LISTAGG(t0.name, ', ') WITHIN GROUP (ORDER BY t0.name ASC NULLS LAST)");
+    expect(sql('postgres', name.join(', ', [name.ascending()]))).toContain("STRING_AGG(t0.name, ', ' ORDER BY t0.name ASC NULLS FIRST)");
+    expect(sql('duckdb', name.join(', ', [name.ascending()]))).toContain("STRING_AGG(t0.name, ', ' ORDER BY t0.name ASC NULLS FIRST)");
+    expect(sql('databricks', name.join(', ', [name.ascending()]))).toContain("LISTAGG(t0.name, ', ') WITHIN GROUP (ORDER BY t0.name ASC NULLS FIRST)");
     expect(sql('databricks', name.join('|'))).toContain("LISTAGG(t0.name, '|')");
     expect(sql('databricks', name.join('|'))).not.toContain('WITHIN GROUP');
   });
@@ -124,9 +127,6 @@ describe('what differs', () => {
     expect(() => POSTGRES.dateDiff(DatePart.DOW, 'a', 'b')).toThrow(/not DOW/);
   });
 
-  it('direction text', () => {
-    expect(POSTGRES.orderDirection(SortDirection.ASC)).toBe(' ASC');
-  });
 });
 
 describe('DuckDB runs what it is given', () => {
@@ -149,9 +149,13 @@ describe('DuckDB runs what it is given', () => {
     expect((await run(query.toSql())).map(r => r[0])).toEqual(['Acme Corp', 'Beta Corp']);
   });
 
-  it('DESC puts NULLs first, as Postgres does', async () => {
-    const rows = await run('SELECT x FROM (VALUES (1), (NULL), (3)) AS v(x) ORDER BY x' + DUCKDB.orderDirection(SortDirection.DESC));
-    expect(rows.map(r => r[0])).toEqual([null, 3, 1]);
+  it('a missing value is the smallest: first ascending, last descending', async () => {
+    const values = '(VALUES (1), (NULL), (3)) AS v(x)';
+    const ordered = async (sort: SortOperation) => (await run(`SELECT x FROM ${values} ORDER BY x` + sortSuffix(sort))).map(r => r[0]);
+    expect(await ordered(f.id().ascending())).toEqual([null, 1, 3]);
+    expect(await ordered(f.id().descending())).toEqual([3, 1, null]);
+    expect(await ordered(f.id().ascending({ nulls: 'last' }))).toEqual([1, 3, null]);
+    expect(await ordered(f.id().descending({ nulls: 'first' }))).toEqual([null, 3, 1]);
   });
 });
 

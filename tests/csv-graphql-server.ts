@@ -234,16 +234,17 @@ function applyWhere(rows: Row[], query: string): Row[] {
   return rows.filter(r => evalWhere(where, r));
 }
 
-/** { a: { b: asc } } gives [["a", "b"], "asc"]. */
-function orderPath(item: any): [string[], string] {
+/** { a: { b: asc_nulls_first } } gives [["a", "b"], "asc", true]. */
+function orderPath(item: any): [string[], string, boolean | null] {
   const path: string[] = [];
   while (item !== null && typeof item === 'object' && Object.keys(item).length === 1) {
     const [[field, inner]] = Object.entries(item);
     path.push(field);
     item = inner;
   }
-  if (path.length === 0 || (item !== 'asc' && item !== 'desc')) throw new GraphQLServerError('invalid order_by expression');
-  return [path, item];
+  const match = typeof item === 'string' ? /^(asc|desc)(?:_nulls_(first|last))?$/.exec(item) : null;
+  if (path.length === 0 || match === null) throw new GraphQLServerError('invalid order_by expression');
+  return [path, match[1], match[2] === undefined ? null : match[2] === 'first'];
 }
 
 function valueAt(row: Row, path: string[]): any {
@@ -262,14 +263,16 @@ function applyOrderBy(rows: Row[], query: string): Row[] {
   if (!orderStr) return rows;
   const [orderList] = parseArray(tokenize(orderStr), 0);
   for (const item of [...orderList].reverse()) {
-    const [path, direction] = orderPath(item);
+    const [path, direction, nullsFirst] = orderPath(item);
     const sign = direction === 'desc' ? -1 : 1;
-    // nulls sort last when ascending, so first when descending
+    // Hasura's own default: nulls sort last when ascending, so first when descending
+    const first = nullsFirst ?? direction === 'desc';
     rows = [...rows].sort((a, b) => {
       const x = valueAt(a, path);
       const y = valueAt(b, path);
       const nulls = (x === null ? 1 : 0) - (y === null ? 1 : 0);
-      return sign * (nulls || (x < y ? -1 : x > y ? 1 : 0));
+      if (nulls !== 0) return first ? -nulls : nulls;
+      return sign * (x < y ? -1 : x > y ? 1 : 0);
     });
   }
   return rows;
